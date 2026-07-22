@@ -5,7 +5,7 @@
 // A date like "2020-05-14" always means 2020-05-14T00:00:00Z regardless of the
 // viewer's local timezone, so a dataset renders identically on every device.
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export type Precision = "exact" | "day" | "month" | "year" | "circa";
 
@@ -85,4 +85,8 @@ export interface TimelineDataset {
   rows: TimelineRow[];
   entities: Entity[];
   entries: TimelineEntry[];
+  // The Person who is "you" — set once the identity onboarding step completes.
+  // Unambiguous even though a Group.personId alone could belong to someone
+  // else's solo group (e.g. a partner you've added).
+  selfPersonId?: string;
 }
