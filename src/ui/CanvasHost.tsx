@@ -40,6 +40,8 @@ export function CanvasHost({ layout, railContentRef, engineRef }: CanvasHostProp
       },
     });
     engineRef.current = engine;
+    // Exposed for end-to-end tests driving the canvas by coordinates.
+    (window as unknown as { __chronicleEngine?: TimelineEngine }).__chronicleEngine = engine;
 
     const feedEngine = () => {
       const state = appStore.getState();

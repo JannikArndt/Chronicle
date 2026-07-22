@@ -91,6 +91,9 @@ export class TimelineEngine {
   private pinchStart?: { distance: number; midX: number; scale: TimeScale };
   private hoverX: number | null = null;
   private hatchPattern: CanvasPattern | null = null;
+  // Removes all canvas listeners on destroy — without this, React StrictMode's
+  // dev double-mount leaves a zombie engine still handling pointer input.
+  private eventAbort = new AbortController();
   // Where the user last clicked in an empty selected row — that's where its
   // single "+" appears (§6).
   private emptyRowClick: { rowId: string; ms: number } | null = null;
@@ -126,7 +129,9 @@ export class TimelineEngine {
   // ---------- public API ----------
 
   setInput(input: EngineInput): void {
-    if (input.selectedRowId !== this.input.selectedRowId) this.emptyRowClick = null;
+    // Forget the remembered click position once its row is deselected —
+    // but not on the state update caused by that very click.
+    if (this.emptyRowClick && input.selectedRowId !== this.emptyRowClick.rowId) this.emptyRowClick = null;
     this.input = input;
     this.requestDraw();
   }
@@ -163,6 +168,7 @@ export class TimelineEngine {
   destroy(): void {
     this.destroyed = true;
     cancelAnimationFrame(this.rafHandle);
+    this.eventAbort.abort();
   }
 
   // ---------- internals ----------
@@ -209,7 +215,7 @@ export class TimelineEngine {
           moved: false,
         };
       }
-    });
+    }, { signal: this.eventAbort.signal });
 
     this.canvas.addEventListener("pointermove", (event) => {
       if (this.activePointers.has(event.pointerId)) {
@@ -240,7 +246,7 @@ export class TimelineEngine {
       this.scrollY = this.pointerDown.scrollY; // setScrollY clamps + syncs
       this.setScrollY(this.pointerDown.scrollY - dy);
       this.requestDraw();
-    });
+    }, { signal: this.eventAbort.signal });
 
     const endPointer = (event: PointerEvent) => {
       const wasTap = this.pointerDown && !this.pointerDown.moved;
@@ -249,19 +255,19 @@ export class TimelineEngine {
       if (wasTap) this.handleClick(event.offsetX, event.offsetY);
       this.pointerDown = undefined;
     };
-    this.canvas.addEventListener("pointerup", endPointer);
+    this.canvas.addEventListener("pointerup", endPointer, { signal: this.eventAbort.signal });
     this.canvas.addEventListener("pointercancel", (event) => {
       this.activePointers.delete(event.pointerId);
       if (this.activePointers.size < 2) this.pinchStart = undefined;
       this.pointerDown = undefined;
-    });
+    }, { signal: this.eventAbort.signal });
 
     this.canvas.addEventListener("pointerleave", () => {
       if (this.hoverX !== null) {
         this.hoverX = null;
         this.requestDraw();
       }
-    });
+    }, { signal: this.eventAbort.signal });
 
     this.canvas.addEventListener(
       "wheel",
@@ -274,7 +280,7 @@ export class TimelineEngine {
           this.panPixels(event.deltaX, event.deltaY);
         }
       },
-      { passive: false },
+      { passive: false, signal: this.eventAbort.signal },
     );
   }
 
