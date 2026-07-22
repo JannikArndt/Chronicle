@@ -28,8 +28,8 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
   const [placeText, setPlaceText] = useState("");
   const [untilText, setUntilText] = useState("");
   const [setup, setSetup] = useState<{ personId: string; placesRowId: string } | null>(null);
-  const [nextStartMs, setNextStartMs] = useState<number | null>(null);
-  const [pendingPlaceLabel, setPendingPlaceLabel] = useState<string | null>(null);
+  const [startMsByIteration, setStartMsByIteration] = useState<Record<number, number>>({});
+  const [placeLabelByIteration, setPlaceLabelByIteration] = useState<Record<number, string>>({});
 
   const commitName = () => {
     const trimmed = name.trim();
@@ -43,39 +43,42 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     const parsed = parseDateInput(birthYearText.trim());
     if (!parsed) return;
     if (setup) updatePerson(setup.personId, { birthDate: parsed.ms });
-    setNextStartMs(parsed.ms);
+    setStartMsByIteration((prev) => ({ ...prev, 1: parsed.ms }));
     flow.advance({ kind: "place", iteration: 1 });
   };
 
   const commitPlace = () => {
     const trimmed = placeText.trim();
     if (trimmed === "" || flow.phase.kind !== "place") return;
-    setPendingPlaceLabel(trimmed);
+    const iteration = flow.phase.iteration;
+    setPlaceLabelByIteration((prev) => ({ ...prev, [iteration]: trimmed }));
     setPlaceText("");
-    flow.advance({ kind: "until", iteration: flow.phase.iteration });
+    flow.advance({ kind: "until", iteration });
   };
 
   const commitUntil = () => {
     const trimmed = untilText.trim();
     const endParsed = trimmed === "" ? null : parseDateInput(trimmed);
     if (trimmed !== "" && !endParsed) return;
-    if (!setup || nextStartMs === null || pendingPlaceLabel === null || flow.phase.kind !== "until") return;
+    if (flow.phase.kind !== "until") return;
+    const iteration = flow.phase.iteration;
+    const startMs = startMsByIteration[iteration];
+    const label = placeLabelByIteration[iteration];
+    if (!setup || startMs === undefined || label === undefined) return;
 
     addOnboardingPlaceEntry(setup.placesRowId, {
-      label: pendingPlaceLabel,
-      startMs: nextStartMs,
+      label,
+      startMs,
       endMs: endParsed?.ms,
     });
     setUntilText("");
-    const finishedIteration = flow.phase.iteration;
-    setPendingPlaceLabel(null);
 
     if (!endParsed) {
       onFinished();
       return;
     }
-    setNextStartMs(endParsed.ms);
-    flow.advance({ kind: "place", iteration: finishedIteration + 1 });
+    setStartMsByIteration((prev) => ({ ...prev, [iteration + 1]: endParsed.ms }));
+    flow.advance({ kind: "place", iteration: iteration + 1 });
   };
 
   switch (flow.phase.kind) {
@@ -142,7 +145,7 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     case "until":
       return (
         <AssistantStepShell
-          prompt={`Until when did you live in ${pendingPlaceLabel ?? "this place"}?`}
+          prompt={`Until when did you live in ${placeLabelByIteration[flow.phase.iteration] ?? "this place"}?`}
           hint="Leave blank if you still live there. You can fine-tune the exact month or day later."
           stepIndex={flow.stepIndex}
           onBack={flow.canGoBack ? flow.back : undefined}
