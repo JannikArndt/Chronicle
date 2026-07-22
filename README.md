@@ -1,5 +1,7 @@
 # Chronicle 🕰️
 
+**Live at [jannikarndt.github.io/Chronicle](https://jannikarndt.github.io/Chronicle/)**
+
 A personal life-timeline web app: your life — and the lives of people around you, and the
 world — as parallel horizontal timelines on one shared time axis. Canvas-rendered,
 no backend, statically hosted on GitHub Pages.
