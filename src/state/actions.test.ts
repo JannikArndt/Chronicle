@@ -134,4 +134,26 @@ describe("onboarding: addOnboardingPlaceEntry", () => {
     expect(berlin.end?.ms).toBe(year2010);
     expect(hamburg.end).toBeUndefined();
   });
+
+  test("addOnboardingPlaceEntry does not insert an entry when planEntryInsert reports a conflict", () => {
+    replaceDataset(emptyDataset());
+    const { placesRowId } = completeIdentityStep("Jannik");
+    const year1985 = Date.UTC(1985, 6, 1);
+    const year1990 = Date.UTC(1990, 6, 1);
+    const year2000 = Date.UTC(2000, 6, 1);
+    const year2005 = Date.UTC(2005, 6, 1);
+
+    addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990, endMs: year2005 });
+
+    // Overlaps Berlin's span but starts before Berlin's own start, so
+    // planEntryInsert's isPlainAppend check (draft.start > last.start) fails
+    // and this is a true conflict, not a chronological append that could be
+    // auto-closed. addOnboardingPlaceEntry must bail out (mirroring
+    // commitDraft) and leave the dataset with only Berlin.
+    addOnboardingPlaceEntry(placesRowId, { label: "Overlap", startMs: year1985, endMs: year2000 });
+
+    const entries = appStore.getState().dataset.entries.filter((e) => e.rowId === placesRowId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].title).toBe("Berlin");
+  });
 });

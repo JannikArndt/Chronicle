@@ -44,13 +44,23 @@ export function App() {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
-        if (event.key === "Escape") target.blur();
+        if (event.key === "Escape") {
+          // Onboarding steps always autoFocus an <input>, so Escape here
+          // must still close the overlay (design spec §A) rather than only
+          // blurring the field.
+          if (onboardingOpen) setOnboardingOpen(false);
+          else target.blur();
+        }
         return;
       }
       const engine = engineRef.current;
       switch (event.key) {
         case "Escape": {
-          // Priority order (§6): deselect → cancel date-picking → close panel.
+          // Priority order (§6): onboarding overlay → deselect → cancel date-picking → close panel.
+          if (onboardingOpen) {
+            setOnboardingOpen(false);
+            break;
+          }
           const current = appStore.getState();
           if (current.selectedEntryId || current.selectedRowId || current.draft) clearSelection();
           else if (current.pickingField) cancelDatePicking();
@@ -82,7 +92,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [onboardingOpen]);
 
   if (!loaded) {
     return <div className="loading">Loading…</div>;
