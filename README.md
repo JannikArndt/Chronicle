@@ -33,7 +33,7 @@ npm run build     # typecheck + production build
 
 Deployment: pushes to `main` build and publish to GitHub Pages via
 [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml). The Vite `base` is
-`/Timeline/` (project pages).
+`/Chronicle/` (project pages, matching the GitHub repo name).
 
 ## Conventions
 
