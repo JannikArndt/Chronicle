@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JannikArndt/Timeline/public-data/schema.json",
+  "title": "Chronicle public dataset",
+  "description": "A TimelineDataset restricted to what public data needs: no people/personId (public data is ownerless) and no visibility field (public entries are always shareable). Ids only need to be unique within this file — the app namespaces them on load.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "groups", "categories", "rows", "entities", "entries"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "collapsed"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "collapsed": { "type": "boolean" }
+        }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "color", "icon", "concurrency", "defaultVisibility"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "color": { "type": "string", "minLength": 1 },
+          "icon": { "type": "string", "minLength": 1 },
+          "concurrency": { "enum": ["exclusive", "concurrent"] },
+          "defaultVisibility": { "const": "shareable" }
+        }
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "groupId", "categoryId", "label"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "groupId": { "type": "string", "minLength": 1 },
+          "categoryId": { "type": "string", "minLength": 1 },
+          "label": { "type": "string", "minLength": 1 },
+          "parentRowId": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "label"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["person", "place", "organization", "object", "other"] },
+          "label": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "rowId", "title", "start"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "rowId": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "start": { "$ref": "#/$defs/fuzzyDate" },
+          "end": { "$ref": "#/$defs/fuzzyDate" },
+          "fadeInDays": { "type": "number", "minimum": 0 },
+          "fadeOutDays": { "type": "number", "minimum": 0 },
+          "parentEntryId": { "type": "string", "minLength": 1 },
+          "linkedEntityIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "concurrencyOverride": { "enum": ["exclusive", "concurrent"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fuzzyDate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ms", "precision"],
+      "properties": {
+        "ms": { "type": "number", "description": "UTC milliseconds since epoch (Date.UTC)" },
+        "precision": { "enum": ["exact", "day", "month", "year", "circa"] },
+        "fuzzDays": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

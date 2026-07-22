@@ -1,0 +1,345 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "id": "g-1",
+      "label": "iPhone",
+      "collapsed": false
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "label": "Releases",
+      "color": "#5e8d9c",
+      "icon": "📱",
+      "concurrency": "exclusive",
+      "defaultVisibility": "shareable"
+    }
+  ],
+  "rows": [
+    {
+      "id": "row-1",
+      "groupId": "g-1",
+      "categoryId": "cat-1",
+      "label": "Flagship generations"
+    }
+  ],
+  "entities": [
+    {
+      "id": "ent-apple",
+      "kind": "organization",
+      "label": "Apple Inc."
+    },
+    {
+      "id": "ent-jobs",
+      "kind": "person",
+      "label": "Steve Jobs"
+    }
+  ],
+  "entries": [
+    {
+      "id": "e-1",
+      "rowId": "row-1",
+      "title": "iPhone",
+      "description": "The original iPhone, introduced by Steve Jobs on January 9, 2007 and released June 29, 2007.",
+      "start": {
+        "ms": 1183075200000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple",
+        "ent-jobs"
+      ],
+      "end": {
+        "ms": 1215734400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-2",
+      "rowId": "row-1",
+      "title": "iPhone 3G",
+      "description": "Added 3G data and GPS; launched alongside the App Store.",
+      "start": {
+        "ms": 1215734400000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1245369600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-3",
+      "rowId": "row-1",
+      "title": "iPhone 3GS",
+      "description": "Speed-focused update with video recording.",
+      "start": {
+        "ms": 1245369600000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1277337600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-4",
+      "rowId": "row-1",
+      "title": "iPhone 4",
+      "description": "Retina display and the flat industrial design; FaceTime introduced.",
+      "start": {
+        "ms": 1277337600000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1318550400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-5",
+      "rowId": "row-1",
+      "title": "iPhone 4S",
+      "description": "Introduced Siri; announced one day before Steve Jobs died.",
+      "start": {
+        "ms": 1318550400000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1348185600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-6",
+      "rowId": "row-1",
+      "title": "iPhone 5",
+      "description": "First 4-inch screen and the Lightning connector.",
+      "start": {
+        "ms": 1348185600000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1379635200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-7",
+      "rowId": "row-1",
+      "title": "iPhone 5s",
+      "description": "Touch ID fingerprint sensor and 64-bit A7 chip.",
+      "start": {
+        "ms": 1379635200000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1411084800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-8",
+      "rowId": "row-1",
+      "title": "iPhone 6",
+      "description": "Larger 4.7/5.5-inch designs; Apple Pay.",
+      "start": {
+        "ms": 1411084800000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1443139200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-9",
+      "rowId": "row-1",
+      "title": "iPhone 6s",
+      "description": "3D Touch and 12 MP camera.",
+      "start": {
+        "ms": 1443139200000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1473984000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-10",
+      "rowId": "row-1",
+      "title": "iPhone 7",
+      "description": "Water resistance; removed the headphone jack.",
+      "start": {
+        "ms": 1473984000000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1509667200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-11",
+      "rowId": "row-1",
+      "title": "iPhone X",
+      "description": "Tenth-anniversary redesign: edge-to-edge OLED, Face ID, no home button.",
+      "start": {
+        "ms": 1509667200000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1537488000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-12",
+      "rowId": "row-1",
+      "title": "iPhone XS",
+      "description": "OLED refinement of the X design; XR followed in October.",
+      "start": {
+        "ms": 1537488000000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1568937600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-13",
+      "rowId": "row-1",
+      "title": "iPhone 11",
+      "description": "Dual camera and Night mode; Pro models introduced.",
+      "start": {
+        "ms": 1568937600000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1603411200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-14",
+      "rowId": "row-1",
+      "title": "iPhone 12",
+      "description": "5G and MagSafe; flat-edge redesign.",
+      "start": {
+        "ms": 1603411200000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1632441600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-15",
+      "rowId": "row-1",
+      "title": "iPhone 13",
+      "description": "Cinematic mode and smaller notch.",
+      "start": {
+        "ms": 1632441600000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1663286400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-16",
+      "rowId": "row-1",
+      "title": "iPhone 14",
+      "description": "Emergency SOS via satellite; Dynamic Island on Pro.",
+      "start": {
+        "ms": 1663286400000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1695340800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-17",
+      "rowId": "row-1",
+      "title": "iPhone 15",
+      "description": "USB-C replaces Lightning; Dynamic Island everywhere.",
+      "start": {
+        "ms": 1695340800000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ],
+      "end": {
+        "ms": 1726790400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-18",
+      "rowId": "row-1",
+      "title": "iPhone 16",
+      "description": "Camera Control button; built around Apple Intelligence.",
+      "start": {
+        "ms": 1726790400000,
+        "precision": "day"
+      },
+      "linkedEntityIds": [
+        "ent-apple"
+      ]
+    }
+  ]
+}
