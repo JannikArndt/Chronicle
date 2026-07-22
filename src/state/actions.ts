@@ -10,6 +10,7 @@ import { loadPublicDatasets } from "../publicData/loader";
 import { appStore } from "./store";
 import type {
   Category,
+  Entity,
   Group,
   Person,
   Precision,
@@ -247,6 +248,20 @@ export function updatePerson(personId: string, patch: Partial<Person>): void {
     if (person) Object.assign(person, patch);
     return dataset;
   });
+}
+
+// Reuses an existing private entity with the same label; creates it otherwise.
+export function ensureEntity(label: string, kind: Entity["kind"]): Entity {
+  const existing = appStore
+    .getState()
+    .dataset.entities.find((e) => e.label.toLowerCase() === label.toLowerCase());
+  if (existing) return existing;
+  const entity: Entity = { id: newId("ent"), kind, label };
+  updateDataset((dataset) => {
+    dataset.entities.push(entity);
+    return dataset;
+  });
+  return entity;
 }
 
 export function updateCategory(categoryId: string, patch: Partial<Category>): void {
