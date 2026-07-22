@@ -135,6 +135,31 @@ export function deleteEntryWithCascade(entryId: string): void {
 
 // ---------- rows / groups / persons / categories ----------
 
+export interface IdentitySetupResult {
+  personId: string;
+  groupId: string;
+  placesRowId: string;
+}
+
+// Onboarding step 1 (docs/superpowers/specs/2026-07-22-onboarding-assistant-design.md):
+// creates the user's own Person + Group and their first row, all in one save.
+export function completeIdentityStep(name: string): IdentitySetupResult {
+  let result!: IdentitySetupResult;
+  updateDataset((dataset) => {
+    const person: Person = { id: newId("person"), label: name };
+    dataset.people.push(person);
+    const group: Group = { id: newId("group"), label: name, personId: person.id, collapsed: false };
+    dataset.groups.push(group);
+    dataset.selfPersonId = person.id;
+    const category = ensureCategory(dataset, "Places lived", "#8ba66f", "🏠", "exclusive");
+    const row: TimelineRow = { id: newId("row"), groupId: group.id, categoryId: category.id, label: "Places lived" };
+    dataset.rows.push(row);
+    result = { personId: person.id, groupId: group.id, placesRowId: row.id };
+    return dataset;
+  });
+  return result;
+}
+
 export function addGroup(label: string, asPerson: boolean): void {
   updateDataset((dataset) => {
     let personId: string | undefined;
@@ -169,7 +194,13 @@ export function addPersonToGroup(groupId: string, label: string): void {
   });
 }
 
-function ensureCategory(dataset: TimelineDataset, label: string, color: string, icon: string): Category {
+function ensureCategory(
+  dataset: TimelineDataset,
+  label: string,
+  color: string,
+  icon: string,
+  concurrency: Category["concurrency"] = "concurrent",
+): Category {
   const existing = dataset.categories.find((c) => c.label === label);
   if (existing) return existing;
   const category: Category = {
@@ -177,7 +208,7 @@ function ensureCategory(dataset: TimelineDataset, label: string, color: string, 
     label,
     color,
     icon,
-    concurrency: "concurrent",
+    concurrency,
     defaultVisibility: "private",
   };
   dataset.categories.push(category);

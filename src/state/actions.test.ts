@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, test } from "vitest";
-import { replaceDataset, selectRow, startDraft, updateDraft } from "./actions";
+import { completeIdentityStep, replaceDataset, selectRow, startDraft, updateDraft } from "./actions";
 import { appStore } from "./store";
 import { emptyDataset } from "../model/dataset";
 import { DAY_MS } from "../model/fuzzyDate";
@@ -69,5 +69,28 @@ describe("selection", () => {
     const state = appStore.getState();
     expect(state.draft).toBeUndefined();
     expect(state.selectedRowId).toBe("r1");
+  });
+});
+
+describe("onboarding: completeIdentityStep", () => {
+  test("creates a self person, group, and an exclusive Places lived row", () => {
+    replaceDataset(emptyDataset());
+    const result = completeIdentityStep("Jannik");
+    const state = appStore.getState();
+
+    expect(state.dataset.selfPersonId).toBe(result.personId);
+
+    const person = state.dataset.people.find((p) => p.id === result.personId);
+    expect(person?.label).toBe("Jannik");
+
+    const group = state.dataset.groups.find((g) => g.id === result.groupId);
+    expect(group?.personId).toBe(result.personId);
+
+    const row = state.dataset.rows.find((r) => r.id === result.placesRowId);
+    expect(row?.label).toBe("Places lived");
+    expect(row?.groupId).toBe(result.groupId);
+
+    const category = state.dataset.categories.find((c) => c.id === row?.categoryId);
+    expect(category?.concurrency).toBe("exclusive");
   });
 });
