@@ -12,7 +12,7 @@ it. `POC/` is the throwaway discovery prototype — never reuse it as source.
 
 ```
 npm run dev       # dev server
-npm test          # vitest (66+ unit tests)
+npm test          # vitest (78+ unit tests)
 npm run build     # tsc -b && vite build  (tsc also typechecks test files)
 ```
 
@@ -39,6 +39,16 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 - `src/ui/` — React shell: rail, detail panel, popovers, search. The rail is DOM and
   is translated by the engine's `onScrollSync` callback every frame (direct style
   mutation, not React state — intentional).
+- `src/onboarding/` — Typeform-style conversational onboarding, auto-shown on a fresh
+  dataset (`shouldShowOnboarding`, gated on `dataset.selfPersonId === undefined &&
+  dataset.groups.length === 0`). `AssistantStepShell` is the one shared, reusable
+  presentational piece across assistants — deliberately no generic step-definition/
+  runner abstraction; each assistant is hand-written with `useAssistantFlow`
+  (a thin wrapper over the pure, stack-based `assistantFlowReducer`, which is what
+  makes Back navigation safe). `IdentityBirthPlacesAssistant` is the first assistant:
+  name → birth year → a chained places-lived loop via `completeIdentityStep`/
+  `addOnboardingPlaceEntry` in `actions.ts`. `PlaceAutocompleteInput`/`nominatim.ts`
+  hit OpenStreetMap Nominatim directly (no API key, no backend to hide one behind).
 
 ## Hard-won invariants (violating these reintroduces known bugs)
 
@@ -60,6 +70,14 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 - **Privacy**: personal data exists only in IndexedDB and user-initiated exports.
   Nothing personal may ever be written to the repo/filesystem; only `public-data/`
   is repo-tracked data.
+- **Onboarding Back must never cross a commit boundary**: `IdentityBirthPlacesAssistant`
+  disables its Back button at `place{iteration > 1}` on purpose — reaching that step
+  means the previous iteration's entry already committed, and re-answering an earlier
+  step after Back would either silently collide with it (`planEntryInsert` returns
+  `"conflict"`, which `addOnboardingPlaceEntry` correctly no-ops on — but silently, so
+  the data is just lost) or, for the name step, spawn a second Person/Group. The name
+  step's fix is the general pattern: check whether identity was already committed and
+  update in place (`updatePerson`/`updateGroup`) instead of re-creating.
 
 ## Testing conventions
 
