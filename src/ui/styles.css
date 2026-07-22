@@ -560,3 +560,106 @@ textarea {
     max-width: none;
   }
 }
+
+/* ---------- onboarding assistant ---------- */
+
+.assistant-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgba(41, 37, 34, 0.35);
+}
+
+.assistant-shell {
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: #fff;
+  border: 1px solid #d6d3cd;
+  border-radius: 14px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.22);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.assistant-progress {
+  display: flex;
+  gap: 5px;
+}
+
+.assistant-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e5e3dd;
+}
+
+.assistant-dot-done {
+  background: #a8a29e;
+}
+
+.assistant-dot-current {
+  background: #c2410c;
+}
+
+.assistant-prompt {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.assistant-input-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.assistant-input-area input {
+  font-size: 15px;
+  padding: 8px 10px;
+}
+
+.assistant-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.place-autocomplete {
+  position: relative;
+}
+
+.place-suggestions {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 1px solid #d6d3cd;
+  border-radius: 8px;
+  background: #fff;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.place-suggestions li button {
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .assistant-overlay {
+    align-items: stretch;
+    background: #fafaf8;
+  }
+
+  .assistant-shell {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    border-radius: 0;
+    border: none;
+    justify-content: center;
+  }
+}
