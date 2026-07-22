@@ -1,0 +1,10 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Editor noise
+.DS_Store
+
+# NOTE ON PRIVACY: personal timeline data must NEVER appear in this repo.
+# The shipped app keeps it in IndexedDB and user-initiated export files only.
+# There is intentionally no local-data/ folder — only public-data/ is repo-tracked.
