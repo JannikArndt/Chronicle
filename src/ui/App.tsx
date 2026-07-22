@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { computeLayout } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
 import {
@@ -12,16 +12,26 @@ import { DataMenu } from "./DataMenu";
 import { DetailPanel } from "./DetailPanel";
 import { RowRail } from "./RowRail";
 import { SearchBar } from "./SearchBar";
+import { IdentityBirthPlacesAssistant } from "../onboarding/IdentityBirthPlacesAssistant";
+import { shouldShowOnboarding } from "../onboarding/shouldShowOnboarding";
 
 export function App() {
   const loaded = useAppState((s) => s.loaded);
   const state = useAppState((s) => s);
   const railContentRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<TimelineEngine | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   useEffect(() => {
     void initializeApp();
   }, []);
+
+  useEffect(() => {
+    if (loaded && shouldShowOnboarding(state.dataset)) setOnboardingOpen(true);
+    // Only re-check right after load — once open, later dataset changes
+    // (created by the assistant itself) must not affect this decision.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
 
   const layout = useMemo(
     () => computeLayout(mergedDataset(state), new Set(), new Set(state.hiddenRowIds)),
@@ -88,7 +98,11 @@ export function App() {
         <DataMenu />
       </header>
       <div className="main-area">
-        <RowRail layout={layout} railContentRef={railContentRef} />
+        <RowRail
+          layout={layout}
+          railContentRef={railContentRef}
+          onStartOnboarding={() => setOnboardingOpen(true)}
+        />
         <CanvasHost layout={layout} railContentRef={railContentRef} engineRef={engineRef} />
         {isEmpty && (
           <div className="empty-hint">
@@ -97,6 +111,11 @@ export function App() {
         )}
         <DetailPanel />
       </div>
+      {onboardingOpen && (
+        <div className="assistant-overlay">
+          <IdentityBirthPlacesAssistant onFinished={() => setOnboardingOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }

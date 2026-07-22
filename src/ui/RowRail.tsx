@@ -37,9 +37,10 @@ type PopoverState =
 interface RowRailProps {
   layout: Layout;
   railContentRef: RefObject<HTMLDivElement>;
+  onStartOnboarding: () => void;
 }
 
-export function RowRail({ layout, railContentRef }: RowRailProps) {
+export function RowRail({ layout, railContentRef, onStartOnboarding }: RowRailProps) {
   const dataset = useAppState((s) => s.dataset);
   const publicDatasets = useAppState((s) => s.publicDatasets);
   const hiddenRowIds = useAppState((s) => s.hiddenRowIds);
@@ -71,6 +72,11 @@ export function RowRail({ layout, railContentRef }: RowRailProps) {
         </div>
       </div>
       <div className="rail-footer">
+        {dataset.selfPersonId === undefined && (
+          <button type="button" className="small-button" onClick={onStartOnboarding}>
+            ✨ Set up your timeline
+          </button>
+        )}
         <button
           type="button"
           className="small-button"
