@@ -160,6 +160,38 @@ export function completeIdentityStep(name: string): IdentitySetupResult {
   return result;
 }
 
+export interface OnboardingPlaceAnswer {
+  label: string;
+  startMs: number;
+  endMs?: number; // absent = "still living here" (ongoing)
+}
+
+// Onboarding places loop: entries are built directly (not through the
+// click-driven startDraft flow) but still pass through planEntryInsert,
+// preserving the invariant that every insert is checked — by construction
+// these are always chronological appends, so it's a defensive no-op here.
+export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAnswer): void {
+  const entity = ensureEntity(place.label, "place");
+  const draft: TimelineEntry = {
+    id: newId("entry"),
+    rowId,
+    title: place.label,
+    start: { ms: place.startMs, precision: "year" },
+    end: place.endMs !== undefined ? { ms: place.endMs, precision: "year" } : undefined,
+    linkedEntityIds: [entity.id],
+    visibility: "private",
+  };
+  const plan = planEntryInsert(appStore.getState().dataset, draft);
+  updateDataset((dataset) => {
+    if (plan.kind === "autoClose") {
+      const previous = dataset.entries.find((e) => e.id === plan.previousEntry.id);
+      if (previous) previous.end = plan.closeAt;
+    }
+    dataset.entries.push(draft);
+    return dataset;
+  });
+}
+
 export function addGroup(label: string, asPerson: boolean): void {
   updateDataset((dataset) => {
     let personId: string | undefined;

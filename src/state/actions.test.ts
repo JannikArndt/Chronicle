@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, test } from "vitest";
-import { completeIdentityStep, replaceDataset, selectRow, startDraft, updateDraft } from "./actions";
+import { addOnboardingPlaceEntry, completeIdentityStep, replaceDataset, selectRow, startDraft, updateDraft } from "./actions";
 import { appStore } from "./store";
 import { emptyDataset } from "../model/dataset";
 import { DAY_MS } from "../model/fuzzyDate";
@@ -92,5 +92,27 @@ describe("onboarding: completeIdentityStep", () => {
 
     const category = state.dataset.categories.find((c) => c.id === row?.categoryId);
     expect(category?.concurrency).toBe("exclusive");
+  });
+});
+
+describe("onboarding: addOnboardingPlaceEntry", () => {
+  test("addOnboardingPlaceEntry chains consecutive places and leaves the last one ongoing", () => {
+    replaceDataset(emptyDataset());
+    const { placesRowId } = completeIdentityStep("Jannik");
+    const year1990 = Date.UTC(1990, 6, 1);
+    const year2005 = Date.UTC(2005, 6, 1);
+
+    addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990, endMs: year2005 });
+    addOnboardingPlaceEntry(placesRowId, { label: "Munich", startMs: year2005 });
+
+    const entries = appStore.getState().dataset.entries.filter((e) => e.rowId === placesRowId);
+    expect(entries).toHaveLength(2);
+
+    const berlin = entries.find((e) => e.title === "Berlin")!;
+    const munich = entries.find((e) => e.title === "Munich")!;
+    expect(berlin.end?.ms).toBe(year2005);
+    expect(berlin.start.precision).toBe("year");
+    expect(munich.end).toBeUndefined();
+    expect(munich.linkedEntityIds).toHaveLength(1);
   });
 });
