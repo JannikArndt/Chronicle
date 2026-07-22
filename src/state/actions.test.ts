@@ -115,4 +115,23 @@ describe("onboarding: addOnboardingPlaceEntry", () => {
     expect(munich.end).toBeUndefined();
     expect(munich.linkedEntityIds).toHaveLength(1);
   });
+
+  test("addOnboardingPlaceEntry backfills an ongoing previous entry's end via the autoClose plan", () => {
+    replaceDataset(emptyDataset());
+    const { placesRowId } = completeIdentityStep("Jannik");
+    const year1990 = Date.UTC(1990, 6, 1);
+    const year2010 = Date.UTC(2010, 6, 1);
+
+    // Berlin is added without endMs, so it's ongoing and planEntryInsert
+    // must return "autoClose" (not "ok") when Hamburg starts later.
+    addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990 });
+    addOnboardingPlaceEntry(placesRowId, { label: "Hamburg", startMs: year2010 });
+
+    const entries = appStore.getState().dataset.entries.filter((e) => e.rowId === placesRowId);
+    const berlin = entries.find((e) => e.title === "Berlin")!;
+    const hamburg = entries.find((e) => e.title === "Hamburg")!;
+
+    expect(berlin.end?.ms).toBe(year2010);
+    expect(hamburg.end).toBeUndefined();
+  });
 });

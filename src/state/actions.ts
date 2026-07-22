@@ -182,6 +182,9 @@ export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAns
     visibility: "private",
   };
   const plan = planEntryInsert(appStore.getState().dataset, draft);
+  if (plan.kind === "conflict") {
+    return;
+  }
   updateDataset((dataset) => {
     if (plan.kind === "autoClose") {
       const previous = dataset.entries.find((e) => e.id === plan.previousEntry.id);
