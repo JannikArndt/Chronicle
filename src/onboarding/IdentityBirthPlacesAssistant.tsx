@@ -8,7 +8,7 @@ import { useState } from "react";
 import { AssistantStepShell } from "./AssistantStepShell";
 import { PlaceAutocompleteInput } from "./PlaceAutocompleteInput";
 import { useAssistantFlow } from "./useAssistantFlow";
-import { addOnboardingPlaceEntry, completeIdentityStep, updatePerson } from "../state/actions";
+import { addOnboardingPlaceEntry, completeIdentityStep, updateGroup, updatePerson } from "../state/actions";
 import { parseDateInput } from "../model/fuzzyDate";
 
 type Phase =
@@ -27,15 +27,24 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
   const [birthYearText, setBirthYearText] = useState("");
   const [placeText, setPlaceText] = useState("");
   const [untilText, setUntilText] = useState("");
-  const [setup, setSetup] = useState<{ personId: string; placesRowId: string } | null>(null);
+  const [setup, setSetup] = useState<{ personId: string; groupId: string; placesRowId: string } | null>(null);
   const [startMsByIteration, setStartMsByIteration] = useState<Record<number, number>>({});
   const [placeLabelByIteration, setPlaceLabelByIteration] = useState<Record<number, string>>({});
 
   const commitName = () => {
     const trimmed = name.trim();
     if (trimmed === "") return;
-    const result = completeIdentityStep(trimmed);
-    setSetup({ personId: result.personId, placesRowId: result.placesRowId });
+    if (setup) {
+      // Resubmitting after Back-ing to "name": relabel the already-committed
+      // person/group instead of calling completeIdentityStep again, which
+      // would create a second Person + Group + "Places lived" row and orphan
+      // the first one.
+      updatePerson(setup.personId, { label: trimmed });
+      updateGroup(setup.groupId, { label: trimmed });
+    } else {
+      const result = completeIdentityStep(trimmed);
+      setSetup({ personId: result.personId, groupId: result.groupId, placesRowId: result.placesRowId });
+    }
     flow.advance({ kind: "birthYear" });
   };
 
@@ -127,7 +136,14 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
           prompt={flow.phase.iteration === 1 ? "Where were you born?" : "Where did you live next?"}
           hint="You can fine-tune the exact address later."
           stepIndex={flow.stepIndex}
-          onBack={flow.canGoBack ? flow.back : undefined}
+          // Reaching place{N>1} means iteration N-1's entry was already
+          // committed to the dataset (commitUntil only advances here after a
+          // successful write). Going back from there would re-enter until{N-1}
+          // and, on resubmit, collide with the still-present committed entry
+          // (same start ms -> planEntryInsert reports a conflict, which
+          // addOnboardingPlaceEntry silently no-ops on). Back from place{1}
+          // is safe: no place entries exist yet.
+          onBack={flow.canGoBack && flow.phase.iteration === 1 ? flow.back : undefined}
           onSkip={onFinished}
         >
           <PlaceAutocompleteInput value={placeText} onChange={setPlaceText} onSubmit={commitPlace} />
