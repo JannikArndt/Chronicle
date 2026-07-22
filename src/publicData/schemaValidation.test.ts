@@ -3,12 +3,13 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Ajv2020 } from "ajv/dist/2020";
 import { describe, expect, test } from "vitest";
 
-const publicDataDir = join(__dirname, "../../public-data");
+const publicDataDir = fileURLToPath(new URL("../../public-data", import.meta.url));
 const schema = JSON.parse(readFileSync(join(publicDataDir, "schema.json"), "utf8"));
-const dataFiles = readdirSync(publicDataDir).filter((f) => f.endsWith(".json") && f !== "schema.json");
+const dataFiles = readdirSync(publicDataDir).filter((f: string) => f.endsWith(".json") && f !== "schema.json");
 
 describe("public-data schema validation", () => {
   test("at least the worked example exists", () => {
