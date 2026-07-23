@@ -62,9 +62,12 @@ describe("computeLayout", () => {
     expect(items[1].id).toBe("g-family");
   });
 
-  test("hidden rows are omitted", () => {
+  test("hidden rows stay in the layout, flagged hidden", () => {
     const { items } = computeLayout(fixture(), new Set(), new Set(["r1s"]));
-    expect(items.find((i) => i.id === "r1s")).toBeUndefined();
+    const r1s = items.find((i) => i.id === "r1s");
+    expect(r1s).toBeDefined();
+    expect(r1s!.hidden).toBe(true);
+    expect(items.find((i) => i.id === "r1")!.hidden).toBe(false);
   });
 
   test("totalHeight covers the last item", () => {

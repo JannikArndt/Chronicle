@@ -18,6 +18,7 @@ export interface LayoutItem {
   height: number;
   depth: number; // sub-row nesting depth (rows only)
   isSubRow: boolean;
+  hidden: boolean; // row is unchecked in the rail (§2) — canvas skips its entries, rail keeps the row
   group?: Group;
   person?: Person;
   row?: TimelineRow;
@@ -39,9 +40,17 @@ export function computeLayout(
   const personById = new Map(dataset.people.map((p) => [p.id, p]));
 
   const pushRowTree = (row: TimelineRow, depth: number) => {
-    if (hiddenRowIds.has(row.id)) return;
     y += depth > 0 ? SUB_ROW_GAP : ROW_GAP;
-    items.push({ kind: "row", id: row.id, y, height: ROW_HEIGHT, depth, isSubRow: depth > 0, row });
+    items.push({
+      kind: "row",
+      id: row.id,
+      y,
+      height: ROW_HEIGHT,
+      depth,
+      isSubRow: depth > 0,
+      hidden: hiddenRowIds.has(row.id),
+      row,
+    });
     y += ROW_HEIGHT;
     for (const child of dataset.rows.filter((r) => r.parentRowId === row.id)) {
       pushRowTree(child, depth + 1);
@@ -49,7 +58,16 @@ export function computeLayout(
   };
 
   for (const group of dataset.groups) {
-    items.push({ kind: "group", id: group.id, y, height: GROUP_HEADER_HEIGHT, depth: 0, isSubRow: false, group });
+    items.push({
+      kind: "group",
+      id: group.id,
+      y,
+      height: GROUP_HEADER_HEIGHT,
+      depth: 0,
+      isSubRow: false,
+      hidden: false,
+      group,
+    });
     y += GROUP_HEADER_HEIGHT;
     const collapsed = collapsedGroupIds.has(group.id) || group.collapsed;
     if (!collapsed) {
@@ -71,6 +89,7 @@ export function computeLayout(
             height: PERSON_HEADER_HEIGHT,
             depth: 0,
             isSubRow: false,
+            hidden: false,
             person,
             group,
           });

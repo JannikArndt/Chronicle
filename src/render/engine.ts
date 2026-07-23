@@ -453,7 +453,7 @@ export class TimelineEngine {
         continue;
       }
       if (item.kind === "person") continue;
-      if (item.row) this.drawRow(item, nowMs, emphasis, relatedIds);
+      if (item.row && !item.hidden) this.drawRow(item, nowMs, emphasis, relatedIds);
     }
 
     if (selectedEntry) this.drawConnectors(selectedEntry, visible, nowMs);
