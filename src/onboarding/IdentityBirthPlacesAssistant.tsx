@@ -12,6 +12,23 @@ import { formatSuggestionText } from "./nominatim";
 import { useAssistantFlow } from "./useAssistantFlow";
 import { addOnboardingPlaceEntry, completeIdentityStep, updateGroup, updatePerson } from "../state/actions";
 import { parseDateInput } from "../model/fuzzyDate";
+import { appStore } from "../state/store";
+
+// Manually re-opening the assistant (e.g. from the rail's "+" menu, for
+// testing) on a dataset that already has a selfPersonId must resume that
+// identity rather than call completeIdentityStep again — otherwise commitName
+// would create a second Person/Group/"Places lived" row and reassign
+// selfPersonId, orphaning the original (the same class of bug the Back-across-
+// commit-boundary fix above guards against, but on fresh mount instead).
+function findExistingSetup(): { personId: string; groupId: string; placesRowId: string } | null {
+  const dataset = appStore.getState().dataset;
+  if (!dataset.selfPersonId) return null;
+  const group = dataset.groups.find((g) => g.personId === dataset.selfPersonId);
+  if (!group) return null;
+  const placesRow = dataset.rows.find((r) => r.groupId === group.id && r.label === "Places lived");
+  if (!placesRow) return null;
+  return { personId: dataset.selfPersonId, groupId: group.id, placesRowId: placesRow.id };
+}
 
 type Phase =
   | { kind: "name" }
@@ -35,11 +52,21 @@ interface IdentityBirthPlacesAssistantProps {
 
 export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlacesAssistantProps) {
   const flow = useAssistantFlow<Phase>({ kind: "name" });
-  const [name, setName] = useState("");
-  const [birthDateMs, setBirthDateMs] = useState<number | undefined>(undefined);
+  const [setup, setSetup] = useState<{ personId: string; groupId: string; placesRowId: string } | null>(
+    findExistingSetup,
+  );
+  const [name, setName] = useState(() => {
+    const dataset = appStore.getState().dataset;
+    const person = setup && dataset.people.find((p) => p.id === setup.personId);
+    return person?.label ?? "";
+  });
+  const [birthDateMs, setBirthDateMs] = useState<number | undefined>(() => {
+    const dataset = appStore.getState().dataset;
+    const person = setup && dataset.people.find((p) => p.id === setup.personId);
+    return person?.birthDate;
+  });
   const [placeText, setPlaceText] = useState("");
   const [untilText, setUntilText] = useState("");
-  const [setup, setSetup] = useState<{ personId: string; groupId: string; placesRowId: string } | null>(null);
   const [startMsByIteration, setStartMsByIteration] = useState<Record<number, number>>({});
   const [placeAnswerByIteration, setPlaceAnswerByIteration] = useState<Record<number, PlaceAnswer>>({});
   const [selectedSuggestion, setSelectedSuggestion] = useState<import("./nominatim").PlaceSuggestion | null>(null);

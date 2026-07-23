@@ -96,7 +96,9 @@ export function RowRail({ layout, railContentRef, onStartOnboarding }: RowRailPr
           ＋
         </button>
       </div>
-      {popover && <Popover popover={popover} open={setPopover} close={closePopover} />}
+      {popover && (
+        <Popover popover={popover} open={setPopover} close={closePopover} onStartOnboarding={onStartOnboarding} />
+      )}
     </div>
   );
 }
@@ -264,17 +266,21 @@ function Popover({
   popover,
   open,
   close,
+  onStartOnboarding,
 }: {
   popover: NonNullable<PopoverState>;
   open: (p: PopoverState) => void;
   close: () => void;
+  onStartOnboarding: () => void;
 }) {
   const footer = isFooterPopover(popover.kind);
   return (
     <>
       <div className="popover-backdrop" onClick={close} />
       <div className="popover" style={{ top: footer ? undefined : popover.top, bottom: footer ? 48 : undefined }}>
-        {popover.kind === "rail-add-menu" && <RailAddMenu open={open} close={close} />}
+        {popover.kind === "rail-add-menu" && (
+          <RailAddMenu open={open} close={close} onStartOnboarding={onStartOnboarding} />
+        )}
         {popover.kind === "add-group" && <AddGroupForm close={close} />}
         {popover.kind === "add-person" && <AddPersonForm close={close} />}
         {popover.kind === "add-menu" && (
@@ -290,7 +296,15 @@ function Popover({
   );
 }
 
-function RailAddMenu({ open, close }: { open: (p: PopoverState) => void; close: () => void }) {
+function RailAddMenu({
+  open,
+  close,
+  onStartOnboarding,
+}: {
+  open: (p: PopoverState) => void;
+  close: () => void;
+  onStartOnboarding: () => void;
+}) {
   const handleImport = () => {
     triggerImportFlow((result) => {
       if (!result.ok) {
@@ -315,6 +329,16 @@ function RailAddMenu({ open, close }: { open: (p: PopoverState) => void; close: 
       </button>
       <button type="button" className="menu-item" onClick={handleImport}>
         ＋ Import
+      </button>
+      <button
+        type="button"
+        className="menu-item"
+        onClick={() => {
+          close();
+          onStartOnboarding();
+        }}
+      >
+        ✨ Replay setup assistant
       </button>
     </div>
   );
