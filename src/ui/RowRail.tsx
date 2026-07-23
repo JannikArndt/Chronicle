@@ -452,6 +452,10 @@ function RailAddMenu({
 
 function AddPersonForm({ close }: { close: () => void }) {
   const [label, setLabel] = useState("");
+  const submit = () => {
+    addGroup(label.trim(), true);
+    close();
+  };
   return (
     <div className="popover-form">
       <div className="popover-title">New person</div>
@@ -461,15 +465,13 @@ function AddPersonForm({ close }: { close: () => void }) {
         placeholder="Name"
         value={label}
         onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
       />
       <button
         type="button"
         className="small-button"
         disabled={label.trim() === ""}
-        onClick={() => {
-          addGroup(label.trim(), true);
-          close();
-        }}
+        onClick={submit}
       >
         Add
       </button>
@@ -480,6 +482,10 @@ function AddPersonForm({ close }: { close: () => void }) {
 function AddGroupForm({ close }: { close: () => void }) {
   const [label, setLabel] = useState("");
   const [asPerson, setAsPerson] = useState(false);
+  const submit = () => {
+    addGroup(label.trim(), asPerson);
+    close();
+  };
   return (
     <div className="popover-form">
       <div className="popover-title">New group</div>
@@ -489,6 +495,7 @@ function AddGroupForm({ close }: { close: () => void }) {
         placeholder="Name (e.g. Me, Family, Work)"
         value={label}
         onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
       />
       <label className="checkbox-line">
         <input type="checkbox" checked={asPerson} onChange={(e) => setAsPerson(e.target.checked)} />
@@ -498,10 +505,7 @@ function AddGroupForm({ close }: { close: () => void }) {
         type="button"
         className="small-button"
         disabled={label.trim() === ""}
-        onClick={() => {
-          addGroup(label.trim(), asPerson);
-          close();
-        }}
+        onClick={submit}
       >
         Add
       </button>
@@ -516,6 +520,12 @@ function AddMenu({ groupId, personId, close }: { groupId: string; personId?: str
   const [label, setLabel] = useState("");
   // A person can only be added inside a personId-less group (§2 asymmetry).
   const canAddPerson = group !== undefined && group.personId === undefined && personId === undefined;
+
+  const submit = () => {
+    if (mode === "person") addPersonToGroup(groupId, label.trim());
+    else addRow(groupId, label.trim(), personId);
+    close();
+  };
 
   if (mode === "menu") {
     return (
@@ -554,16 +564,13 @@ function AddMenu({ groupId, personId, close }: { groupId: string; personId?: str
         placeholder={mode === "person" ? "Name" : "Label (e.g. Job, Residence)"}
         value={label}
         onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
       />
       <button
         type="button"
         className="small-button"
         disabled={label.trim() === ""}
-        onClick={() => {
-          if (mode === "person") addPersonToGroup(groupId, label.trim());
-          else addRow(groupId, label.trim(), personId);
-          close();
-        }}
+        onClick={submit}
       >
         Add
       </button>
@@ -696,18 +703,26 @@ function CategoryEditor({ rowId, close }: { rowId: string; close: () => void }) 
 
 function SubRowForm({ rowId, close }: { rowId: string; close: () => void }) {
   const [label, setLabel] = useState("");
+  const submit = () => {
+    addSubRow(rowId, label.trim());
+    close();
+  };
   return (
     <div className="popover-form">
       <div className="popover-title">New sub-timeline</div>
-      <input type="text" autoFocus placeholder="Label" value={label} onChange={(e) => setLabel(e.target.value)} />
+      <input
+        type="text"
+        autoFocus
+        placeholder="Label"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
+      />
       <button
         type="button"
         className="small-button"
         disabled={label.trim() === ""}
-        onClick={() => {
-          addSubRow(rowId, label.trim());
-          close();
-        }}
+        onClick={submit}
       >
         Add
       </button>
