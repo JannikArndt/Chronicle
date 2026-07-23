@@ -366,15 +366,15 @@ textarea {
   background: var(--color-bg-hover);
 }
 
-/* Hover-reveal only where a real hover exists; always visible on touch (§5). */
+/* Hover-reveal only where a real hover exists; always visible on touch (§5).
+   Visibility is driven by JS (onMouseEnter/onMouseLeave in RowRail.tsx), not
+   by :hover — Safari can leave :hover "stuck" after a fast mouse-exit from an
+   absolutely-positioned element. No transition: an instant toggle, not a fade. */
 @media (hover: hover) and (pointer: fine) {
   .hover-reveal {
     opacity: 0;
-    transition: opacity 0.12s;
   }
-  .rail-group:hover .hover-reveal,
-  .rail-person:hover .hover-reveal,
-  .rail-row:hover .hover-reveal {
+  .hover-reveal-visible {
     opacity: 1;
   }
 }

@@ -57,6 +57,14 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
   const hiddenRowIds = useAppState((s) => s.hiddenRowIds);
   const selectedRowId = useAppState((s) => s.selectedRowId);
   const [popover, setPopover] = useState<PopoverState>(null);
+  // Which rail item's action buttons are shown (§ hover-reveal). Tracked in JS
+  // rather than pure CSS :hover: Safari can leave :hover "stuck" after a fast
+  // mouse-exit from these absolutely-positioned, transitioned rows, but real
+  // mouseenter/mouseleave events don't have that failure mode. hoveredCategoryRowId
+  // is the top-level row a hovered sub-row belongs to, so a category's own
+  // buttons also light up while hovering any of its nested timelines.
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [hoveredCategoryRowId, setHoveredCategoryRowId] = useState<string | null>(null);
 
   const allPeople = [...dataset.people, ...publicDatasets.flatMap((d) => d.people)];
   const allCategories = [...dataset.categories, ...publicDatasets.flatMap((d) => d.categories)];
@@ -65,11 +73,21 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
 
   const closePopover = () => setPopover(null);
 
+  // pushRowTree (layout.ts) emits each top-level row immediately followed by
+  // all its descendants before the next one, so a single running variable is
+  // enough to know which category row each item belongs to.
+  const categoryRowIds: (string | null)[] = [];
+  let currentCategoryRowId: string | null = null;
+  for (const item of layout.items) {
+    if (item.kind === "row" && item.row && !item.isSubRow) currentCategoryRowId = item.row.id;
+    categoryRowIds.push(currentCategoryRowId);
+  }
+
   return (
     <div className="rail" onPointerDown={(e) => e.stopPropagation()}>
       <div className="rail-scroll">
         <div className="rail-content" ref={railContentRef} style={{ height: layout.totalHeight }}>
-          {layout.items.map((item) => (
+          {layout.items.map((item, index) => (
             <RailItem
               key={`${item.kind}:${item.id}`}
               item={item}
@@ -79,6 +97,17 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
               selectedRowId={selectedRowId}
               openPopover={setPopover}
               engineRef={engineRef}
+              categoryRowId={categoryRowIds[index]}
+              hoveredKey={hoveredKey}
+              hoveredCategoryRowId={hoveredCategoryRowId}
+              onHoverEnter={(key, categoryRowId) => {
+                setHoveredKey(key);
+                setHoveredCategoryRowId(categoryRowId);
+              }}
+              onHoverLeave={() => {
+                setHoveredKey(null);
+                setHoveredCategoryRowId(null);
+              }}
             />
           ))}
         </div>
@@ -125,18 +154,44 @@ interface RailItemProps {
   selectedRowId?: string;
   openPopover: (p: PopoverState) => void;
   engineRef: MutableRefObject<TimelineEngine | null>;
+  categoryRowId: string | null;
+  hoveredKey: string | null;
+  hoveredCategoryRowId: string | null;
+  onHoverEnter: (key: string, categoryRowId: string | null) => void;
+  onHoverLeave: () => void;
 }
 
-function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId, openPopover, engineRef }: RailItemProps) {
+function RailItem({
+  item,
+  personById,
+  categoryById,
+  hiddenRowIds,
+  selectedRowId,
+  openPopover,
+  engineRef,
+  categoryRowId,
+  hoveredKey,
+  hoveredCategoryRowId,
+  onHoverEnter,
+  onHoverLeave,
+}: RailItemProps) {
   const style = { top: item.y, height: item.height };
   const readOnly = isPublicId(item.id);
+  const key = `${item.kind}:${item.id}`;
+  const hoverReveal = (visible: boolean) => `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`;
 
   if (item.kind === "group" && item.group) {
     const group = item.group;
     const person = group.personId ? personById.get(group.personId) : undefined;
     const age = person ? computedAge(person) : null;
+    const visible = hoveredKey === key;
     return (
-      <div className="rail-group" style={style}>
+      <div
+        className="rail-group"
+        style={style}
+        onMouseEnter={() => onHoverEnter(key, null)}
+        onMouseLeave={onHoverLeave}
+      >
         <button type="button" className="collapse-button" onClick={() => toggleGroupCollapsed(group.id)}>
           {group.collapsed ? "▸" : "▾"}
         </button>
@@ -148,7 +203,7 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
           {person && person.birthDate !== undefined && (
             <button
               type="button"
-              className="icon-button hover-reveal"
+              className={hoverReveal(visible)}
               title="Zoom to life span"
               onClick={() => {
                 const { startMs, endMs } = lifeSpanRange(person.birthDate!);
@@ -163,7 +218,7 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
               {person && (
                 <button
                   type="button"
-                  className="icon-button hover-reveal"
+                  className={hoverReveal(visible)}
                   title="Edit person"
                   onClick={(e) =>
                     openPopover({ kind: "person-edit", personId: person.id, groupId: group.id, top: topOf(e) })
@@ -174,7 +229,7 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
               )}
               <button
                 type="button"
-                className="icon-button hover-reveal"
+                className={hoverReveal(visible)}
                 title="Add…"
                 onClick={(e) => openPopover({ kind: "add-menu", groupId: group.id, top: topOf(e) })}
               >
@@ -191,8 +246,14 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
     const person = item.person;
     const age = computedAge(person);
     const readOnlyPerson = isPublicId(person.id);
+    const visible = hoveredKey === key;
     return (
-      <div className="rail-person" style={style}>
+      <div
+        className="rail-person"
+        style={style}
+        onMouseEnter={() => onHoverEnter(key, null)}
+        onMouseLeave={onHoverLeave}
+      >
         <span className="rail-person-label" title={person.label}>
           {person.label}
           {age !== null && <span className="age-badge">{age}</span>}
@@ -201,7 +262,7 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
           {person.birthDate !== undefined && (
             <button
               type="button"
-              className="icon-button hover-reveal"
+              className={hoverReveal(visible)}
               title="Zoom to life span"
               onClick={() => {
                 const { startMs, endMs } = lifeSpanRange(person.birthDate!);
@@ -215,7 +276,7 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
             <>
               <button
                 type="button"
-                className="icon-button hover-reveal"
+                className={hoverReveal(visible)}
                 title="Edit person"
                 onClick={(e) => openPopover({ kind: "person-edit", personId: person.id, top: topOf(e) })}
               >
@@ -223,7 +284,7 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
               </button>
               <button
                 type="button"
-                className="icon-button hover-reveal"
+                className={hoverReveal(visible)}
                 title="Add…"
                 onClick={(e) =>
                   openPopover({ kind: "add-menu", groupId: item.group!.id, personId: person.id, top: topOf(e) })
@@ -242,11 +303,16 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
     const row = item.row;
     const category = categoryById.get(row.categoryId);
     const hidden = hiddenRowIds.includes(row.id);
+    // A category (top-level) row's buttons also show while hovering any of its
+    // nested timelines; a sub-row's own buttons show only on its own direct hover.
+    const visible = item.isSubRow ? hoveredKey === key : hoveredKey === key || hoveredCategoryRowId === row.id;
     return (
       <div
         className={`rail-row ${item.isSubRow ? "rail-row-sub" : ""} ${row.id === selectedRowId ? "rail-row-selected" : ""}`}
         style={{ ...style, paddingLeft: 8 + item.depth * 14 }}
         onClick={() => selectRow(row.id)}
+        onMouseEnter={() => onHoverEnter(key, categoryRowId)}
+        onMouseLeave={onHoverLeave}
       >
         <input
           type="checkbox"
@@ -266,7 +332,7 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
           <span className="rail-actions">
             <button
               type="button"
-              className="icon-button hover-reveal"
+              className={hoverReveal(visible)}
               title="Add sub-timeline"
               onClick={(e) => {
                 e.stopPropagation();
@@ -277,7 +343,7 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
             </button>
             <button
               type="button"
-              className="icon-button hover-reveal"
+              className={hoverReveal(visible)}
               title="Edit row & category"
               onClick={(e) => {
                 e.stopPropagation();
