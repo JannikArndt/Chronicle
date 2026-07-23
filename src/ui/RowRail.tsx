@@ -30,7 +30,7 @@ const EMOJI_QUICK_PICKS = ["💼", "🏠", "❤️", "🎓", "✈️", "🎨", "
 
 type PopoverState =
   | { kind: "add-menu"; groupId: string; personId?: string; top: number }
-  | { kind: "person-edit"; personId: string; top: number }
+  | { kind: "person-edit"; personId: string; groupId?: string; top: number }
   | { kind: "category-edit"; rowId: string; top: number }
   | { kind: "add-sub-row"; rowId: string; top: number }
   | { kind: "add-group"; top: number }
@@ -140,7 +140,9 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
                 type="button"
                 className="icon-button hover-reveal"
                 title="Edit person"
-                onClick={(e) => openPopover({ kind: "person-edit", personId: person.id, top: topOf(e) })}
+                onClick={(e) =>
+                  openPopover({ kind: "person-edit", personId: person.id, groupId: group.id, top: topOf(e) })
+                }
               >
                 ⚙
               </button>
@@ -278,7 +280,9 @@ function Popover({
         {popover.kind === "add-menu" && (
           <AddMenu groupId={popover.groupId} personId={popover.personId} close={close} />
         )}
-        {popover.kind === "person-edit" && <PersonEditor personId={popover.personId} close={close} />}
+        {popover.kind === "person-edit" && (
+          <PersonEditor personId={popover.personId} groupId={popover.groupId} close={close} />
+        )}
         {popover.kind === "category-edit" && <CategoryEditor rowId={popover.rowId} close={close} />}
         {popover.kind === "add-sub-row" && <SubRowForm rowId={popover.rowId} close={close} />}
       </div>
@@ -437,8 +441,17 @@ function AddMenu({ groupId, personId, close }: { groupId: string; personId?: str
   );
 }
 
-function PersonEditor({ personId, close }: { personId: string; close: () => void }) {
-  const person = useAppState((s) => s.dataset.people.find((p) => p.id === personId));
+function PersonEditor({
+  personId,
+  groupId,
+  close,
+}: {
+  personId: string;
+  groupId?: string;
+  close: () => void;
+}) {
+  const dataset = useAppState((s) => s.dataset);
+  const person = dataset.people.find((p) => p.id === personId);
   if (!person) return null;
   const birthValue =
     person.birthDate !== undefined ? new Date(person.birthDate).toISOString().slice(0, 10) : "";
@@ -461,6 +474,21 @@ function PersonEditor({ personId, close }: { personId: string; close: () => void
           });
         }}
       />
+      {groupId !== undefined && (
+        <button
+          type="button"
+          className="danger-button"
+          onClick={() => {
+            const cascade = collectGroupCascade(dataset, groupId);
+            if (window.confirm(`Delete “${person.label}”? ${describeCascade(cascade)}`)) {
+              deleteGroupWithCascade(groupId);
+              close();
+            }
+          }}
+        >
+          🗑 Delete
+        </button>
+      )}
       <button type="button" className="small-button" onClick={close}>
         Done
       </button>
