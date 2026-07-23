@@ -122,11 +122,15 @@ export function PlacesTable({ placesRowId, birthDateMs, firstRow, onFinished }: 
 
   const ensureTrailingBlankRow = (currentRows: PlaceRow[]): PlaceRow[] => {
     const last = currentRows[currentRows.length - 1];
-    if (last?.entryId) {
-      rowKeyCounter.current += 1;
-      return [...currentRows, { key: `row-${rowKeyCounter.current}`, placeText: "", placeAnswer: null, yearText: "" }];
-    }
-    return currentRows;
+    if (!last?.entryId) return currentRows;
+    // Only append once the year is saved, not merely the place: a place-only
+    // commit (ongoing entry, no end) already has an entryId, and the appended
+    // row's mount-time autofocus would steal focus from the year field the
+    // user is about to fill.
+    const lastEntry = appStore.getState().dataset.entries.find((e) => e.id === last.entryId);
+    if (lastEntry?.end === undefined) return currentRows;
+    rowKeyCounter.current += 1;
+    return [...currentRows, { key: `row-${rowKeyCounter.current}`, placeText: "", placeAnswer: null, yearText: "" }];
   };
 
   // Plain function, not a setState updater — see the file header. Always
@@ -194,6 +198,11 @@ export function PlacesTable({ placesRowId, birthDateMs, firstRow, onFinished }: 
 
   return (
     <div className="places-table">
+      <div className="places-table-header" aria-hidden="true">
+        <span className="places-table-header-place">Place</span>
+        <span className="places-table-header-year">Until</span>
+        <span className="places-table-remove-gutter" />
+      </div>
       {rows.map((row, index) => {
         const showRemove = row.placeText.trim() !== "" || row.entryId !== undefined;
         return (
@@ -228,10 +237,17 @@ export function PlacesTable({ placesRowId, birthDateMs, firstRow, onFinished }: 
               placeholder="Year"
               inputMode="numeric"
             />
-            {showRemove && (
-              <button type="button" className="icon-button" title="Remove this place" onClick={() => removeRow(index)}>
+            {showRemove ? (
+              <button
+                type="button"
+                className="icon-button places-table-remove"
+                title="Remove this place"
+                onClick={() => removeRow(index)}
+              >
                 ✕
               </button>
+            ) : (
+              <span className="places-table-remove-gutter" />
             )}
           </div>
         );

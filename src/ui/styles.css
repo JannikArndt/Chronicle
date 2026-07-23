@@ -713,7 +713,7 @@ textarea {
 }
 
 .assistant-shell {
-  width: 360px;
+  width: 440px;
   max-width: calc(100vw - 32px);
   background: var(--color-surface);
   color: var(--color-text);
@@ -771,6 +771,38 @@ textarea {
   display: flex;
   align-items: flex-start;
   gap: 6px;
+}
+
+/* Column labels above the rows — mirrors the row flex layout exactly:
+   place flex: 1, year 64px, then the fixed remove-button gutter. */
+.places-table-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.places-table-header-place {
+  flex: 1;
+  min-width: 0;
+}
+
+.places-table-header-year {
+  width: 64px;
+  flex: none;
+}
+
+/* Fixed-width remove column: the ✕ button and the spacer (header, rows
+   without ✕) share it so the year column lines up in every row. */
+.places-table-remove,
+.places-table-remove-gutter {
+  width: 24px;
+  flex: none;
+}
+
+.places-table-remove {
+  text-align: center;
 }
 
 .places-table-row .place-autocomplete {

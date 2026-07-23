@@ -35,6 +35,10 @@ export function PlaceAutocompleteInput({
   onBlur,
 }: PlaceAutocompleteInputProps) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  // Gates the dropdown so it never lingers over the next field after focus
+  // moves away. Suggestion buttons preventDefault on mousedown, so clicking
+  // one does not blur the input — selection still runs through onClick.
+  const [isFocused, setIsFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [confirmedSuggestion, setConfirmedSuggestion] = useState<PlaceSuggestion | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -117,20 +121,31 @@ export function PlaceAutocompleteInput({
         value={value}
         onChange={(event) => handleTextChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        onBlur={onBlur}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => {
+          setIsFocused(false);
+          onBlur?.();
+        }}
         placeholder="City, region, or country"
       />
       {confirmedSuggestion && (
         <div className="place-suggestion-confirmed">📍 {formatSuggestionText(confirmedSuggestion)} ✓</div>
       )}
-      {!confirmedSuggestion && suggestions.length > 0 && (
+      {!confirmedSuggestion && isFocused && suggestions.length > 0 && (
         <ul className="place-suggestions">
           {suggestions.map((suggestion, index) => (
             <li
               key={`${suggestion.lat},${suggestion.lon}`}
               className={index === highlightedIndex ? "place-suggestion-highlighted" : undefined}
             >
-              <button type="button" className="menu-item" onClick={() => selectSuggestion(suggestion)}>
+              <button
+                type="button"
+                className="menu-item"
+                // Mousedown would blur the input (hiding this list) before
+                // click fires — prevent it so click-to-select keeps working.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectSuggestion(suggestion)}
+              >
                 <span className="place-suggestion-title">📍 {suggestion.title}</span>
                 {suggestion.subtitle && <span className="place-suggestion-subtitle">{suggestion.subtitle}</span>}
               </button>
