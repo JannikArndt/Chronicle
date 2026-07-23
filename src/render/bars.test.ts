@@ -13,7 +13,6 @@ function entry(overrides: Partial<TimelineEntry>): TimelineEntry {
     rowId: "r1",
     title: "t",
     start: { ms: T0, precision: "day" },
-    visibility: "private",
     ...overrides,
   };
 }

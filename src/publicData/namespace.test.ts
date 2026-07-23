@@ -7,7 +7,7 @@ function fixture(): TimelineDataset {
   const ds = emptyDataset();
   ds.groups = [{ id: "g-1", label: "Apple", collapsed: false }];
   ds.categories = [
-    { id: "cat-1", label: "Releases", color: "#888", icon: "📱", defaultVisibility: "shareable" },
+    { id: "cat-1", label: "Releases", color: "#888", icon: "📱" },
   ];
   ds.rows = [
     { id: "row-1", groupId: "g-1", categoryId: "cat-1", label: "iPhone" },
@@ -19,7 +19,6 @@ function fixture(): TimelineDataset {
       rowId: "row-1",
       title: "iPhone",
       start: { ms: 0, precision: "day" },
-      visibility: "shareable",
     },
     {
       id: "e-2",
@@ -27,7 +26,6 @@ function fixture(): TimelineDataset {
       title: "Launch event",
       start: { ms: 0, precision: "day" },
       parentEntryId: "e-1",
-      visibility: "shareable",
     },
   ];
   return ds;

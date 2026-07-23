@@ -10,15 +10,9 @@ import { clearSelection, deleteEntryWithCascade, updateEntry, updateRow } from "
 import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { DateField } from "./DateField";
 import { PillSelector } from "./PillSelector";
-import type { PillOption } from "./PillSelector";
 import { PlaceAutocompleteInput } from "../onboarding/PlaceAutocompleteInput";
 import { formatSuggestionText } from "../onboarding/nominatim";
 import type { PlaceSuggestion } from "../onboarding/nominatim";
-
-const VISIBILITY_OPTIONS: PillOption<"private" | "shareable">[] = [
-  { value: "private", icon: "🔒", label: "private" },
-  { value: "shareable", icon: "🔗", label: "shareable" },
-];
 
 export function DetailPanel() {
   const state = useAppState((s) => s);
@@ -171,16 +165,6 @@ export function DetailPanel() {
           />
         </div>
       )}
-
-      <div className="field">
-        <label className="field-label">Visibility</label>
-        <PillSelector
-          options={VISIBILITY_OPTIONS}
-          value={entry.visibility}
-          disabled={readOnly}
-          onChange={(visibility) => change({ visibility })}
-        />
-      </div>
 
       {!readOnly && !isDraft && (
         <button

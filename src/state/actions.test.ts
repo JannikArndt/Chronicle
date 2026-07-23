@@ -18,7 +18,7 @@ const T0 = Date.UTC(2020, 0, 1);
 
 function fixture(): TimelineDataset {
   const ds = emptyDataset();
-  ds.categories = [{ id: "cat-1", label: "Job", color: "#333", icon: "💼", defaultVisibility: "private" }];
+  ds.categories = [{ id: "cat-1", label: "Job", color: "#333", icon: "💼" }];
   ds.groups = [{ id: "g1", label: "Me", collapsed: false }];
   ds.rows = [{ id: "r1", groupId: "g1", categoryId: "cat-1", label: "Job" }];
   ds.entries = [
@@ -27,7 +27,6 @@ function fixture(): TimelineDataset {
       rowId: "r1",
       title: "First job",
       start: { ms: T0, precision: "day" },
-      visibility: "private",
     },
   ];
   return ds;

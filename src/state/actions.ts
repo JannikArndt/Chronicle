@@ -66,17 +66,11 @@ export function clearSelection(): void {
 // ---------- drafts (§6: inserted only once titled) ----------
 
 export function startDraft(rowId: string, startMs: number): void {
-  const state = appStore.getState();
-  const category = (() => {
-    const row = state.dataset.rows.find((r) => r.id === rowId);
-    return state.dataset.categories.find((c) => c.id === row?.categoryId);
-  })();
   const draft: TimelineEntry = {
     id: newId("entry"),
     rowId,
     title: "",
     start: { ms: startMs, precision: "day" },
-    visibility: category?.defaultVisibility ?? "private",
   };
   appStore.setState({ draft, selectedEntryId: undefined, selectedRowId: rowId });
 }
@@ -177,7 +171,6 @@ export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAns
       : undefined,
     start: { ms: place.startMs, precision: "year" },
     end: place.endMs !== undefined ? { ms: place.endMs, precision: "year" } : undefined,
-    visibility: "private",
   };
   updateDataset((dataset) => {
     dataset.entries.push(draft);
@@ -255,7 +248,6 @@ function ensureCategory(dataset: TimelineDataset, label: string, color: string, 
     label,
     color,
     icon,
-    defaultVisibility: "private",
   };
   dataset.categories.push(category);
   return category;

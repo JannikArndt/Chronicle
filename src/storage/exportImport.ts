@@ -13,9 +13,10 @@ export type ImportResult = { ok: true; dataset: TimelineDataset } | { ok: false;
 
 const ARRAY_FIELDS = ["people", "groups", "categories", "rows", "entries"] as const;
 
-// Oldest export shape this importer still reads. v1/v2 files are structurally
-// valid as-is: v2 only added the optional selfPersonId, and v3 only dropped the
-// (now-ignored) `entities`/`linkedEntityIds` fields — no migration needed, those
+// Oldest export shape this importer still reads. v1/v2/v3 files are
+// structurally valid as-is: v2 only added the optional selfPersonId, v3
+// dropped the (now-ignored) `entities`/`linkedEntityIds` fields, and v4
+// dropped `visibility`/`defaultVisibility` — no migration needed, those
 // fields just go unread on an older file.
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
 
@@ -44,9 +45,10 @@ export function validateImport(raw: unknown): ImportResult {
     }
   }
   // No field migration needed beyond the version bump: v1→v2's diff (selfPersonId)
-  // is optional and stays undefined; v3 only removes fields the app no longer
-  // reads, so any leftover `entities`/`linkedEntityIds` in an older file are
-  // simply ignored rather than migrated.
+  // is optional and stays undefined; v3 and v4 only remove fields the app no
+  // longer reads (`entities`/`linkedEntityIds`, then `visibility`/
+  // `defaultVisibility`), so any leftover copies in an older file are simply
+  // ignored rather than migrated.
   if (schemaVersion < SCHEMA_VERSION) {
     candidate.schemaVersion = SCHEMA_VERSION;
   }

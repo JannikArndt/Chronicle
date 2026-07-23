@@ -5,7 +5,7 @@
 // A date like "2020-05-14" always means 2020-05-14T00:00:00Z regardless of the
 // viewer's local timezone, so a dataset renders identically on every device.
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export type Precision = "exact" | "day" | "month" | "year" | "circa";
 
@@ -20,7 +20,6 @@ export interface Category {
   label: string;
   color: string; // any CSS color — a native color picker, not a fixed palette
   icon: string; // any emoji — free-text input, plus a few quick-picks for convenience
-  defaultVisibility: "private" | "shareable";
 }
 
 export interface Person {
@@ -77,7 +76,6 @@ export interface TimelineEntry {
   fadeInDays?: number; // gradual start (e.g. "grew into" a relationship) — visually
   fadeOutDays?: number; // distinct from precision fuzziness, but combined into one continuous edge (§5)
   parentEntryId?: string; // links a sub-timeline entry to the parent entry it nests under
-  visibility: "private" | "shareable";
 }
 
 export interface TimelineDataset {

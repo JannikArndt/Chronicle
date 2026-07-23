@@ -24,7 +24,6 @@ import {
 } from "../state/actions";
 import { isPublicId, useAppState } from "../state/store";
 import type { Category, Person } from "../model/types";
-import { PillSelector } from "./PillSelector";
 import { triggerImportFlow } from "../storage/exportImport";
 
 const EMOJI_QUICK_PICKS = ["💼", "🏠", "❤️", "🎓", "✈️", "🎨", "⚽", "🐕"];
@@ -561,11 +560,6 @@ function PersonEditor({
   );
 }
 
-const VISIBILITY_PILLS = [
-  { value: "private" as const, icon: "🔒", label: "private" },
-  { value: "shareable" as const, icon: "🔗", label: "shareable" },
-];
-
 function CategoryEditor({ rowId, close }: { rowId: string; close: () => void }) {
   const dataset = useAppState((s) => s.dataset);
   const row = dataset.rows.find((r) => r.id === rowId);
@@ -610,11 +604,6 @@ function CategoryEditor({ rowId, close }: { rowId: string; close: () => void }) 
           ))}
         </span>
       </div>
-      <PillSelector
-        options={VISIBILITY_PILLS}
-        value={category.defaultVisibility}
-        onChange={(defaultVisibility) => updateCategory(category.id, { defaultVisibility })}
-      />
       <div className="hint">
         Category in use by {blockers.length} row{blockers.length === 1 ? "" : "s"} (
         {blockers.map((b) => b.label).join(", ")}) — it can only be deleted once no row uses it.
