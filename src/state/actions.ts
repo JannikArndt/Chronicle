@@ -161,9 +161,12 @@ export function completeIdentityStep(name: string): IdentitySetupResult {
 }
 
 export interface OnboardingPlaceAnswer {
-  label: string;
+  label: string; // short display title — kept as `label` for backward compatibility with existing tests/call sites
   startMs: number;
   endMs?: number; // absent = "still living here" (ongoing)
+  subtitle?: string;
+  fullName?: string;
+  coordinates?: { lat: number; lon: number };
 }
 
 // Onboarding places loop: entries are built directly (not through the
@@ -171,7 +174,11 @@ export interface OnboardingPlaceAnswer {
 // preserving the invariant that every insert is checked — by construction
 // these are always chronological appends, so it's a defensive no-op here.
 export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAnswer): void {
-  const entity = ensureEntity(place.label, "place");
+  const entity = ensureEntity(
+    place.label,
+    "place",
+    place.fullName ? { fullName: place.fullName, coordinates: place.coordinates, subtitle: place.subtitle } : undefined,
+  );
   const draft: TimelineEntry = {
     id: newId("entry"),
     rowId,
@@ -317,12 +324,32 @@ export function updatePerson(personId: string, patch: Partial<Person>): void {
 }
 
 // Reuses an existing private entity with the same label; creates it otherwise.
-export function ensureEntity(label: string, kind: Entity["kind"]): Entity {
+// For kind "place", placeDetails carries the full address/coordinates that
+// shouldn't be shown as the label itself (that stays a short display title).
+// Matching an existing entity that has no place data yet upgrades it in
+// place rather than overwriting already-set place data.
+export function ensureEntity(
+  label: string,
+  kind: Entity["kind"],
+  placeDetails?: { fullName: string; coordinates?: { lat: number; lon: number }; subtitle?: string },
+): Entity {
   const existing = appStore
     .getState()
     .dataset.entities.find((e) => e.label.toLowerCase() === label.toLowerCase());
-  if (existing) return existing;
-  const entity: Entity = { id: newId("ent"), kind, label };
+  if (existing) {
+    if (placeDetails && !existing.place) {
+      let upgraded!: Entity;
+      updateDataset((dataset) => {
+        const entity = dataset.entities.find((e) => e.id === existing.id);
+        if (entity) entity.place = placeDetails;
+        upgraded = entity ?? existing;
+        return dataset;
+      });
+      return upgraded;
+    }
+    return existing;
+  }
+  const entity: Entity = { id: newId("ent"), kind, label, place: placeDetails };
   updateDataset((dataset) => {
     dataset.entities.push(entity);
     return dataset;

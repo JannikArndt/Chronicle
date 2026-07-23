@@ -183,8 +183,11 @@ export function DetailPanel() {
         <label className="field-label">Linked entities</label>
         {linkedEntities.map((entity) => (
           <div key={entity.id} className="entity-chip">
-            <span>
-              {ENTITY_KIND_OPTIONS.find((o) => o.value === entity.kind)?.icon} {entity.label}
+            <span className="entity-chip-text">
+              <span className="entity-chip-title">
+                {ENTITY_KIND_OPTIONS.find((o) => o.value === entity.kind)?.icon} {entity.label}
+              </span>
+              {entity.place?.subtitle && <span className="entity-chip-subtitle">{entity.place.subtitle}</span>}
             </span>
             {!readOnly && (
               <button

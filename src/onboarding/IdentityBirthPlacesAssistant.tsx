@@ -17,6 +17,13 @@ type Phase =
   | { kind: "place"; iteration: number }
   | { kind: "until"; iteration: number };
 
+interface PlaceAnswer {
+  title: string;
+  subtitle?: string;
+  fullName: string;
+  coordinates?: { lat: number; lon: number };
+}
+
 interface IdentityBirthPlacesAssistantProps {
   onFinished: () => void;
 }
@@ -29,7 +36,8 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
   const [untilText, setUntilText] = useState("");
   const [setup, setSetup] = useState<{ personId: string; groupId: string; placesRowId: string } | null>(null);
   const [startMsByIteration, setStartMsByIteration] = useState<Record<number, number>>({});
-  const [placeLabelByIteration, setPlaceLabelByIteration] = useState<Record<number, string>>({});
+  const [placeAnswerByIteration, setPlaceAnswerByIteration] = useState<Record<number, PlaceAnswer>>({});
+  const [selectedSuggestion, setSelectedSuggestion] = useState<import("./nominatim").PlaceSuggestion | null>(null);
 
   const commitName = () => {
     const trimmed = name.trim();
@@ -60,7 +68,17 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     const trimmed = placeText.trim();
     if (trimmed === "" || flow.phase.kind !== "place") return;
     const iteration = flow.phase.iteration;
-    setPlaceLabelByIteration((prev) => ({ ...prev, [iteration]: trimmed }));
+    const answer: PlaceAnswer =
+      selectedSuggestion && selectedSuggestion.title === trimmed
+        ? {
+            title: selectedSuggestion.title,
+            subtitle: selectedSuggestion.subtitle,
+            fullName: selectedSuggestion.fullName,
+            coordinates: { lat: Number(selectedSuggestion.lat), lon: Number(selectedSuggestion.lon) },
+          }
+        : { title: trimmed, subtitle: undefined, fullName: trimmed, coordinates: undefined };
+    setPlaceAnswerByIteration((prev) => ({ ...prev, [iteration]: answer }));
+    setSelectedSuggestion(null);
     setPlaceText("");
     flow.advance({ kind: "until", iteration });
   };
@@ -72,13 +90,16 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     if (flow.phase.kind !== "until") return;
     const iteration = flow.phase.iteration;
     const startMs = startMsByIteration[iteration];
-    const label = placeLabelByIteration[iteration];
-    if (!setup || startMs === undefined || label === undefined) return;
+    const place = placeAnswerByIteration[iteration];
+    if (!setup || startMs === undefined || place === undefined) return;
 
     addOnboardingPlaceEntry(setup.placesRowId, {
-      label,
+      label: place.title,
       startMs,
       endMs: endParsed?.ms,
+      subtitle: place.subtitle,
+      fullName: place.fullName,
+      coordinates: place.coordinates,
     });
     setUntilText("");
 
@@ -146,7 +167,15 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
           onBack={flow.canGoBack && flow.phase.iteration === 1 ? flow.back : undefined}
           onSkip={onFinished}
         >
-          <PlaceAutocompleteInput value={placeText} onChange={setPlaceText} onSubmit={commitPlace} />
+          <PlaceAutocompleteInput
+            value={placeText}
+            onChange={(text) => {
+              setPlaceText(text);
+              if (selectedSuggestion && text !== selectedSuggestion.title) setSelectedSuggestion(null);
+            }}
+            onSubmit={commitPlace}
+            onSelect={(suggestion) => setSelectedSuggestion(suggestion)}
+          />
           <button type="button" className="small-button" onClick={commitPlace}>
             Next →
           </button>
@@ -161,7 +190,7 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     case "until":
       return (
         <AssistantStepShell
-          prompt={`Until when did you live in ${placeLabelByIteration[flow.phase.iteration] ?? "this place"}?`}
+          prompt={`Until when did you live in ${placeAnswerByIteration[flow.phase.iteration]?.title ?? "this place"}?`}
           hint="Leave blank if you still live there. You can fine-tune the exact month or day later."
           stepIndex={flow.stepIndex}
           onBack={flow.canGoBack ? flow.back : undefined}

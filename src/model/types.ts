@@ -59,7 +59,13 @@ export interface TimelineRow {
 export interface Entity {
   id: string;
   kind: "person" | "place" | "organization" | "object" | "other";
-  label: string;
+  label: string; // for kind "place", this is the short display title (street+number+city, or just city)
+  // Only ever set when kind === "place".
+  place?: {
+    fullName: string; // the complete address/name as returned by the source (or as typed, if free-text)
+    coordinates?: { lat: number; lon: number }; // absent for free-text entries with no picked suggestion
+    subtitle?: string; // secondary context line, e.g. the city when the title is a street; state/country when the title is a city
+  };
 }
 
 export interface TimelineEntry {

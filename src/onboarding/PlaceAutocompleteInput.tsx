@@ -10,11 +10,12 @@ interface PlaceAutocompleteInputProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  onSelect: (suggestion: PlaceSuggestion) => void;
 }
 
 const DEBOUNCE_MS = 500;
 
-export function PlaceAutocompleteInput({ value, onChange, onSubmit }: PlaceAutocompleteInputProps) {
+export function PlaceAutocompleteInput({ value, onChange, onSubmit, onSelect }: PlaceAutocompleteInputProps) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -49,11 +50,13 @@ export function PlaceAutocompleteInput({ value, onChange, onSubmit }: PlaceAutoc
                 type="button"
                 className="menu-item"
                 onClick={() => {
-                  onChange(suggestion.label);
+                  onSelect(suggestion);
+                  onChange(suggestion.title);
                   setSuggestions([]);
                 }}
               >
-                {suggestion.label}
+                <span className="place-suggestion-title">📍 {suggestion.title}</span>
+                {suggestion.subtitle && <span className="place-suggestion-subtitle">{suggestion.subtitle}</span>}
               </button>
             </li>
           ))}

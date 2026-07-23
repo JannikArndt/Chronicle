@@ -506,6 +506,17 @@ textarea {
   font-size: 13px;
 }
 
+.entity-chip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.entity-chip-subtitle {
+  font-size: 11px;
+  color: #78716c;
+}
+
 .entity-adder {
   display: flex;
   flex-direction: column;
@@ -657,6 +668,18 @@ textarea {
   width: 100%;
   text-align: left;
   font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.place-suggestion-title {
+  font-weight: 600;
+}
+
+.place-suggestion-subtitle {
+  font-size: 11px;
+  color: #78716c;
 }
 
 @media (max-width: 640px) {
