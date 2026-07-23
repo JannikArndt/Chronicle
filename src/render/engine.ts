@@ -8,7 +8,7 @@ import type { Layout, LayoutItem } from "./layout";
 import { ROW_HEIGHT } from "./layout";
 import { barGeometry, gradientStops, labelAnchorX } from "./bars";
 import type { BarGeometry } from "./bars";
-import { clampScale, msToX, panBy, xToMs, zoomAt } from "./timeScale";
+import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
 import type { TimeScale } from "./timeScale";
 import { computeTicks, snapForScale } from "./timeAxis";
 import { formatFuzzyDate } from "../model/fuzzyDate";
@@ -198,6 +198,11 @@ export class TimelineEngine {
 
   jumpToNow(): void {
     this.scale = { ...this.scale, startMs: Date.now() - (this.width / 2) * this.scale.msPerPx };
+    this.requestDraw();
+  }
+
+  zoomToRange(startMs: number, endMs: number): void {
+    this.scale = scaleForRange(startMs, endMs, this.width);
     this.requestDraw();
   }
 
