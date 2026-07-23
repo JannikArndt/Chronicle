@@ -13,16 +13,21 @@ export type ImportResult = { ok: true; dataset: TimelineDataset } | { ok: false;
 
 const ARRAY_FIELDS = ["people", "groups", "categories", "rows", "entities", "entries"] as const;
 
+// Oldest export shape this importer still reads. v1's only difference from v2 is
+// the (optional) selfPersonId field, so v1 files are already structurally valid.
+const MIN_SUPPORTED_SCHEMA_VERSION = 1;
+
 export function validateImport(raw: unknown): ImportResult {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return { ok: false, error: "Not a Chronicle export: expected a JSON object." };
   }
   const candidate = raw as Record<string, unknown>;
-  if (candidate.schemaVersion !== SCHEMA_VERSION) {
+  const schemaVersion = candidate.schemaVersion;
+  if (typeof schemaVersion !== "number" || schemaVersion < MIN_SUPPORTED_SCHEMA_VERSION || schemaVersion > SCHEMA_VERSION) {
     return {
       ok: false,
       error:
-        `Unsupported schemaVersion ${String(candidate.schemaVersion)} — this app reads version ${SCHEMA_VERSION}. ` +
+        `Unsupported schemaVersion ${String(schemaVersion)} — this app reads versions ${MIN_SUPPORTED_SCHEMA_VERSION} through ${SCHEMA_VERSION}. ` +
         `Import aborted to avoid corrupting your data.`,
     };
   }
@@ -35,6 +40,11 @@ export function validateImport(raw: unknown): ImportResult {
     if (typeof entry.id !== "string" || typeof entry.rowId !== "string" || typeof entry.start !== "object") {
       return { ok: false, error: "Malformed entry found (needs id, rowId, start). Import aborted." };
     }
+  }
+  // No field migration needed beyond the version bump: every schema difference
+  // between v1 and v2 (selfPersonId) is optional and simply stays undefined.
+  if (schemaVersion < SCHEMA_VERSION) {
+    candidate.schemaVersion = SCHEMA_VERSION;
   }
   return { ok: true, dataset: candidate as unknown as TimelineDataset };
 }

@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import { loadDataset, saveDataset } from "./db";
 import { parseImportFile, serializeDataset, validateImport } from "./exportImport";
 import { emptyDataset } from "../model/dataset";
+import { SCHEMA_VERSION } from "../model/types";
 
 describe("IndexedDB round-trip", () => {
   test("save then load returns the same dataset", async () => {
@@ -24,6 +25,13 @@ describe("import validation", () => {
     const result = validateImport({ ...emptyDataset(), schemaVersion: 99 });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("schemaVersion 99");
+  });
+
+  test("accepts a v1 export and upgrades it to the current schemaVersion", () => {
+    const dataset = { ...emptyDataset(), schemaVersion: 1 };
+    const result = validateImport(dataset);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.dataset.schemaVersion).toBe(SCHEMA_VERSION);
   });
 
   test("rejects structurally broken files", () => {
