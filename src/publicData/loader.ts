@@ -21,15 +21,11 @@ export function loadPublicDatasets(): TimelineDataset[] {
   return datasets;
 }
 
-// Public files omit `visibility` (always shareable) and `people`; fill the
-// gaps so the rest of the app sees a complete TimelineDataset.
+// Public files omit `people`; fill the gap so the rest of the app sees a
+// complete TimelineDataset.
 function withPublicDefaults(raw: TimelineDataset): TimelineDataset {
   return {
     ...raw,
     people: raw.people ?? [],
-    entries: raw.entries.map((entry) => ({
-      ...entry,
-      visibility: "shareable",
-    })),
   };
 }

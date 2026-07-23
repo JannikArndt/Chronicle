@@ -12,8 +12,7 @@
       "id": "cat-1",
       "label": "Best Picture",
       "color": "#c9a227",
-      "icon": "🏆",
-      "defaultVisibility": "shareable"
+      "icon": "🏆"
     }
   ],
   "rows": [

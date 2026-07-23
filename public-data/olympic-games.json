@@ -12,8 +12,7 @@
       "id": "cat-1",
       "label": "Games",
       "color": "#0f6ab4",
-      "icon": "🏅",
-      "defaultVisibility": "shareable"
+      "icon": "🏅"
     }
   ],
   "rows": [

@@ -12,8 +12,7 @@
       "id": "cat-1",
       "label": "Firsts",
       "color": "#e63946",
-      "icon": "🚀",
-      "defaultVisibility": "shareable"
+      "icon": "🚀"
     }
   ],
   "rows": [

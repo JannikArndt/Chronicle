@@ -12,8 +12,7 @@
       "id": "cat-1",
       "label": "Tournaments",
       "color": "#1a7a3c",
-      "icon": "⚽",
-      "defaultVisibility": "shareable"
+      "icon": "⚽"
     }
   ],
   "rows": [

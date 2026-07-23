@@ -12,8 +12,7 @@
       "id": "cat-1",
       "label": "Box Office",
       "color": "#c8102e",
-      "icon": "🎬",
-      "defaultVisibility": "shareable"
+      "icon": "🎬"
     }
   ],
   "rows": [

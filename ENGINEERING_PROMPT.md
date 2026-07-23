@@ -173,7 +173,7 @@ Row-level controls, always visible in the rail: a visibility checkbox, the categ
 
 ## 7. Deferred — reserved in the data model, not built now
 
-- **Publish/subscribe sharing**: eventually, a user should be able to publish a subset of their timelines (tagged `visibility: "shareable"`) as a static export that others "subscribe" to, iCal-subscription-style, decentralized, with the original owner staying the source of truth. `visibility` exists on every entry today specifically so this needs no schema migration later — but no publish/export/subscribe UI ships in v1.
+- **Publish/subscribe sharing**: eventually, a user should be able to publish a subset of their timelines as a static export that others "subscribe" to, iCal-subscription-style, decentralized, with the original owner staying the source of truth — no publish/subscribe UI ships in v1. **DEPRECATED (2026-07-23):** the `visibility`/`defaultVisibility` field this bullet originally reserved for that purpose has been removed. The Share feature that *did* ship (see `docs/superpowers/plans/2026-07-23-share-feature.md`) instead lets the user pick which groups/rows to include at share time, with no schema field involved.
 - **GitHub Gist sync** for non-technical users: still an open problem (see §3). Don't paper over it with a fake solution; leave it as a clearly marked gap.
 - **Nested people** (a person containing their own person sub-groups): the data model's group/person asymmetry (§2) doesn't support this. Not needed yet — revisit only if a real scenario demands it.
 

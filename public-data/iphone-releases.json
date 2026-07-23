@@ -12,8 +12,7 @@
       "id": "cat-1",
       "label": "Releases",
       "color": "#5e8d9c",
-      "icon": "📱",
-      "defaultVisibility": "shareable"
+      "icon": "📱"
     }
   ],
   "rows": [
