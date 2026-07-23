@@ -227,6 +227,7 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
           onSkip={onFinished}
         >
           <input
+            autoFocus
             value={untilText}
             onChange={(event) => setUntilText(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && commitUntil()}
