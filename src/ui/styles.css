@@ -633,14 +633,24 @@ textarea {
 }
 
 .place-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
   list-style: none;
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   padding: 0;
-  border: 1px solid #d6d3cd;
+  border: 1px solid #cfcbc0;
   border-radius: 8px;
-  background: #fff;
+  background: #f8f7f4;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   max-height: 180px;
   overflow-y: auto;
+}
+
+.place-suggestions li:not(:first-child) {
+  border-top: 1px solid #eceae4;
 }
 
 .place-suggestions li button {
