@@ -133,7 +133,7 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     case "place":
       return (
         <AssistantStepShell
-          prompt={flow.phase.iteration === 1 ? "Where were you born?" : "Where did you live next?"}
+          prompt={flow.phase.iteration === 1 ? "Where did you live first?" : "Where did you live next?"}
           hint="You can fine-tune the exact address later."
           stepIndex={flow.stepIndex}
           // Reaching place{N>1} means iteration N-1's entry was already
