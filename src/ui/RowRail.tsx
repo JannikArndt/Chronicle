@@ -2,8 +2,8 @@
 // and native color/date inputs. It renders from the SAME layout the canvas
 // uses and is translated by the canvas scroll position every frame.
 
-import { useState } from "react";
-import type { MutableRefObject, RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { categoryDeleteBlockers, collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
@@ -14,6 +14,8 @@ import {
   addSubRow,
   deleteGroupWithCascade,
   deleteRowWithCascade,
+  moveRow,
+  reorderGroup,
   replaceDataset,
   selectRow,
   toggleGroupCollapsed,
@@ -44,6 +46,270 @@ function isFooterPopover(kind: NonNullable<PopoverState>["kind"]): boolean {
   return kind === "add-group" || kind === "add-person" || kind === "rail-add-menu";
 }
 
+// ---------- drag-and-drop (reorder groups, move rows) ----------
+// Hand-rolled Pointer Events (pointerdown/move/up + setPointerCapture) — one
+// code path for mouse, trackpad, and touch, same category as the canvas
+// engine's pan/zoom. No library, no HTML5 DnD (plans/rail-drag-and-drop.md).
+
+// What the pressed handle belongs to.
+type DragDescriptor = { kind: "group"; groupId: string } | { kind: "row"; rowId: string };
+
+// Where releasing the pointer would drop it.
+type DropTarget =
+  | { kind: "group"; beforeGroupId: string | null }
+  | { kind: "row"; targetGroupId: string; beforeRowId: string | null };
+
+// One candidate insertion line: the drop it stands for and its on-screen Y.
+interface DropSlot {
+  drop: DropTarget;
+  clientY: number;
+}
+
+interface ActiveDrag {
+  descriptor: DragDescriptor;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  started: boolean; // pointer moved past the click threshold
+  drop: DropTarget | null;
+}
+
+// A press that moves less than this is a click, not a drag.
+const DRAG_START_THRESHOLD_PX = 4;
+// How far outside the rail the pointer may stray before the drop is invalid.
+const RAIL_BOUNDS_MARGIN_PX = 32;
+
+interface RailDragController {
+  // Y (in rail-content coordinates) of the insertion-line indicator, or null.
+  indicatorTop: number | null;
+  startDrag: (event: ReactPointerEvent<HTMLElement>, descriptor: DragDescriptor) => void;
+  updateDrag: (event: ReactPointerEvent<HTMLElement>) => void;
+  finishDrag: (event: ReactPointerEvent<HTMLElement>) => void;
+  cancelDrag: () => void;
+}
+
+function useRailDragController(railContentRef: RefObject<HTMLDivElement>): RailDragController {
+  // The drag itself lives in a ref: pointermove fires every frame and only the
+  // indicator needs a re-render.
+  const activeDragRef = useRef<ActiveDrag | null>(null);
+  const [indicatorTop, setIndicatorTop] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const cancelDrag = () => {
+    activeDragRef.current = null;
+    setIndicatorTop(null);
+    setIsDragging(false);
+  };
+
+  // Escape aborts with no mutation; the captured pointer's remaining events
+  // are ignored because activeDragRef is already null.
+  useEffect(() => {
+    if (!isDragging) return;
+    const abortOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") cancelDrag();
+    };
+    window.addEventListener("keydown", abortOnEscape);
+    return () => window.removeEventListener("keydown", abortOnEscape);
+  }, [isDragging]);
+
+  const startDrag = (event: ReactPointerEvent<HTMLElement>, descriptor: DragDescriptor) => {
+    // Don't let the press bubble into row selection or start a text selection.
+    event.stopPropagation();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    activeDragRef.current = {
+      descriptor,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      started: false,
+      drop: null,
+    };
+    setIsDragging(true);
+  };
+
+  const updateDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    const activeDrag = activeDragRef.current;
+    const railContent = railContentRef.current;
+    if (!activeDrag || !railContent || event.pointerId !== activeDrag.pointerId) return;
+    if (!activeDrag.started) {
+      const distance = Math.hypot(
+        event.clientX - activeDrag.startClientX,
+        event.clientY - activeDrag.startClientY,
+      );
+      if (distance < DRAG_START_THRESHOLD_PX) return;
+      activeDrag.started = true;
+    }
+    const slot = resolveDropSlot(railContent, activeDrag.descriptor, event.clientX, event.clientY);
+    activeDrag.drop = slot?.drop ?? null;
+    // The rail is scroll-translated by the engine every frame, so slot Ys are
+    // read from live client rects and converted here, not from layout math.
+    setIndicatorTop(slot === null ? null : slot.clientY - railContent.getBoundingClientRect().top);
+  };
+
+  const finishDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    const activeDrag = activeDragRef.current;
+    if (!activeDrag || event.pointerId !== activeDrag.pointerId) return;
+    if (activeDrag.started && activeDrag.drop !== null) applyDrop(activeDrag.descriptor, activeDrag.drop);
+    cancelDrag();
+  };
+
+  return { indicatorTop, startDrag, updateDrag, finishDrag, cancelDrag };
+}
+
+function applyDrop(descriptor: DragDescriptor, drop: DropTarget): void {
+  if (descriptor.kind === "group" && drop.kind === "group") {
+    reorderGroup(descriptor.groupId, drop.beforeGroupId);
+  }
+  if (descriptor.kind === "row" && drop.kind === "row") {
+    moveRow(descriptor.rowId, drop.targetGroupId, drop.beforeRowId);
+  }
+}
+
+// A rail item as read back from the live DOM. Hit-testing works on client
+// rects because the engine translates the rail via direct style mutation
+// every frame — layout.y alone would miss that offset.
+interface RailElementInfo {
+  kind: "group" | "person" | "row";
+  id: string;
+  isSubRow: boolean;
+  rect: DOMRect;
+}
+
+function readRailElements(railContent: HTMLElement): RailElementInfo[] {
+  // querySelectorAll returns document order, which is layout order.
+  return Array.from(railContent.querySelectorAll<HTMLElement>("[data-rail-kind]")).map((element) => ({
+    kind: element.dataset.railKind as RailElementInfo["kind"],
+    id: element.dataset.railId ?? "",
+    isSubRow: element.dataset.railSubRow === "true",
+    rect: element.getBoundingClientRect(),
+  }));
+}
+
+function resolveDropSlot(
+  railContent: HTMLElement,
+  descriptor: DragDescriptor,
+  clientX: number,
+  clientY: number,
+): DropSlot | null {
+  if (!isPointerInsideRailBounds(railContent, clientX, clientY)) return null;
+  const elements = readRailElements(railContent);
+  const slots =
+    descriptor.kind === "group"
+      ? computeGroupDropSlots(elements, descriptor.groupId)
+      : computeRowDropSlots(elements, descriptor.rowId);
+  return nearestDropSlot(slots, clientY);
+}
+
+function isPointerInsideRailBounds(railContent: HTMLElement, clientX: number, clientY: number): boolean {
+  const rect = railContent.getBoundingClientRect();
+  return (
+    clientX >= rect.left - RAIL_BOUNDS_MARGIN_PX &&
+    clientX <= rect.right + RAIL_BOUNDS_MARGIN_PX &&
+    clientY >= rect.top - RAIL_BOUNDS_MARGIN_PX &&
+    clientY <= rect.bottom + RAIL_BOUNDS_MARGIN_PX
+  );
+}
+
+// Group drag: one slot per private group header ("before this group") plus a
+// final slot after the last private item ("end of the list"). Public groups
+// are read-only and never drop anchors.
+function computeGroupDropSlots(elements: RailElementInfo[], draggedGroupId: string): DropSlot[] {
+  const slots: DropSlot[] = [];
+  let insidePrivateGroup = false;
+  let lastPrivateBottom: number | null = null;
+  for (const element of elements) {
+    if (element.kind === "group") {
+      insidePrivateGroup = !isPublicId(element.id);
+      if (insidePrivateGroup && element.id !== draggedGroupId) {
+        slots.push({ drop: { kind: "group", beforeGroupId: element.id }, clientY: element.rect.top });
+      }
+    }
+    if (insidePrivateGroup) lastPrivateBottom = element.rect.bottom;
+  }
+  if (lastPrivateBottom !== null) {
+    slots.push({ drop: { kind: "group", beforeGroupId: null }, clientY: lastPrivateBottom });
+  }
+  return slots;
+}
+
+// Row drag: one slot per top-level private row ("before this row") plus, per
+// private group, an end-of-group slot after its last item — which for an
+// empty or collapsed group is the header itself, so dropping onto a group
+// header means "end of that group" (the plan's rule). Sub-rows are never
+// anchors (they follow their parent) but do extend the group's bottom.
+function computeRowDropSlots(elements: RailElementInfo[], draggedRowId: string): DropSlot[] {
+  const slots: DropSlot[] = [];
+  let currentGroupId: string | null = null; // null while inside a public group
+  let currentGroupBottom = 0;
+  const closeCurrentGroup = () => {
+    if (currentGroupId !== null) {
+      slots.push({
+        drop: { kind: "row", targetGroupId: currentGroupId, beforeRowId: null },
+        clientY: currentGroupBottom,
+      });
+    }
+  };
+  for (const element of elements) {
+    if (element.kind === "group") {
+      closeCurrentGroup();
+      currentGroupId = isPublicId(element.id) ? null : element.id;
+      currentGroupBottom = element.rect.bottom;
+      continue;
+    }
+    if (currentGroupId === null) continue;
+    if (element.kind === "row" && !element.isSubRow && element.id !== draggedRowId) {
+      slots.push({
+        drop: { kind: "row", targetGroupId: currentGroupId, beforeRowId: element.id },
+        clientY: element.rect.top,
+      });
+    }
+    currentGroupBottom = element.rect.bottom;
+  }
+  closeCurrentGroup();
+  return slots;
+}
+
+function nearestDropSlot(slots: DropSlot[], clientY: number): DropSlot | null {
+  let nearest: DropSlot | null = null;
+  let nearestDistance = Infinity;
+  for (const slot of slots) {
+    const distance = Math.abs(slot.clientY - clientY);
+    if (distance < nearestDistance) {
+      nearest = slot;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
+// The ≡ handle. A click (movement under the threshold) does nothing — the
+// drag only starts once the pointer actually moves.
+function RailDragHandle({
+  className,
+  dragController,
+  descriptor,
+}: {
+  className: string;
+  dragController: RailDragController;
+  descriptor: DragDescriptor;
+}) {
+  return (
+    <button
+      type="button"
+      className={`${className} rail-drag-handle`}
+      title="Drag to reorder"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => dragController.startDrag(e, descriptor)}
+      onPointerMove={dragController.updateDrag}
+      onPointerUp={dragController.finishDrag}
+      onPointerCancel={dragController.cancelDrag}
+    >
+      ≡
+    </button>
+  );
+}
+
 interface RowRailProps {
   layout: Layout;
   railContentRef: RefObject<HTMLDivElement>;
@@ -65,6 +331,7 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
   // buttons also light up while hovering any of its nested timelines.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [hoveredCategoryRowId, setHoveredCategoryRowId] = useState<string | null>(null);
+  const dragController = useRailDragController(railContentRef);
 
   const allPeople = [...dataset.people, ...publicDatasets.flatMap((d) => d.people)];
   const allCategories = [...dataset.categories, ...publicDatasets.flatMap((d) => d.categories)];
@@ -108,8 +375,12 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
                 setHoveredKey(null);
                 setHoveredCategoryRowId(null);
               }}
+              dragController={dragController}
             />
           ))}
+          {dragController.indicatorTop !== null && (
+            <div className="rail-drop-indicator" style={{ top: dragController.indicatorTop }} />
+          )}
         </div>
       </div>
       <div className="rail-footer">
@@ -159,6 +430,7 @@ interface RailItemProps {
   hoveredCategoryRowId: string | null;
   onHoverEnter: (key: string, categoryRowId: string | null) => void;
   onHoverLeave: () => void;
+  dragController: RailDragController;
 }
 
 function RailItem({
@@ -174,6 +446,7 @@ function RailItem({
   hoveredCategoryRowId,
   onHoverEnter,
   onHoverLeave,
+  dragController,
 }: RailItemProps) {
   const style = { top: item.y, height: item.height };
   const readOnly = isPublicId(item.id);
@@ -189,6 +462,8 @@ function RailItem({
       <div
         className="rail-group"
         style={style}
+        data-rail-kind="group"
+        data-rail-id={group.id}
         onMouseEnter={() => onHoverEnter(key, null)}
         onMouseLeave={onHoverLeave}
       >
@@ -215,6 +490,11 @@ function RailItem({
           )}
           {!readOnly && (
             <>
+              <RailDragHandle
+                className={hoverReveal(visible)}
+                dragController={dragController}
+                descriptor={{ kind: "group", groupId: group.id }}
+              />
               {person && (
                 <button
                   type="button"
@@ -251,6 +531,8 @@ function RailItem({
       <div
         className="rail-person"
         style={style}
+        data-rail-kind="person"
+        data-rail-id={person.id}
         onMouseEnter={() => onHoverEnter(key, null)}
         onMouseLeave={onHoverLeave}
       >
@@ -310,6 +592,9 @@ function RailItem({
       <div
         className={`rail-row ${item.isSubRow ? "rail-row-sub" : ""} ${row.id === selectedRowId ? "rail-row-selected" : ""}`}
         style={{ ...style, paddingLeft: 8 + item.depth * 14 }}
+        data-rail-kind="row"
+        data-rail-id={row.id}
+        data-rail-sub-row={item.isSubRow ? "true" : undefined}
         onClick={() => selectRow(row.id)}
         onMouseEnter={() => onHoverEnter(key, categoryRowId)}
         onMouseLeave={onHoverLeave}
@@ -330,6 +615,14 @@ function RailItem({
         </span>
         {!isPublicId(row.id) && (
           <span className="rail-actions">
+            {/* Sub-rows are not draggable (plan scope cut) — no handle. */}
+            {!item.isSubRow && (
+              <RailDragHandle
+                className={hoverReveal(visible)}
+                dragController={dragController}
+                descriptor={{ kind: "row", rowId: row.id }}
+              />
+            )}
             <button
               type="button"
               className={hoverReveal(visible)}

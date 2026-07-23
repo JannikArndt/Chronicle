@@ -297,6 +297,78 @@ export function deleteRowWithCascade(rowId: string): void {
   clearSelection();
 }
 
+// ---------- rail drag-and-drop (reorder groups, move rows) ----------
+
+// Order is array position — no explicit order field exists (deliberate: no
+// schema change for drag-and-drop).
+
+// Repositions a group immediately before `beforeGroupId`, or at the end of
+// `dataset.groups` when `beforeGroupId` is null. Unknown ids and
+// self-referential drops are no-ops.
+export function reorderGroup(groupId: string, beforeGroupId: string | null): void {
+  if (groupId === beforeGroupId) return;
+  updateDataset((dataset) => {
+    const movingGroup = dataset.groups.find((g) => g.id === groupId);
+    if (!movingGroup) return dataset;
+    if (beforeGroupId !== null && !dataset.groups.some((g) => g.id === beforeGroupId)) return dataset;
+    const remainingGroups = dataset.groups.filter((g) => g.id !== groupId);
+    const insertIndex =
+      beforeGroupId === null
+        ? remainingGroups.length
+        : remainingGroups.findIndex((g) => g.id === beforeGroupId);
+    remainingGroups.splice(insertIndex, 0, movingGroup);
+    dataset.groups = remainingGroups;
+    return dataset;
+  });
+}
+
+// Moves a top-level row into `targetGroupId`, immediately before `beforeRowId`
+// (which must belong to the target group), or at the end of that group's rows
+// when null. Same-group reorder is the same code path. The row adopts the
+// personId of its drop position (the before-row's, or the target group's last
+// row's) so it renders exactly where the drop indicator showed — container
+// groups section their rows by personId. Known scope cut: a moved parent's
+// sub-rows keep their stored groupId (they still render under their parent,
+// since layout follows parentRowId, but their groupId goes stale).
+export function moveRow(rowId: string, targetGroupId: string, beforeRowId: string | null): void {
+  if (rowId === beforeRowId) return;
+  updateDataset((dataset) => {
+    const movingRow = dataset.rows.find((r) => r.id === rowId);
+    // Sub-rows are not draggable (plan scope cut) — refuse them here too so no
+    // caller can detach a sub-row from its parent's group.
+    if (!movingRow || movingRow.parentRowId !== undefined) return dataset;
+    if (!dataset.groups.some((g) => g.id === targetGroupId)) return dataset;
+    const beforeRow = beforeRowId === null ? undefined : dataset.rows.find((r) => r.id === beforeRowId);
+    if (beforeRowId !== null && (beforeRow === undefined || beforeRow.groupId !== targetGroupId)) {
+      return dataset;
+    }
+    const remainingRows = dataset.rows.filter((r) => r.id !== rowId);
+    let insertIndex: number;
+    let adoptedPersonId: string | undefined;
+    if (beforeRow !== undefined) {
+      insertIndex = remainingRows.findIndex((r) => r.id === beforeRow.id);
+      adoptedPersonId = beforeRow.personId;
+    } else {
+      const lastIndexInTargetGroup = lastIndexWhere(remainingRows, (r) => r.groupId === targetGroupId);
+      insertIndex = lastIndexInTargetGroup === -1 ? remainingRows.length : lastIndexInTargetGroup + 1;
+      adoptedPersonId = lastIndexInTargetGroup === -1 ? undefined : remainingRows[lastIndexInTargetGroup].personId;
+    }
+    movingRow.groupId = targetGroupId;
+    movingRow.personId = adoptedPersonId;
+    remainingRows.splice(insertIndex, 0, movingRow);
+    dataset.rows = remainingRows;
+    return dataset;
+  });
+}
+
+// Array.prototype.findLastIndex needs ES2023; the build targets ES2022.
+function lastIndexWhere<T>(items: T[], matches: (item: T) => boolean): number {
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (matches(items[i])) return i;
+  }
+  return -1;
+}
+
 export function updateGroup(groupId: string, patch: Partial<Group>): void {
   updateDataset((dataset) => {
     const group = dataset.groups.find((g) => g.id === groupId);
