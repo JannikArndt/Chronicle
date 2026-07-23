@@ -31,3 +31,7 @@ export function zoomAt(scale: TimeScale, anchorX: number, factor: number): TimeS
 export function clampScale(scale: TimeScale): TimeScale {
   return { ...scale, msPerPx: Math.min(MAX_MS_PER_PX, Math.max(MIN_MS_PER_PX, scale.msPerPx)) };
 }
+
+export function scaleForRange(startMs: number, endMs: number, width: number): TimeScale {
+  return clampScale({ startMs, msPerPx: (endMs - startMs) / width });
+}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { MAX_MS_PER_PX, MIN_MS_PER_PX, clampScale, msToX, panBy, xToMs, zoomAt } from "./timeScale";
+import { MAX_MS_PER_PX, MIN_MS_PER_PX, clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
 import { DAY_MS } from "../model/fuzzyDate";
 
 const T0 = Date.UTC(2020, 0, 1);
@@ -28,5 +28,20 @@ describe("time scale", () => {
   test("clampScale bounds msPerPx", () => {
     expect(clampScale({ startMs: T0, msPerPx: 1 }).msPerPx).toBe(MIN_MS_PER_PX);
     expect(clampScale({ startMs: T0, msPerPx: 1e15 }).msPerPx).toBe(MAX_MS_PER_PX);
+  });
+
+  test("scaleForRange fits the given window to the viewport width", () => {
+    const startMs = T0;
+    const endMs = T0 + 100 * DAY_MS;
+    const width = 1000;
+    const result = scaleForRange(startMs, endMs, width);
+    expect(result.startMs).toBe(startMs);
+    expect(result.msPerPx).toBe((endMs - startMs) / width);
+    expect(msToX(result, endMs)).toBeCloseTo(width, 5);
+  });
+
+  test("scaleForRange clamps an extremely narrow window to MIN_MS_PER_PX", () => {
+    const result = scaleForRange(T0, T0 + 1000, 1000);
+    expect(result.msPerPx).toBe(MIN_MS_PER_PX);
   });
 });
