@@ -33,6 +33,11 @@
       "start": {
         "ms": -1932940800000,
         "precision": "day"
+      },
+      "subtitle": "Ford Motor Company",
+      "place": {
+        "fullName": "Michigan, USA",
+        "country": "United States"
       }
     },
     {
@@ -43,7 +48,8 @@
       "start": {
         "ms": -1382140800000,
         "precision": "day"
-      }
+      },
+      "subtitle": "Robert Goddard"
     },
     {
       "id": "e-3",
@@ -53,7 +59,8 @@
       "start": {
         "ms": -557539200000,
         "precision": "day"
-      }
+      },
+      "subtitle": "BOAC"
     },
     {
       "id": "e-4",
@@ -63,6 +70,10 @@
       "start": {
         "ms": -386380800000,
         "precision": "day"
+      },
+      "place": {
+        "fullName": "Soviet Union",
+        "country": "Soviet Union"
       }
     },
     {
@@ -73,7 +84,8 @@
       "start": {
         "ms": -275270400000,
         "precision": "day"
-      }
+      },
+      "subtitle": "Yuri Gagarin"
     },
     {
       "id": "e-6",
@@ -83,7 +95,8 @@
       "start": {
         "ms": -14256000000,
         "precision": "day"
-      }
+      },
+      "subtitle": "Neil Armstrong & Buzz Aldrin"
     },
     {
       "id": "e-7",
@@ -93,7 +106,8 @@
       "start": {
         "ms": 191030400000,
         "precision": "day"
-      }
+      },
+      "subtitle": "Concorde"
     },
     {
       "id": "e-8",
@@ -103,7 +117,8 @@
       "start": {
         "ms": 1201824000000,
         "precision": "day"
-      }
+      },
+      "subtitle": "Tesla, Inc."
     },
     {
       "id": "e-9",
@@ -113,7 +128,8 @@
       "start": {
         "ms": 1450656000000,
         "precision": "day"
-      }
+      },
+      "subtitle": "SpaceX"
     },
     {
       "id": "e-10",
@@ -123,7 +139,8 @@
       "start": {
         "ms": 1590796800000,
         "precision": "day"
-      }
+      },
+      "subtitle": "SpaceX"
     }
   ]
 }

@@ -29,7 +29,12 @@
       "id": "e-1",
       "rowId": "row-1",
       "title": "1930 FIFA World Cup",
-      "description": "Hosted by Uruguay. Uruguay defeated Argentina to win the title. The first World Cup, held with 13 teams, all invited rather than qualified.",
+      "subtitle": "Winner: Uruguay · Runner-up: Argentina",
+      "place": {
+        "fullName": "Uruguay",
+        "country": "Uruguay"
+      },
+      "description": "Hosted by Uruguay. The first World Cup, held with 13 teams, all invited rather than qualified.",
       "start": {
         "ms": -1245628800000,
         "precision": "day"
@@ -43,7 +48,12 @@
       "id": "e-2",
       "rowId": "row-1",
       "title": "1934 FIFA World Cup",
-      "description": "Hosted by Italy. Italy defeated Czechoslovakia to win the title. The first World Cup with a qualifying tournament and a knockout format throughout.",
+      "subtitle": "Winner: Italy · Runner-up: Czechoslovakia",
+      "place": {
+        "fullName": "Italy",
+        "country": "Italy"
+      },
+      "description": "Hosted by Italy. The first World Cup with a qualifying tournament and a knockout format throughout.",
       "start": {
         "ms": -1123459200000,
         "precision": "day"
@@ -57,7 +67,12 @@
       "id": "e-3",
       "rowId": "row-1",
       "title": "1938 FIFA World Cup",
-      "description": "Hosted by France. Italy defeated Hungary to win the title. Italy became the first team to retain the title.",
+      "subtitle": "Winner: Italy · Runner-up: Hungary",
+      "place": {
+        "fullName": "France",
+        "country": "France"
+      },
+      "description": "Hosted by France. Italy became the first team to retain the title.",
       "start": {
         "ms": -996537600000,
         "precision": "day"
@@ -71,7 +86,12 @@
       "id": "e-4",
       "rowId": "row-1",
       "title": "1950 FIFA World Cup",
-      "description": "Hosted by Brazil. Uruguay defeated Brazil to win the title. The first World Cup after a 12-year, war-interrupted gap; Uruguay stunned hosts Brazil in the 'Maracanazo'.",
+      "subtitle": "Winner: Uruguay · Runner-up: Brazil",
+      "place": {
+        "fullName": "Brazil",
+        "country": "Brazil"
+      },
+      "description": "Hosted by Brazil. The first World Cup after a 12-year, war-interrupted gap; Uruguay stunned hosts Brazil in the 'Maracanazo'.",
       "start": {
         "ms": -616118400000,
         "precision": "day"
@@ -85,7 +105,12 @@
       "id": "e-5",
       "rowId": "row-1",
       "title": "1954 FIFA World Cup",
-      "description": "Hosted by Switzerland. West Germany defeated Hungary to win the title. West Germany's win, the 'Miracle of Bern', over a heavily favored Hungary.",
+      "subtitle": "Winner: West Germany · Runner-up: Hungary",
+      "place": {
+        "fullName": "Switzerland",
+        "country": "Switzerland"
+      },
+      "description": "Hosted by Switzerland. West Germany's win, the 'Miracle of Bern', over a heavily favored Hungary.",
       "start": {
         "ms": -490579200000,
         "precision": "day"
@@ -99,7 +124,12 @@
       "id": "e-6",
       "rowId": "row-1",
       "title": "1958 FIFA World Cup",
-      "description": "Hosted by Sweden. Brazil defeated Sweden to win the title. A 17-year-old Pelé announced himself to the world.",
+      "subtitle": "Winner: Brazil · Runner-up: Sweden",
+      "place": {
+        "fullName": "Sweden",
+        "country": "Sweden"
+      },
+      "description": "Hosted by Sweden. A 17-year-old Pelé announced himself to the world.",
       "start": {
         "ms": -365040000000,
         "precision": "day"
@@ -113,7 +143,12 @@
       "id": "e-7",
       "rowId": "row-1",
       "title": "1962 FIFA World Cup",
-      "description": "Hosted by Chile. Brazil defeated Czechoslovakia to win the title. Brazil retained the title despite losing Pelé to injury early in the tournament.",
+      "subtitle": "Winner: Brazil · Runner-up: Czechoslovakia",
+      "place": {
+        "fullName": "Chile",
+        "country": "Chile"
+      },
+      "description": "Hosted by Chile. Brazil retained the title despite losing Pelé to injury early in the tournament.",
       "start": {
         "ms": -239587200000,
         "precision": "day"
@@ -127,7 +162,12 @@
       "id": "e-8",
       "rowId": "row-1",
       "title": "1966 FIFA World Cup",
-      "description": "Hosted by England. England defeated West Germany to win the title. Hosts England won their only title, decided by a contested extra-time goal in the final.",
+      "subtitle": "Winner: England · Runner-up: West Germany",
+      "place": {
+        "fullName": "England",
+        "country": "England"
+      },
+      "description": "Hosted by England. Hosts England won their only title, decided by a contested extra-time goal in the final.",
       "start": {
         "ms": -109728000000,
         "precision": "day"
@@ -141,7 +181,12 @@
       "id": "e-9",
       "rowId": "row-1",
       "title": "1970 FIFA World Cup",
-      "description": "Hosted by Mexico. Brazil defeated Italy to win the title. Widely regarded as one of the greatest tournaments, won by a Pelé-led Brazil side.",
+      "subtitle": "Winner: Brazil · Runner-up: Italy",
+      "place": {
+        "fullName": "Mexico",
+        "country": "Mexico"
+      },
+      "description": "Hosted by Mexico. Widely regarded as one of the greatest tournaments, won by a Pelé-led Brazil side.",
       "start": {
         "ms": 12960000000,
         "precision": "day"
@@ -155,7 +200,12 @@
       "id": "e-10",
       "rowId": "row-1",
       "title": "1974 FIFA World Cup",
-      "description": "Hosted by West Germany. West Germany defeated Netherlands to win the title. West Germany beat the Netherlands' influential 'Total Football' side on home soil.",
+      "subtitle": "Winner: West Germany · Runner-up: Netherlands",
+      "place": {
+        "fullName": "West Germany",
+        "country": "West Germany"
+      },
+      "description": "Hosted by West Germany. West Germany beat the Netherlands' influential 'Total Football' side on home soil.",
       "start": {
         "ms": 140313600000,
         "precision": "day"
@@ -169,7 +219,12 @@
       "id": "e-11",
       "rowId": "row-1",
       "title": "1978 FIFA World Cup",
-      "description": "Hosted by Argentina. Argentina defeated Netherlands to win the title. Hosts Argentina won their first title amid the backdrop of a military dictatorship.",
+      "subtitle": "Winner: Argentina · Runner-up: Netherlands",
+      "place": {
+        "fullName": "Argentina",
+        "country": "Argentina"
+      },
+      "description": "Hosted by Argentina. Hosts Argentina won their first title amid the backdrop of a military dictatorship.",
       "start": {
         "ms": 265507200000,
         "precision": "day"
@@ -183,7 +238,12 @@
       "id": "e-12",
       "rowId": "row-1",
       "title": "1982 FIFA World Cup",
-      "description": "Hosted by Spain. Italy defeated West Germany to win the title. Expanded to 24 teams for the first time.",
+      "subtitle": "Winner: Italy · Runner-up: West Germany",
+      "place": {
+        "fullName": "Spain",
+        "country": "Spain"
+      },
+      "description": "Hosted by Spain. Expanded to 24 teams for the first time.",
       "start": {
         "ms": 392774400000,
         "precision": "day"
@@ -197,7 +257,12 @@
       "id": "e-13",
       "rowId": "row-1",
       "title": "1986 FIFA World Cup",
-      "description": "Hosted by Mexico. Argentina defeated West Germany to win the title. Diego Maradona's 'Hand of God' and 'Goal of the Century' both came in this tournament.",
+      "subtitle": "Winner: Argentina · Runner-up: West Germany",
+      "place": {
+        "fullName": "Mexico",
+        "country": "Mexico"
+      },
+      "description": "Hosted by Mexico. Diego Maradona's 'Hand of God' and 'Goal of the Century' both came in this tournament.",
       "start": {
         "ms": 517881600000,
         "precision": "day"
@@ -211,7 +276,12 @@
       "id": "e-14",
       "rowId": "row-1",
       "title": "1990 FIFA World Cup",
-      "description": "Hosted by Italy. West Germany defeated Argentina to win the title. West Germany's third title, months before German reunification.",
+      "subtitle": "Winner: West Germany · Runner-up: Argentina",
+      "place": {
+        "fullName": "Italy",
+        "country": "Italy"
+      },
+      "description": "Hosted by Italy. West Germany's third title, months before German reunification.",
       "start": {
         "ms": 644803200000,
         "precision": "day"
@@ -225,7 +295,12 @@
       "id": "e-15",
       "rowId": "row-1",
       "title": "1994 FIFA World Cup",
-      "description": "Hosted by United States. Brazil defeated Italy to win the title. The final was decided on penalties for the first time in World Cup history.",
+      "subtitle": "Winner: Brazil · Runner-up: Italy",
+      "place": {
+        "fullName": "United States",
+        "country": "United States"
+      },
+      "description": "Hosted by United States. The final was decided on penalties for the first time in World Cup history.",
       "start": {
         "ms": 771811200000,
         "precision": "day"
@@ -239,7 +314,12 @@
       "id": "e-16",
       "rowId": "row-1",
       "title": "1998 FIFA World Cup",
-      "description": "Hosted by France. France defeated Brazil to win the title. Hosts France won their first title, expanded to 32 teams for the first time.",
+      "subtitle": "Winner: France · Runner-up: Brazil",
+      "place": {
+        "fullName": "France",
+        "country": "France"
+      },
+      "description": "Hosted by France. Hosts France won their first title, expanded to 32 teams for the first time.",
       "start": {
         "ms": 897436800000,
         "precision": "day"
@@ -253,7 +333,11 @@
       "id": "e-17",
       "rowId": "row-1",
       "title": "2002 FIFA World Cup",
-      "description": "Hosted by South Korea / Japan. Brazil defeated Germany to win the title. The first World Cup held in Asia and the first with co-hosts.",
+      "subtitle": "Winner: Brazil · Runner-up: Germany",
+      "place": {
+        "fullName": "South Korea / Japan"
+      },
+      "description": "Hosted by South Korea / Japan. The first World Cup held in Asia and the first with co-hosts.",
       "start": {
         "ms": 1022803200000,
         "precision": "day"
@@ -267,7 +351,12 @@
       "id": "e-18",
       "rowId": "row-1",
       "title": "2006 FIFA World Cup",
-      "description": "Hosted by Germany. Italy defeated France to win the title. Remembered for Zinedine Zidane's headbutt in his final match as a professional.",
+      "subtitle": "Winner: Italy · Runner-up: France",
+      "place": {
+        "fullName": "Germany",
+        "country": "Germany"
+      },
+      "description": "Hosted by Germany. Remembered for Zinedine Zidane's headbutt in his final match as a professional.",
       "start": {
         "ms": 1149811200000,
         "precision": "day"
@@ -281,7 +370,12 @@
       "id": "e-19",
       "rowId": "row-1",
       "title": "2010 FIFA World Cup",
-      "description": "Hosted by South Africa. Spain defeated Netherlands to win the title. The first World Cup held in Africa; Spain won their first title.",
+      "subtitle": "Winner: Spain · Runner-up: Netherlands",
+      "place": {
+        "fullName": "South Africa",
+        "country": "South Africa"
+      },
+      "description": "Hosted by South Africa. The first World Cup held in Africa; Spain won their first title.",
       "start": {
         "ms": 1276214400000,
         "precision": "day"
@@ -295,7 +389,12 @@
       "id": "e-20",
       "rowId": "row-1",
       "title": "2014 FIFA World Cup",
-      "description": "Hosted by Brazil. Germany defeated Argentina to win the title. Hosts Brazil were eliminated 7-1 by Germany in a stunning semi-final.",
+      "subtitle": "Winner: Germany · Runner-up: Argentina",
+      "place": {
+        "fullName": "Brazil",
+        "country": "Brazil"
+      },
+      "description": "Hosted by Brazil. Hosts Brazil were eliminated 7-1 by Germany in a stunning semi-final.",
       "start": {
         "ms": 1402531200000,
         "precision": "day"
@@ -309,7 +408,12 @@
       "id": "e-21",
       "rowId": "row-1",
       "title": "2018 FIFA World Cup",
-      "description": "Hosted by Russia. France defeated Croatia to win the title. France's second title, led by a breakout tournament from 19-year-old Kylian Mbappé.",
+      "subtitle": "Winner: France · Runner-up: Croatia",
+      "place": {
+        "fullName": "Russia",
+        "country": "Russia"
+      },
+      "description": "Hosted by Russia. France's second title, led by a breakout tournament from 19-year-old Kylian Mbappé.",
       "start": {
         "ms": 1528934400000,
         "precision": "day"
@@ -323,7 +427,12 @@
       "id": "e-22",
       "rowId": "row-1",
       "title": "2022 FIFA World Cup",
-      "description": "Hosted by Qatar. Argentina defeated France to win the title. The first World Cup held in the Middle East and in the northern-hemisphere winter; Argentina won on penalties.",
+      "subtitle": "Winner: Argentina · Runner-up: France",
+      "place": {
+        "fullName": "Qatar",
+        "country": "Qatar"
+      },
+      "description": "Hosted by Qatar. The first World Cup held in the Middle East and in the northern-hemisphere winter; Argentina won on penalties.",
       "start": {
         "ms": 1668902400000,
         "precision": "day"
