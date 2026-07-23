@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "id": "g-1",
+      "label": "US Presidents",
+      "collapsed": false
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "label": "Presidents",
+      "color": "#3c3b6e",
+      "icon": "🇺🇸",
+      "defaultVisibility": "shareable"
+    }
+  ],
+  "rows": [
+    {
+      "id": "row-1",
+      "groupId": "g-1",
+      "categoryId": "cat-1",
+      "label": "President of the United States"
+    }
+  ],
+  "entries": [
+    {
+      "id": "e-1",
+      "rowId": "row-1",
+      "title": "Gerald Ford (Republican)",
+      "description": "Took office after Richard Nixon's resignation and later pardoned him.",
+      "start": {
+        "ms": 145238400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 222566400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-2",
+      "rowId": "row-1",
+      "title": "Jimmy Carter (Democratic)",
+      "description": "Brokered the Camp David Accords and presided over the Iran hostage crisis.",
+      "start": {
+        "ms": 222566400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 348796800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-3",
+      "rowId": "row-1",
+      "title": "Ronald Reagan (Republican)",
+      "description": "Pursued tax cuts and a defense buildup, and presided over the end of the Cold War.",
+      "start": {
+        "ms": 348796800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 601257600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-4",
+      "rowId": "row-1",
+      "title": "George H. W. Bush (Republican)",
+      "description": "Led the Gulf War coalition and oversaw the end of the Soviet Union.",
+      "start": {
+        "ms": 601257600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 727488000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-5",
+      "rowId": "row-1",
+      "title": "Bill Clinton (Democratic)",
+      "description": "Presided over a period of economic expansion and was impeached, though not removed, in 1998.",
+      "start": {
+        "ms": 727488000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 979948800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-6",
+      "rowId": "row-1",
+      "title": "George W. Bush (Republican)",
+      "description": "Led the response to the September 11 attacks and the wars in Afghanistan and Iraq.",
+      "start": {
+        "ms": 979948800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1232409600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-7",
+      "rowId": "row-1",
+      "title": "Barack Obama (Democratic)",
+      "description": "The first Black US president; oversaw the recovery from the 2008 financial crisis and the Affordable Care Act.",
+      "start": {
+        "ms": 1232409600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1484870400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-8",
+      "rowId": "row-1",
+      "title": "Donald Trump (Republican)",
+      "description": "First term marked by trade disputes with China and the start of the COVID-19 pandemic.",
+      "start": {
+        "ms": 1484870400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1611100800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-9",
+      "rowId": "row-1",
+      "title": "Joe Biden (Democratic)",
+      "description": "Oversaw the withdrawal from Afghanistan and major infrastructure and climate legislation.",
+      "start": {
+        "ms": 1611100800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1737331200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-10",
+      "rowId": "row-1",
+      "title": "Donald Trump (Republican)",
+      "description": "Became the second president, after Grover Cleveland, to serve two non-consecutive terms.",
+      "start": {
+        "ms": 1737331200000,
+        "precision": "day"
+      }
+    }
+  ]
+}

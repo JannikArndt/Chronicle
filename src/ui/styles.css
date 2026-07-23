@@ -634,16 +634,22 @@ textarea {
   gap: 1px;
 }
 
-.entity-chip-subtitle {
-  font-size: 11px;
-  color: var(--color-text-muted);
-}
-
 .entity-adder {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-top: 4px;
+}
+
+.field-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.favicon-preview {
+  flex-shrink: 0;
+  border-radius: 3px;
 }
 
 /* ---------- data menu ---------- */

@@ -42,8 +42,8 @@ export function deriveTitleSubtitle(result: NominatimResult): { title: string; s
 
 // Derives the structured street/city/country components (distinct from the
 // short display title/subtitle above) from the same address block, for
-// storing on Entity.place so callers who want more than a display string
-// (e.g. a future map view) have it without re-parsing fullName.
+// storing on TimelineEntry.place so callers who want more than a display
+// string (e.g. a future map view) have it without re-parsing fullName.
 export function deriveAddressComponents(result: NominatimResult): { street?: string; city?: string; country?: string } {
   const address = result.address;
   const street = [address?.house_number, address?.road].filter(Boolean).join(" ") || undefined;

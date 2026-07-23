@@ -6,13 +6,17 @@
 import { computeLayout } from "./layout";
 import type { Layout, LayoutItem } from "./layout";
 import { ROW_HEIGHT } from "./layout";
-import { barGeometry, gradientStops, labelAnchorX } from "./bars";
+import { barGeometry, gradientStops, labelAnchorX, pickBarLabel } from "./bars";
 import type { BarGeometry } from "./bars";
 import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
 import type { TimeScale } from "./timeScale";
 import { computeTicks, snapForScale } from "./timeAxis";
 import { formatFuzzyDate } from "../model/fuzzyDate";
+import { faviconUrl } from "../model/favicon";
 import type { Precision, TimelineDataset, TimelineEntry, TimelineRow } from "../model/types";
+
+const FAVICON_SIZE_PX = 12;
+const FAVICON_GAP_PX = 4;
 
 export const AXIS_HEIGHT = 46;
 const PLUS_RADIUS = 11;
@@ -136,6 +140,10 @@ export class TimelineEngine {
   // Where the user last clicked in an empty selected row — that's where its
   // single "+" appears (§6).
   private emptyRowClick: { rowId: string; ms: number } | null = null;
+  // Favicon images for entries with a website (§5), keyed by favicon URL.
+  // No explicit repaint trigger needed on load — the rAF loop below already
+  // repaints every frame, so a newly-loaded image just appears next frame.
+  private faviconCache = new Map<string, HTMLImageElement | "loading" | "error">();
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -153,7 +161,6 @@ export class TimelineEngine {
       groups: [],
       categories: [],
       rows: [],
-      entities: [],
       entries: [],
     };
     this.input = {
@@ -581,22 +588,51 @@ export class TimelineEngine {
       ctx.stroke();
     }
 
-    // Label anchored inside the near-opaque span so it stays legible (§5).
+    // Label anchored inside the near-opaque span so it stays legible (§5),
+    // swapping to shortTitle when the full title overflows the bar, with a
+    // favicon (if entry.website is set and its icon has loaded) in front.
     ctx.font = "12px -apple-system, system-ui, sans-serif";
-    const textWidth = ctx.measureText(entry.title).width;
-    const labelX = labelAnchorX(geom, textWidth, this.width);
+    const iconUrl = entry.website ? faviconUrl(entry.website, FAVICON_SIZE_PX) : undefined;
+    const icon = iconUrl ? this.getFaviconImage(iconUrl) : undefined;
+    const iconSpace = icon ? FAVICON_SIZE_PX + FAVICON_GAP_PX : 0;
+
+    const titleWidth = ctx.measureText(entry.title).width;
+    const useShortTitle =
+      pickBarLabel(entry, geom, titleWidth + iconSpace) === "shortTitle" && !!entry.shortTitle;
+    const labelText = useShortTitle ? entry.shortTitle! : entry.title;
+    const textWidth = useShortTitle ? ctx.measureText(labelText).width : titleWidth;
+
+    const labelX = labelAnchorX(geom, textWidth + iconSpace, this.width);
     ctx.fillStyle = readableTextColor(colorToRgb(this.ctx, color), this.colors);
     ctx.textBaseline = "middle";
-    ctx.fillText(entry.title, labelX, top + barHeight / 2);
+    if (icon) {
+      ctx.drawImage(icon, labelX, top + barHeight / 2 - FAVICON_SIZE_PX / 2, FAVICON_SIZE_PX, FAVICON_SIZE_PX);
+    }
+    ctx.fillText(labelText, labelX + iconSpace, top + barHeight / 2);
     ctx.restore();
 
     this.entryHits.push({
       x0: Math.min(x0, labelX),
-      x1: Math.max(x1, labelX + textWidth),
+      x1: Math.max(x1, labelX + iconSpace + textWidth),
       y0: item.y + 6 - this.scrollY + AXIS_HEIGHT,
       y1: item.y + item.height - 6 - this.scrollY + AXIS_HEIGHT,
       entry,
     });
+  }
+
+  // Lazily loads and caches a favicon image; returns undefined until it has
+  // finished loading (no manual repaint needed — the rAF loop already repaints
+  // every frame, so a completed load just appears on the next one).
+  private getFaviconImage(url: string): HTMLImageElement | undefined {
+    const cached = this.faviconCache.get(url);
+    if (cached === "loading" || cached === "error") return undefined;
+    if (cached) return cached;
+    this.faviconCache.set(url, "loading");
+    const image = new Image();
+    image.onload = () => this.faviconCache.set(url, image);
+    image.onerror = () => this.faviconCache.set(url, "error");
+    image.src = url;
+    return undefined;
   }
 
   // Sub-timeline bracket (§5): vertical line from the attached parent entry
@@ -709,9 +745,6 @@ export class TimelineEngine {
     if (selected.parentEntryId) related.add(selected.parentEntryId);
     for (const entry of this.input.dataset.entries) {
       if (entry.parentEntryId === selected.id) related.add(entry.id);
-      if (selected.linkedEntityIds.length > 0 && entry.linkedEntityIds.some((id) => selected.linkedEntityIds.includes(id))) {
-        related.add(entry.id);
-      }
     }
     return related;
   }

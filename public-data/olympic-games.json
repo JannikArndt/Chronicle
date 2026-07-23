@@ -1,0 +1,791 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "id": "g-1",
+      "label": "Olympic Games",
+      "collapsed": false
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "label": "Games",
+      "color": "#0f6ab4",
+      "icon": "🏅",
+      "defaultVisibility": "shareable"
+    }
+  ],
+  "rows": [
+    {
+      "id": "row-summer",
+      "groupId": "g-1",
+      "categoryId": "cat-1",
+      "label": "Summer Games"
+    },
+    {
+      "id": "row-winter",
+      "groupId": "g-1",
+      "categoryId": "cat-1",
+      "label": "Winter Games"
+    }
+  ],
+  "entries": [
+    {
+      "id": "e-row-summer-1",
+      "rowId": "row-summer",
+      "title": "1896 Summer Olympics",
+      "description": "The inaugural modern Olympic Games, with 241 athletes from 14 nations competing in 43 events.",
+      "start": {
+        "ms": -2326924800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -2326147200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-2",
+      "rowId": "row-summer",
+      "title": "1900 Summer Olympics",
+      "description": "Held as part of the 1900 World's Fair; women competed for the first time.",
+      "start": {
+        "ms": -2197497600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -2183068800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-3",
+      "rowId": "row-summer",
+      "title": "1904 Summer Olympics",
+      "description": "The first Games held outside Europe, overshadowed by the concurrent World's Fair.",
+      "start": {
+        "ms": -2067120000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -2054592000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-4",
+      "rowId": "row-summer",
+      "title": "1908 Summer Olympics",
+      "description": "The marathon distance of 26 miles 385 yards, run here, later became the standard.",
+      "start": {
+        "ms": -1946505600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1930348800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-5",
+      "rowId": "row-summer",
+      "title": "1912 Summer Olympics",
+      "description": "The first Games to use electronic timing and a public address system.",
+      "start": {
+        "ms": -1819584000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1812844800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-6",
+      "rowId": "row-summer",
+      "title": "1920 Summer Olympics",
+      "description": "The first postwar Games, introducing the Olympic flag and the athletes' oath.",
+      "start": {
+        "ms": -1568419200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1555891200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-7",
+      "rowId": "row-summer",
+      "title": "1924 Summer Olympics",
+      "description": "The first Games with a closing ceremony and an official Olympic Village.",
+      "start": {
+        "ms": -1440979200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1433721600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-8",
+      "rowId": "row-summer",
+      "title": "1928 Summer Olympics",
+      "description": "The first Games with a permanently lit Olympic flame.",
+      "start": {
+        "ms": -1313625600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1306108800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-9",
+      "rowId": "row-summer",
+      "title": "1932 Summer Olympics",
+      "description": "Held during the Great Depression, with a podium ceremony introduced for medalists.",
+      "start": {
+        "ms": -1181001600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1179705600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-10",
+      "rowId": "row-summer",
+      "title": "1936 Summer Olympics",
+      "description": "Used by the Nazi regime for propaganda; Jesse Owens won four gold medals.",
+      "start": {
+        "ms": -1054598400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1053302400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-11",
+      "rowId": "row-summer",
+      "title": "1948 Summer Olympics",
+      "description": "The first Games after a 12-year gap caused by the Second World War.",
+      "start": {
+        "ms": -676166400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -674784000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-12",
+      "rowId": "row-summer",
+      "title": "1952 Summer Olympics",
+      "description": "The Soviet Union competed at the Olympics for the first time.",
+      "start": {
+        "ms": -550800000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -549504000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-13",
+      "rowId": "row-summer",
+      "title": "1956 Summer Olympics",
+      "description": "The first Games held in the Southern Hemisphere.",
+      "start": {
+        "ms": -413683200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -412300800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-14",
+      "rowId": "row-summer",
+      "title": "1960 Summer Olympics",
+      "description": "The first Games to be broadcast live on television across Europe.",
+      "start": {
+        "ms": -295142400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -293673600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-15",
+      "rowId": "row-summer",
+      "title": "1964 Summer Olympics",
+      "description": "The first Games held in Asia, and the first broadcast live via satellite.",
+      "start": {
+        "ms": -164937600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -163728000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-16",
+      "rowId": "row-summer",
+      "title": "1968 Summer Olympics",
+      "description": "The first Games held in Latin America; Bob Beamon's long jump record stood for 23 years.",
+      "start": {
+        "ms": -38534400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -37238400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-17",
+      "rowId": "row-summer",
+      "title": "1972 Summer Olympics",
+      "description": "Marked by the hostage-taking and killing of eleven Israeli athletes and coaches.",
+      "start": {
+        "ms": 83635200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 85017600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-18",
+      "rowId": "row-summer",
+      "title": "1976 Summer Olympics",
+      "description": "Nadia Comăneci scored gymnastics' first perfect 10.",
+      "start": {
+        "ms": 206409600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 207705600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-19",
+      "rowId": "row-summer",
+      "title": "1980 Summer Olympics",
+      "description": "Boycotted by the United States and dozens of other countries over the Soviet invasion of Afghanistan.",
+      "start": {
+        "ms": 332812800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 334108800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-20",
+      "rowId": "row-summer",
+      "title": "1984 Summer Olympics",
+      "description": "Boycotted by the Soviet Union and allies; the first privately financed Games.",
+      "start": {
+        "ms": 459820800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 461116800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-21",
+      "rowId": "row-summer",
+      "title": "1988 Summer Olympics",
+      "description": "The last Games of the Cold War era, with broad international participation restored.",
+      "start": {
+        "ms": 590457600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 591753600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-22",
+      "rowId": "row-summer",
+      "title": "1992 Summer Olympics",
+      "description": "The first Games since 1972 with no boycotts; the US 'Dream Team' debuted in basketball.",
+      "start": {
+        "ms": 712022400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 713318400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-23",
+      "rowId": "row-summer",
+      "title": "1996 Summer Olympics",
+      "description": "Held for the Games' centennial; a bombing in Centennial Olympic Park killed two people.",
+      "start": {
+        "ms": 837734400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 839116800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-24",
+      "rowId": "row-summer",
+      "title": "2000 Summer Olympics",
+      "description": "North and South Korean athletes marched together in the opening ceremony.",
+      "start": {
+        "ms": 968976000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 970358400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-25",
+      "rowId": "row-summer",
+      "title": "2004 Summer Olympics",
+      "description": "Returned the Games to their birthplace 108 years after the first modern Olympics.",
+      "start": {
+        "ms": 1092355200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1093737600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-26",
+      "rowId": "row-summer",
+      "title": "2008 Summer Olympics",
+      "description": "Michael Phelps won a record eight gold medals in a single Games.",
+      "start": {
+        "ms": 1218153600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1219536000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-27",
+      "rowId": "row-summer",
+      "title": "2012 Summer Olympics",
+      "description": "London became the first city to host the Summer Games three times.",
+      "start": {
+        "ms": 1343347200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1344729600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-28",
+      "rowId": "row-summer",
+      "title": "2016 Summer Olympics",
+      "description": "The first Games held in South America.",
+      "start": {
+        "ms": 1470355200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1471737600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-29",
+      "rowId": "row-summer",
+      "title": "2020 Summer Olympics",
+      "description": "Postponed a year by the COVID-19 pandemic and held largely without spectators.",
+      "start": {
+        "ms": 1626998400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1628380800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-summer-30",
+      "rowId": "row-summer",
+      "title": "2024 Summer Olympics",
+      "description": "Paris became the second city, after London, to host the Summer Games three times.",
+      "start": {
+        "ms": 1721952000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1723334400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-1",
+      "rowId": "row-winter",
+      "title": "1924 Winter Olympics",
+      "description": "Originally an 'International Winter Sports Week', retroactively recognized as the first Winter Olympics.",
+      "start": {
+        "ms": -1449619200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1448668800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-2",
+      "rowId": "row-winter",
+      "title": "1928 Winter Olympics",
+      "description": "Warm weather forced the cancellation of several events.",
+      "start": {
+        "ms": -1321920000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1321228800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-3",
+      "rowId": "row-winter",
+      "title": "1932 Winter Olympics",
+      "description": "Held during the Great Depression with only 17 participating nations.",
+      "start": {
+        "ms": -1196294400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1195344000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-4",
+      "rowId": "row-winter",
+      "title": "1936 Winter Olympics",
+      "description": "The last Winter Games before a 12-year wartime hiatus.",
+      "start": {
+        "ms": -1069891200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -1069027200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-5",
+      "rowId": "row-winter",
+      "title": "1948 Winter Olympics",
+      "description": "The first Winter Games after the Second World War; Germany and Japan were not invited.",
+      "start": {
+        "ms": -691804800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -691027200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-6",
+      "rowId": "row-winter",
+      "title": "1952 Winter Olympics",
+      "description": "The first Winter Games held in a Scandinavian country.",
+      "start": {
+        "ms": -564278400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -563328000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-7",
+      "rowId": "row-winter",
+      "title": "1956 Winter Olympics",
+      "description": "The first Winter Games televised live, and the Soviet Union's first appearance.",
+      "start": {
+        "ms": -439689600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -438825600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-8",
+      "rowId": "row-winter",
+      "title": "1960 Winter Olympics",
+      "description": "The first Winter Games to use a computer to help tabulate results.",
+      "start": {
+        "ms": -311472000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -310608000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-9",
+      "rowId": "row-winter",
+      "title": "1964 Winter Olympics",
+      "description": "The Austrian army helped truck in snow after an unusually mild winter.",
+      "start": {
+        "ms": -186969600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -186019200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-10",
+      "rowId": "row-winter",
+      "title": "1968 Winter Olympics",
+      "description": "The first Winter Games with widespread color television coverage.",
+      "start": {
+        "ms": -60048000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": -59011200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-11",
+      "rowId": "row-winter",
+      "title": "1972 Winter Olympics",
+      "description": "The first Winter Games held in Asia.",
+      "start": {
+        "ms": 65923200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 66787200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-12",
+      "rowId": "row-winter",
+      "title": "1976 Winter Olympics",
+      "description": "Innsbruck stepped in as host after Denver withdrew following a local referendum.",
+      "start": {
+        "ms": 192240000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 193190400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-13",
+      "rowId": "row-winter",
+      "title": "1980 Winter Olympics",
+      "description": "The US ice hockey team's 'Miracle on Ice' upset the Soviet Union.",
+      "start": {
+        "ms": 319248000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 320198400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-14",
+      "rowId": "row-winter",
+      "title": "1984 Winter Olympics",
+      "description": "The first Winter Games held in a communist and a Balkan country.",
+      "start": {
+        "ms": 445046400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 445996800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-15",
+      "rowId": "row-winter",
+      "title": "1988 Winter Olympics",
+      "description": "Expanded to 16 days, the longest Winter Games to that point.",
+      "start": {
+        "ms": 571708800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 573004800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-16",
+      "rowId": "row-winter",
+      "title": "1992 Winter Olympics",
+      "description": "The last Winter Games held in the same year as the Summer Games.",
+      "start": {
+        "ms": 697507200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 698803200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-17",
+      "rowId": "row-winter",
+      "title": "1994 Winter Olympics",
+      "description": "The first Winter Games held on its own 4-year cycle, offset from the Summer Games.",
+      "start": {
+        "ms": 761011200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 762307200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-18",
+      "rowId": "row-winter",
+      "title": "1998 Winter Olympics",
+      "description": "Women's ice hockey debuted as an Olympic event.",
+      "start": {
+        "ms": 886809600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 888105600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-19",
+      "rowId": "row-winter",
+      "title": "2002 Winter Olympics",
+      "description": "Held five months after the September 11 attacks, under heightened security.",
+      "start": {
+        "ms": 1013126400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1014508800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-20",
+      "rowId": "row-winter",
+      "title": "2006 Winter Olympics",
+      "description": "Set a record at the time for the number of participating nations at a Winter Games.",
+      "start": {
+        "ms": 1139529600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1140912000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-21",
+      "rowId": "row-winter",
+      "title": "2010 Winter Olympics",
+      "description": "A luge athlete died in a training crash on the day of the opening ceremony.",
+      "start": {
+        "ms": 1265932800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1267315200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-22",
+      "rowId": "row-winter",
+      "title": "2014 Winter Olympics",
+      "description": "The most expensive Olympics ever held, at an estimated cost of over $50 billion.",
+      "start": {
+        "ms": 1391731200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1393113600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-23",
+      "rowId": "row-winter",
+      "title": "2018 Winter Olympics",
+      "description": "North and South Korea marched together and fielded a joint women's ice hockey team.",
+      "start": {
+        "ms": 1518134400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1519516800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-row-winter-24",
+      "rowId": "row-winter",
+      "title": "2022 Winter Olympics",
+      "description": "Beijing became the first city to host both the Summer and Winter Olympics.",
+      "start": {
+        "ms": 1643932800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1645315200000,
+        "precision": "day"
+      }
+    }
+  ]
+}

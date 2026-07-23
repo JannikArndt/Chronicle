@@ -27,7 +27,6 @@ function fixture(): TimelineDataset {
       rowId: "r1",
       title: "First job",
       start: { ms: T0, precision: "day" },
-      linkedEntityIds: [],
       visibility: "private",
     },
   ];
@@ -113,7 +112,6 @@ describe("onboarding: addOnboardingPlaceEntry", () => {
     expect(berlin.end?.ms).toBe(year2005);
     expect(berlin.start.precision).toBe("year");
     expect(munich.end).toBeUndefined();
-    expect(munich.linkedEntityIds).toHaveLength(1);
   });
 
   test("addOnboardingPlaceEntry allows overlapping places — rows are always concurrent", () => {
@@ -145,7 +143,7 @@ describe("onboarding: addOnboardingPlaceEntry", () => {
 });
 
 describe("onboarding: updateOnboardingPlaceEntry", () => {
-  test("updates an existing entry's title, dates, and linked entity in place", () => {
+  test("updates an existing entry's title, dates, and place data in place", () => {
     replaceDataset(emptyDataset());
     const { placesRowId } = completeIdentityStep("Jannik");
     const year1990 = Date.UTC(1990, 6, 1);
@@ -171,10 +169,8 @@ describe("onboarding: updateOnboardingPlaceEntry", () => {
     expect(entry.title).toBe("Munich");
     expect(entry.start.ms).toBe(year1990);
     expect(entry.end?.ms).toBe(year2010);
-
-    const entity = state.dataset.entities.find((e) => e.id === entry.linkedEntityIds[0]);
-    expect(entity?.label).toBe("Munich");
-    expect(entity?.place?.city).toBe("Munich");
+    expect(entry.place?.city).toBe("Munich");
+    expect(entry.place?.country).toBe("Germany");
   });
 
   test("does nothing if the entry id no longer exists", () => {

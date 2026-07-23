@@ -29,7 +29,6 @@ function withPublicDefaults(raw: TimelineDataset): TimelineDataset {
     people: raw.people ?? [],
     entries: raw.entries.map((entry) => ({
       ...entry,
-      linkedEntityIds: entry.linkedEntityIds ?? [],
       visibility: "shareable",
     })),
   };

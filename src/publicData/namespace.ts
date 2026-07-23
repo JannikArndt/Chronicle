@@ -27,13 +27,11 @@ export function namespaceDataset(dataset: TimelineDataset, fileStem: string): Ti
       categoryId: ns(row.categoryId),
       parentRowId: nsOptional(row.parentRowId),
     })),
-    entities: dataset.entities.map((entity) => ({ ...entity, id: ns(entity.id) })),
     entries: dataset.entries.map((entry) => ({
       ...entry,
       id: ns(entry.id),
       rowId: ns(entry.rowId),
       parentEntryId: nsOptional(entry.parentEntryId),
-      linkedEntityIds: entry.linkedEntityIds.map(ns),
     })),
   };
 }

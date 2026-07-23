@@ -6,7 +6,7 @@ A working visual-language prototype (throwaway HTML/Canvas, no framework) was bu
 
 ## 1. Product summary
 
-Chronicle renders a person's life — and the lives of people around them, and the world — as parallel horizontal timelines on a single shared time axis. Up to ~30 timelines ("rows") are visible at once, each made of one or more entries (bars) with a title, a date range of varying precision, a description, and links to other entries/entities.
+Chronicle renders a person's life — and the lives of people around them, and the world — as parallel horizontal timelines on a single shared time axis. Up to ~30 timelines ("rows") are visible at once, each made of one or more entries (bars) with a title, a date range of varying precision, a description, and a link to a parent entry for sub-timelines.
 
 Two audiences for the same rendering engine, no separate "mode" toggle:
 - **Browsing**: pan/zoom, search, filter, inspect.
@@ -66,16 +66,22 @@ interface TimelineRow {
   parentRowId?: string;      // set for a sub-timeline (e.g. "Projects at Kestrel" under "Job")
 }
 
-interface Entity {
-  id: string;
-  kind: "person" | "place" | "organization" | "object" | "other";
-  label: string;
+interface Place {
+  fullName: string;        // complete address/name as returned by the source (or as typed, if free-text)
+  coordinates?: { lat: number; lon: number }; // absent for free-text entries with no picked suggestion
+  street?: string;
+  city?: string;
+  country?: string;
 }
 
 interface TimelineEntry {
   id: string;
   rowId: string;
   title: string;
+  subtitle?: string;
+  shortTitle?: string;        // shown on the timeline bar in place of title when title doesn't fit
+  website?: string;           // fetches a favicon (see §5), shown in front of the label
+  place?: Place;
   description?: string;
   start: FuzzyDate;
   end?: FuzzyDate;            // absent = ongoing, renders as an open arrow, not a hard stop
@@ -83,7 +89,6 @@ interface TimelineEntry {
   fadeOutDays?: number;       // distinct concept from start/end precision fuzziness, but the
                               // two are combined into one continuous edge (see §5)
   parentEntryId?: string;     // links a sub-timeline entry to the parent entry it nests under
-  linkedEntityIds: string[];
   concurrencyOverride?: "exclusive" | "concurrent"; // overrides the row's category default
   visibility: "private" | "shareable";
 }
@@ -94,7 +99,6 @@ interface TimelineDataset {
   groups: Group[];
   categories: Category[];
   rows: TimelineRow[];
-  entities: Entity[];
   entries: TimelineEntry[];
 }
 ```
@@ -163,9 +167,9 @@ Row-level controls, always visible in the rail: a visibility checkbox, the categ
 
 **Editing fields**: no Save/Cancel buttons — autosave on every field change (Apple-style). A brand-new draft entry is only actually inserted into the dataset once it has a non-empty title; until then, further edits just mutate the in-memory draft. Category and visibility are icon-pill row selectors (icon + small caption label), not `<select>` dropdowns — this project's rule of thumb is **no dropdown for fewer than ~7 options**. Each date field pairs with a 5-option precision pill selector (`exact`/`day`/`month`/`year`/`circa`) using the same icon-pill pattern as category/visibility. Date fields also have a "pick on timeline" affordance (a target/crosshair icon button): activating it arms a picking mode where hovering the canvas shows a live vertical guide line and a floating tooltip with the date under the cursor, snapped to a sensible unit for the current zoom level; clicking commits that date *and* its precision into the field together, from the snapped-to unit. Manual text entry into the date field defaults to `exact`/`day` precision and the user widens it via the pill.
 
-**Connections between entries**: always exist as data (`linkedEntityIds`, `parentEntryId`), but are only drawn as connector lines when an entry is selected — at rest, no persistent web of lines. Selecting an entry also dims every unrelated bar so the connected ones stand out.
+**Connections between entries**: always exist as data (`parentEntryId`), but are only drawn as connector lines when an entry is selected — at rest, no persistent web of lines. Selecting an entry also dims every unrelated bar so the connected ones stand out.
 
-**Search & filter**: text search matches title/description/linked-entity labels; non-matches dim rather than disappear (keeps spatial/temporal context legible). Filtering by time range, place, person, and category should reuse the same dim-not-hide treatment for consistency, plus the existing group/row visibility checkboxes for outright hiding.
+**Search & filter**: text search matches title/description/subtitle/place; non-matches dim rather than disappear (keeps spatial/temporal context legible). Filtering by time range, person, and category should reuse the same dim-not-hide treatment for consistency, plus the existing group/row visibility checkboxes for outright hiding.
 
 ## 7. Deferred — reserved in the data model, not built now
 

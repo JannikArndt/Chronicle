@@ -11,10 +11,12 @@ export function serializeDataset(dataset: TimelineDataset): string {
 
 export type ImportResult = { ok: true; dataset: TimelineDataset } | { ok: false; error: string };
 
-const ARRAY_FIELDS = ["people", "groups", "categories", "rows", "entities", "entries"] as const;
+const ARRAY_FIELDS = ["people", "groups", "categories", "rows", "entries"] as const;
 
-// Oldest export shape this importer still reads. v1's only difference from v2 is
-// the (optional) selfPersonId field, so v1 files are already structurally valid.
+// Oldest export shape this importer still reads. v1/v2 files are structurally
+// valid as-is: v2 only added the optional selfPersonId, and v3 only dropped the
+// (now-ignored) `entities`/`linkedEntityIds` fields — no migration needed, those
+// fields just go unread on an older file.
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
 
 export function validateImport(raw: unknown): ImportResult {
@@ -41,8 +43,10 @@ export function validateImport(raw: unknown): ImportResult {
       return { ok: false, error: "Malformed entry found (needs id, rowId, start). Import aborted." };
     }
   }
-  // No field migration needed beyond the version bump: every schema difference
-  // between v1 and v2 (selfPersonId) is optional and simply stays undefined.
+  // No field migration needed beyond the version bump: v1→v2's diff (selfPersonId)
+  // is optional and stays undefined; v3 only removes fields the app no longer
+  // reads, so any leftover `entities`/`linkedEntityIds` in an older file are
+  // simply ignored rather than migrated.
   if (schemaVersion < SCHEMA_VERSION) {
     candidate.schemaVersion = SCHEMA_VERSION;
   }

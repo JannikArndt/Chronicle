@@ -13,7 +13,6 @@ export interface TimeRangeFilter {
 export interface Filters {
   categoryIds: string[];
   personIds: string[];
-  entityIds: string[];
   timeRange?: TimeRangeFilter;
 }
 
@@ -38,7 +37,7 @@ const initialState: AppState = {
   dataset: emptyDataset(),
   publicDatasets: [],
   search: "",
-  filters: { categoryIds: [], personIds: [], entityIds: [] },
+  filters: { categoryIds: [], personIds: [] },
   hiddenRowIds: [],
 };
 

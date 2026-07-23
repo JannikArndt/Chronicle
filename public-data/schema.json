@@ -5,7 +5,7 @@
   "description": "A TimelineDataset restricted to what public data needs: no people/personId (public data is ownerless) and no visibility field (public entries are always shareable). Ids only need to be unique within this file — the app namespaces them on load.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "groups", "categories", "rows", "entities", "entries"],
+  "required": ["schemaVersion", "groups", "categories", "rows", "entries"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "groups": {
@@ -51,19 +51,6 @@
         }
       }
     },
-    "entities": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "kind", "label"],
-        "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "kind": { "enum": ["person", "place", "organization", "object", "other"] },
-          "label": { "type": "string", "minLength": 1 }
-        }
-      }
-    },
     "entries": {
       "type": "array",
       "items": {
@@ -74,13 +61,35 @@
           "id": { "type": "string", "minLength": 1 },
           "rowId": { "type": "string", "minLength": 1 },
           "title": { "type": "string", "minLength": 1 },
+          "subtitle": { "type": "string", "minLength": 1 },
+          "shortTitle": { "type": "string", "minLength": 1 },
+          "website": { "type": "string", "minLength": 1 },
+          "place": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fullName"],
+            "properties": {
+              "fullName": { "type": "string", "minLength": 1 },
+              "coordinates": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["lat", "lon"],
+                "properties": {
+                  "lat": { "type": "number" },
+                  "lon": { "type": "number" }
+                }
+              },
+              "street": { "type": "string", "minLength": 1 },
+              "city": { "type": "string", "minLength": 1 },
+              "country": { "type": "string", "minLength": 1 }
+            }
+          },
           "description": { "type": "string" },
           "start": { "$ref": "#/$defs/fuzzyDate" },
           "end": { "$ref": "#/$defs/fuzzyDate" },
           "fadeInDays": { "type": "number", "minimum": 0 },
           "fadeOutDays": { "type": "number", "minimum": 0 },
-          "parentEntryId": { "type": "string", "minLength": 1 },
-          "linkedEntityIds": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          "parentEntryId": { "type": "string", "minLength": 1 }
         }
       }
     }

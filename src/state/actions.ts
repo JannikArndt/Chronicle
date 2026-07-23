@@ -9,7 +9,6 @@ import { loadPublicDatasets } from "../publicData/loader";
 import { appStore } from "./store";
 import type {
   Category,
-  Entity,
   Group,
   Person,
   Precision,
@@ -77,7 +76,6 @@ export function startDraft(rowId: string, startMs: number): void {
     rowId,
     title: "",
     start: { ms: startMs, precision: "day" },
-    linkedEntityIds: [],
     visibility: category?.defaultVisibility ?? "private",
   };
   appStore.setState({ draft, selectedEntryId: undefined, selectedRowId: rowId });
@@ -163,27 +161,22 @@ export interface OnboardingPlaceAnswer {
 // click-driven startDraft flow). Returns the created entry's id, for the
 // caller to track for later edits.
 export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAnswer): string {
-  const entity = ensureEntity(
-    place.label,
-    "place",
-    place.fullName
+  const draft: TimelineEntry = {
+    id: newId("entry"),
+    rowId,
+    title: place.label,
+    subtitle: place.subtitle,
+    place: place.fullName
       ? {
           fullName: place.fullName,
           coordinates: place.coordinates,
-          subtitle: place.subtitle,
           street: place.street,
           city: place.city,
           country: place.country,
         }
       : undefined,
-  );
-  const draft: TimelineEntry = {
-    id: newId("entry"),
-    rowId,
-    title: place.label,
     start: { ms: place.startMs, precision: "year" },
     end: place.endMs !== undefined ? { ms: place.endMs, precision: "year" } : undefined,
-    linkedEntityIds: [entity.id],
     visibility: "private",
   };
   updateDataset((dataset) => {
@@ -200,27 +193,22 @@ export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAns
 // rewriting every row's start from the edited row forward, not by any check
 // in here.
 export function updateOnboardingPlaceEntry(entryId: string, place: OnboardingPlaceAnswer): void {
-  const entity = ensureEntity(
-    place.label,
-    "place",
-    place.fullName
-      ? {
-          fullName: place.fullName,
-          coordinates: place.coordinates,
-          subtitle: place.subtitle,
-          street: place.street,
-          city: place.city,
-          country: place.country,
-        }
-      : undefined,
-  );
   updateDataset((dataset) => {
     const entry = dataset.entries.find((e) => e.id === entryId);
     if (!entry) return dataset;
     entry.title = place.label;
+    entry.subtitle = place.subtitle;
+    entry.place = place.fullName
+      ? {
+          fullName: place.fullName,
+          coordinates: place.coordinates,
+          street: place.street,
+          city: place.city,
+          country: place.country,
+        }
+      : undefined;
     entry.start = { ms: place.startMs, precision: "year" };
     entry.end = place.endMs !== undefined ? { ms: place.endMs, precision: "year" } : undefined;
-    entry.linkedEntityIds = [entity.id];
     return dataset;
   });
 }
@@ -337,47 +325,6 @@ export function updatePerson(personId: string, patch: Partial<Person>): void {
     if (person) Object.assign(person, patch);
     return dataset;
   });
-}
-
-// Reuses an existing private entity with the same label; creates it otherwise.
-// For kind "place", placeDetails carries the full address/coordinates that
-// shouldn't be shown as the label itself (that stays a short display title).
-// Matching an existing entity that has no place data yet upgrades it in
-// place rather than overwriting already-set place data.
-export function ensureEntity(
-  label: string,
-  kind: Entity["kind"],
-  placeDetails?: {
-    fullName: string;
-    coordinates?: { lat: number; lon: number };
-    street?: string;
-    city?: string;
-    country?: string;
-    subtitle?: string;
-  },
-): Entity {
-  const existing = appStore
-    .getState()
-    .dataset.entities.find((e) => e.label.toLowerCase() === label.toLowerCase());
-  if (existing) {
-    if (placeDetails && !existing.place) {
-      let upgraded!: Entity;
-      updateDataset((dataset) => {
-        const entity = dataset.entities.find((e) => e.id === existing.id);
-        if (entity) entity.place = placeDetails;
-        upgraded = entity ?? existing;
-        return dataset;
-      });
-      return upgraded;
-    }
-    return existing;
-  }
-  const entity: Entity = { id: newId("ent"), kind, label, place: placeDetails };
-  updateDataset((dataset) => {
-    dataset.entities.push(entity);
-    return dataset;
-  });
-  return entity;
 }
 
 export function updateCategory(categoryId: string, patch: Partial<Category>): void {

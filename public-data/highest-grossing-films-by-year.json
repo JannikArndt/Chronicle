@@ -1,0 +1,725 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "id": "g-1",
+      "label": "Box Office",
+      "collapsed": false
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "label": "Box Office",
+      "color": "#c8102e",
+      "icon": "🎬",
+      "defaultVisibility": "shareable"
+    }
+  ],
+  "rows": [
+    {
+      "id": "row-1",
+      "groupId": "g-1",
+      "categoryId": "cat-1",
+      "label": "Highest-grossing film of the year (worldwide)"
+    }
+  ],
+  "entries": [
+    {
+      "id": "e-1",
+      "rowId": "row-1",
+      "title": "Jaws",
+      "description": "The highest-grossing film worldwide released in 1975.",
+      "start": {
+        "ms": 157766400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 189302400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-2",
+      "rowId": "row-1",
+      "title": "Rocky",
+      "description": "The highest-grossing film worldwide released in 1976.",
+      "start": {
+        "ms": 189302400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 220924800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-3",
+      "rowId": "row-1",
+      "title": "Star Wars",
+      "description": "The highest-grossing film worldwide released in 1977.",
+      "start": {
+        "ms": 220924800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 252460800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-4",
+      "rowId": "row-1",
+      "title": "Grease",
+      "description": "The highest-grossing film worldwide released in 1978.",
+      "start": {
+        "ms": 252460800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 283996800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-5",
+      "rowId": "row-1",
+      "title": "Kramer vs. Kramer",
+      "description": "The highest-grossing film worldwide released in 1979.",
+      "start": {
+        "ms": 283996800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 315532800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-6",
+      "rowId": "row-1",
+      "title": "The Empire Strikes Back",
+      "description": "The highest-grossing film worldwide released in 1980.",
+      "start": {
+        "ms": 315532800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 347155200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-7",
+      "rowId": "row-1",
+      "title": "Raiders of the Lost Ark",
+      "description": "The highest-grossing film worldwide released in 1981.",
+      "start": {
+        "ms": 347155200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 378691200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-8",
+      "rowId": "row-1",
+      "title": "E.T. the Extra-Terrestrial",
+      "description": "The highest-grossing film worldwide released in 1982.",
+      "start": {
+        "ms": 378691200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 410227200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-9",
+      "rowId": "row-1",
+      "title": "Return of the Jedi",
+      "description": "The highest-grossing film worldwide released in 1983.",
+      "start": {
+        "ms": 410227200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 441763200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-10",
+      "rowId": "row-1",
+      "title": "Ghostbusters",
+      "description": "The highest-grossing film worldwide released in 1984.",
+      "start": {
+        "ms": 441763200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 473385600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-11",
+      "rowId": "row-1",
+      "title": "Back to the Future",
+      "description": "The highest-grossing film worldwide released in 1985.",
+      "start": {
+        "ms": 473385600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 504921600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-12",
+      "rowId": "row-1",
+      "title": "Top Gun",
+      "description": "The highest-grossing film worldwide released in 1986.",
+      "start": {
+        "ms": 504921600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 536457600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-13",
+      "rowId": "row-1",
+      "title": "Three Men and a Baby",
+      "description": "The highest-grossing film worldwide released in 1987.",
+      "start": {
+        "ms": 536457600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 567993600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-14",
+      "rowId": "row-1",
+      "title": "Rain Man",
+      "description": "The highest-grossing film worldwide released in 1988.",
+      "start": {
+        "ms": 567993600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 599616000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-15",
+      "rowId": "row-1",
+      "title": "Batman",
+      "description": "The highest-grossing film worldwide released in 1989.",
+      "start": {
+        "ms": 599616000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 631152000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-16",
+      "rowId": "row-1",
+      "title": "Home Alone",
+      "description": "The highest-grossing film worldwide released in 1990.",
+      "start": {
+        "ms": 631152000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 662688000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-17",
+      "rowId": "row-1",
+      "title": "Terminator 2: Judgment Day",
+      "description": "The highest-grossing film worldwide released in 1991.",
+      "start": {
+        "ms": 662688000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 694224000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-18",
+      "rowId": "row-1",
+      "title": "Aladdin",
+      "description": "The highest-grossing film worldwide released in 1992.",
+      "start": {
+        "ms": 694224000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 725846400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-19",
+      "rowId": "row-1",
+      "title": "Jurassic Park",
+      "description": "The highest-grossing film worldwide released in 1993.",
+      "start": {
+        "ms": 725846400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 757382400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-20",
+      "rowId": "row-1",
+      "title": "Forrest Gump",
+      "description": "The highest-grossing film worldwide released in 1994.",
+      "start": {
+        "ms": 757382400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 788918400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-21",
+      "rowId": "row-1",
+      "title": "Batman Forever",
+      "description": "The highest-grossing film worldwide released in 1995.",
+      "start": {
+        "ms": 788918400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 820454400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-22",
+      "rowId": "row-1",
+      "title": "Independence Day",
+      "description": "The highest-grossing film worldwide released in 1996.",
+      "start": {
+        "ms": 820454400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 852076800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-23",
+      "rowId": "row-1",
+      "title": "Titanic",
+      "description": "The highest-grossing film worldwide released in 1997.",
+      "start": {
+        "ms": 852076800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 883612800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-24",
+      "rowId": "row-1",
+      "title": "Armageddon",
+      "description": "The highest-grossing film worldwide released in 1998.",
+      "start": {
+        "ms": 883612800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 915148800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-25",
+      "rowId": "row-1",
+      "title": "Star Wars: Episode I – The Phantom Menace",
+      "description": "The highest-grossing film worldwide released in 1999.",
+      "start": {
+        "ms": 915148800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 946684800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-26",
+      "rowId": "row-1",
+      "title": "Mission: Impossible II",
+      "description": "The highest-grossing film worldwide released in 2000.",
+      "start": {
+        "ms": 946684800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 978307200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-27",
+      "rowId": "row-1",
+      "title": "Harry Potter and the Sorcerer's Stone",
+      "description": "The highest-grossing film worldwide released in 2001.",
+      "start": {
+        "ms": 978307200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1009843200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-28",
+      "rowId": "row-1",
+      "title": "The Lord of the Rings: The Two Towers",
+      "description": "The highest-grossing film worldwide released in 2002.",
+      "start": {
+        "ms": 1009843200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1041379200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-29",
+      "rowId": "row-1",
+      "title": "The Lord of the Rings: The Return of the King",
+      "description": "The highest-grossing film worldwide released in 2003.",
+      "start": {
+        "ms": 1041379200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1072915200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-30",
+      "rowId": "row-1",
+      "title": "Shrek 2",
+      "description": "The highest-grossing film worldwide released in 2004.",
+      "start": {
+        "ms": 1072915200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1104537600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-31",
+      "rowId": "row-1",
+      "title": "Star Wars: Episode III – Revenge of the Sith",
+      "description": "The highest-grossing film worldwide released in 2005.",
+      "start": {
+        "ms": 1104537600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1136073600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-32",
+      "rowId": "row-1",
+      "title": "Pirates of the Caribbean: Dead Man's Chest",
+      "description": "The highest-grossing film worldwide released in 2006.",
+      "start": {
+        "ms": 1136073600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1167609600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-33",
+      "rowId": "row-1",
+      "title": "Pirates of the Caribbean: At World's End",
+      "description": "The highest-grossing film worldwide released in 2007.",
+      "start": {
+        "ms": 1167609600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1199145600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-34",
+      "rowId": "row-1",
+      "title": "The Dark Knight",
+      "description": "The highest-grossing film worldwide released in 2008.",
+      "start": {
+        "ms": 1199145600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1230768000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-35",
+      "rowId": "row-1",
+      "title": "Avatar",
+      "description": "The highest-grossing film worldwide released in 2009.",
+      "start": {
+        "ms": 1230768000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1262304000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-36",
+      "rowId": "row-1",
+      "title": "Toy Story 3",
+      "description": "The highest-grossing film worldwide released in 2010.",
+      "start": {
+        "ms": 1262304000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1293840000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-37",
+      "rowId": "row-1",
+      "title": "Harry Potter and the Deathly Hallows – Part 2",
+      "description": "The highest-grossing film worldwide released in 2011.",
+      "start": {
+        "ms": 1293840000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1325376000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-38",
+      "rowId": "row-1",
+      "title": "The Avengers",
+      "description": "The highest-grossing film worldwide released in 2012.",
+      "start": {
+        "ms": 1325376000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1356998400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-39",
+      "rowId": "row-1",
+      "title": "Frozen",
+      "description": "The highest-grossing film worldwide released in 2013.",
+      "start": {
+        "ms": 1356998400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1388534400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-40",
+      "rowId": "row-1",
+      "title": "Transformers: Age of Extinction",
+      "description": "The highest-grossing film worldwide released in 2014.",
+      "start": {
+        "ms": 1388534400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1420070400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-41",
+      "rowId": "row-1",
+      "title": "Star Wars: The Force Awakens",
+      "description": "The highest-grossing film worldwide released in 2015.",
+      "start": {
+        "ms": 1420070400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1451606400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-42",
+      "rowId": "row-1",
+      "title": "Captain America: Civil War",
+      "description": "The highest-grossing film worldwide released in 2016.",
+      "start": {
+        "ms": 1451606400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1483228800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-43",
+      "rowId": "row-1",
+      "title": "Star Wars: The Last Jedi",
+      "description": "The highest-grossing film worldwide released in 2017.",
+      "start": {
+        "ms": 1483228800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1514764800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-44",
+      "rowId": "row-1",
+      "title": "Avengers: Infinity War",
+      "description": "The highest-grossing film worldwide released in 2018.",
+      "start": {
+        "ms": 1514764800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1546300800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-45",
+      "rowId": "row-1",
+      "title": "Avengers: Endgame",
+      "description": "The highest-grossing film worldwide released in 2019.",
+      "start": {
+        "ms": 1546300800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1577836800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-46",
+      "rowId": "row-1",
+      "title": "The Eight Hundred",
+      "description": "The highest-grossing film worldwide released in 2020.",
+      "start": {
+        "ms": 1577836800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1609459200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-47",
+      "rowId": "row-1",
+      "title": "Spider-Man: No Way Home",
+      "description": "The highest-grossing film worldwide released in 2021.",
+      "start": {
+        "ms": 1609459200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1640995200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-48",
+      "rowId": "row-1",
+      "title": "Avatar: The Way of Water",
+      "description": "The highest-grossing film worldwide released in 2022.",
+      "start": {
+        "ms": 1640995200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1672531200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-49",
+      "rowId": "row-1",
+      "title": "Barbie",
+      "description": "The highest-grossing film worldwide released in 2023.",
+      "start": {
+        "ms": 1672531200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1704067200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-50",
+      "rowId": "row-1",
+      "title": "Inside Out 2",
+      "description": "The highest-grossing film worldwide released in 2024.",
+      "start": {
+        "ms": 1704067200000,
+        "precision": "day"
+      }
+    }
+  ]
+}

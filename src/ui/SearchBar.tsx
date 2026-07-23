@@ -15,9 +15,6 @@ export function SearchBar() {
 
   const categories = [...dataset.categories, ...publicDatasets.flatMap((d) => d.categories)];
   const people = [...dataset.people, ...publicDatasets.flatMap((d) => d.people)];
-  const places = [...dataset.entities, ...publicDatasets.flatMap((d) => d.entities)].filter(
-    (e) => e.kind === "place",
-  );
 
   const toggle = (list: string[], id: string): string[] =>
     list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
@@ -65,21 +62,6 @@ export function SearchBar() {
                 >
                   <span className="pill-icon">🧑</span>
                   <span className="pill-label">{person.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          {places.length > 0 && (
-            <div className="filter-group">
-              {places.map((place) => (
-                <button
-                  key={place.id}
-                  type="button"
-                  className={`pill ${filters.entityIds.includes(place.id) ? "pill-active" : ""}`}
-                  onClick={() => setFilters({ ...filters, entityIds: toggle(filters.entityIds, place.id) })}
-                >
-                  <span className="pill-icon">📍</span>
-                  <span className="pill-label">{place.label}</span>
                 </button>
               ))}
             </div>

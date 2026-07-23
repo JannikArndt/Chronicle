@@ -42,18 +42,15 @@ The JSON must conform exactly to this structure (no extra fields anywhere):
   "rows": [
     { "id": "row-1", "groupId": "g-1", "categoryId": "cat-1", "label": "<row label>" }
   ],
-  "entities": [
-    { "id": "ent-1", "kind": "person|place|organization|object|other", "label": "<name>" }
-  ],
   "entries": [
     {
       "id": "e-1",
       "rowId": "row-1",
       "title": "<short title>",
+      "subtitle": "<optional secondary line>",
       "description": "<one or two factual sentences>",
       "start": { "ms": 0, "precision": "day" },
-      "end": { "ms": 0, "precision": "day" },
-      "linkedEntityIds": ["ent-1"]
+      "end": { "ms": 0, "precision": "day" }
     }
   ]
 }
@@ -69,9 +66,10 @@ Rules:
 - Omit `end` entirely for things that are still ongoing.
 - Consecutive terms/holders/versions on the same row: make each entry's `end` equal
   the next entry's `start` so they read as a continuous sequence.
-- Ids: short and unique within this file only (`g-1`, `cat-1`, `row-1`, `ent-1`, `e-1`, …).
-- Link entries to the people/places/organizations they involve via `entities` +
-  `linkedEntityIds`.
+- Ids: short and unique within this file only (`g-1`, `cat-1`, `row-1`, `e-1`, …).
+- Optional per-entry fields: `subtitle`, `shortTitle` (shown on the bar when the
+  full title doesn't fit), `website` (fetches a favicon shown before the label),
+  `place` (`{ fullName, coordinates?: { lat, lon }, street?, city?, country? }`).
 - Output ONLY the JSON, no commentary, no markdown fences.
 
 ---

@@ -8,7 +8,6 @@ export function emptyDataset(): TimelineDataset {
     groups: [],
     categories: [],
     rows: [],
-    entities: [],
     entries: [],
   };
 }
@@ -29,7 +28,6 @@ export function mergeDatasets(base: TimelineDataset, ...extra: TimelineDataset[]
     merged.groups.push(...dataset.groups);
     merged.categories.push(...dataset.categories);
     merged.rows.push(...dataset.rows);
-    merged.entities.push(...dataset.entities);
     merged.entries.push(...dataset.entries);
   }
   return merged;

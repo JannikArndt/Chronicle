@@ -13,14 +13,12 @@ function fixture(): TimelineDataset {
     { id: "row-1", groupId: "g-1", categoryId: "cat-1", label: "iPhone" },
     { id: "row-2", groupId: "g-1", categoryId: "cat-1", label: "Details", parentRowId: "row-1" },
   ];
-  ds.entities = [{ id: "ent-1", kind: "organization", label: "Apple Inc." }];
   ds.entries = [
     {
       id: "e-1",
       rowId: "row-1",
       title: "iPhone",
       start: { ms: 0, precision: "day" },
-      linkedEntityIds: ["ent-1"],
       visibility: "shareable",
     },
     {
@@ -29,7 +27,6 @@ function fixture(): TimelineDataset {
       title: "Launch event",
       start: { ms: 0, precision: "day" },
       parentEntryId: "e-1",
-      linkedEntityIds: [],
       visibility: "shareable",
     },
   ];
@@ -43,11 +40,9 @@ describe("namespaceDataset", () => {
     expect(ds.rows[0].groupId).toBe("pub:iphone-releases:g-1");
     expect(ds.rows[1].parentRowId).toBe("pub:iphone-releases:row-1");
     expect(ds.entries[0].rowId).toBe("pub:iphone-releases:row-1");
-    expect(ds.entries[0].linkedEntityIds).toEqual(["pub:iphone-releases:ent-1"]);
     expect(ds.entries[1].parentEntryId).toBe("pub:iphone-releases:e-1");
     expect(ds.categories[0].id).toBe("pub:iphone-releases:cat-1");
     expect(ds.rows[0].categoryId).toBe("pub:iphone-releases:cat-1");
-    expect(ds.entities[0].id).toBe("pub:iphone-releases:ent-1");
   });
 
   test("leaves absent optional references undefined", () => {

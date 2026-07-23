@@ -17,7 +17,6 @@ function makeEntry(id: string, rowId: string, parentEntryId?: string): TimelineE
     title: id,
     start: { ms: 0, precision: "day" },
     parentEntryId,
-    linkedEntityIds: [],
     visibility: "private",
   };
 }

@@ -31,7 +31,7 @@ describe("public-data schema validation", () => {
     test(`${file} has internally unique and resolvable ids`, () => {
       const data = JSON.parse(readFileSync(join(publicDataDir, file), "utf8"));
       const ids = new Set<string>();
-      for (const collection of ["groups", "categories", "rows", "entities", "entries"]) {
+      for (const collection of ["groups", "categories", "rows", "entries"]) {
         for (const item of data[collection]) {
           expect(ids.has(item.id), `duplicate id ${item.id}`).toBe(false);
           ids.add(item.id);
@@ -43,7 +43,6 @@ describe("public-data schema validation", () => {
       }
       for (const entry of data.entries) {
         expect(ids.has(entry.rowId)).toBe(true);
-        for (const entityId of entry.linkedEntityIds ?? []) expect(ids.has(entityId)).toBe(true);
       }
     });
   }

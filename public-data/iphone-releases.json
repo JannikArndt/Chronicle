@@ -24,18 +24,6 @@
       "label": "Flagship generations"
     }
   ],
-  "entities": [
-    {
-      "id": "ent-apple",
-      "kind": "organization",
-      "label": "Apple Inc."
-    },
-    {
-      "id": "ent-jobs",
-      "kind": "person",
-      "label": "Steve Jobs"
-    }
-  ],
   "entries": [
     {
       "id": "e-1",
@@ -46,10 +34,6 @@
         "ms": 1183075200000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple",
-        "ent-jobs"
-      ],
       "end": {
         "ms": 1215734400000,
         "precision": "day"
@@ -64,9 +48,6 @@
         "ms": 1215734400000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1245369600000,
         "precision": "day"
@@ -81,9 +62,6 @@
         "ms": 1245369600000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1277337600000,
         "precision": "day"
@@ -98,9 +76,6 @@
         "ms": 1277337600000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1318550400000,
         "precision": "day"
@@ -115,9 +90,6 @@
         "ms": 1318550400000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1348185600000,
         "precision": "day"
@@ -132,9 +104,6 @@
         "ms": 1348185600000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1379635200000,
         "precision": "day"
@@ -149,9 +118,6 @@
         "ms": 1379635200000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1411084800000,
         "precision": "day"
@@ -166,9 +132,6 @@
         "ms": 1411084800000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1443139200000,
         "precision": "day"
@@ -183,9 +146,6 @@
         "ms": 1443139200000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1473984000000,
         "precision": "day"
@@ -200,9 +160,6 @@
         "ms": 1473984000000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1509667200000,
         "precision": "day"
@@ -217,9 +174,6 @@
         "ms": 1509667200000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1537488000000,
         "precision": "day"
@@ -234,9 +188,6 @@
         "ms": 1537488000000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1568937600000,
         "precision": "day"
@@ -251,9 +202,6 @@
         "ms": 1568937600000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1603411200000,
         "precision": "day"
@@ -268,9 +216,6 @@
         "ms": 1603411200000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1632441600000,
         "precision": "day"
@@ -285,9 +230,6 @@
         "ms": 1632441600000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1663286400000,
         "precision": "day"
@@ -302,9 +244,6 @@
         "ms": 1663286400000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1695340800000,
         "precision": "day"
@@ -319,9 +258,6 @@
         "ms": 1695340800000,
         "precision": "day"
       },
-      "linkedEntityIds": [
-        "ent-apple"
-      ],
       "end": {
         "ms": 1726790400000,
         "precision": "day"
@@ -335,10 +271,7 @@
       "start": {
         "ms": 1726790400000,
         "precision": "day"
-      },
-      "linkedEntityIds": [
-        "ent-apple"
-      ]
+      }
     }
   ]
 }

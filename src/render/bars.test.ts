@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { barGeometry, gradientStops, labelAnchorX } from "./bars";
+import { barGeometry, gradientStops, labelAnchorX, pickBarLabel } from "./bars";
 import { DAY_MS } from "../model/fuzzyDate";
 import type { TimelineEntry } from "../model/types";
 
@@ -13,7 +13,6 @@ function entry(overrides: Partial<TimelineEntry>): TimelineEntry {
     rowId: "r1",
     title: "t",
     start: { ms: T0, precision: "day" },
-    linkedEntityIds: [],
     visibility: "private",
     ...overrides,
   };
@@ -84,5 +83,21 @@ describe("labelAnchorX", () => {
     expect(geomOff.xSolidStart).toBeLessThan(0);
     expect(labelAnchorX(geomOff, 50, 1000)).toBeGreaterThanOrEqual(0);
     expect(labelAnchorX(geom, 50, 1000)).toBeGreaterThanOrEqual(geom.xSolidStart);
+  });
+});
+
+describe("pickBarLabel", () => {
+  const geom = barGeometry(entry({ end: { ms: T0 + 100 * DAY_MS, precision: "day" } }), scale, NOW);
+
+  test("uses the title when it fits", () => {
+    expect(pickBarLabel({ title: "Short" }, geom, 10)).toBe("title");
+  });
+
+  test("uses the title when it overflows but there's no shortTitle", () => {
+    expect(pickBarLabel({ title: "A very long title indeed" }, geom, 500)).toBe("title");
+  });
+
+  test("swaps to shortTitle when the title overflows and a shortTitle is set", () => {
+    expect(pickBarLabel({ title: "A very long title indeed", shortTitle: "Long" }, geom, 500)).toBe("shortTitle");
   });
 });

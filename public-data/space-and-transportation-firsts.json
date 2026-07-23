@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "id": "g-1",
+      "label": "Space & Transportation Firsts",
+      "collapsed": false
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "label": "Firsts",
+      "color": "#e63946",
+      "icon": "🚀",
+      "defaultVisibility": "shareable"
+    }
+  ],
+  "rows": [
+    {
+      "id": "row-1",
+      "groupId": "g-1",
+      "categoryId": "cat-1",
+      "label": "Space & Transportation"
+    }
+  ],
+  "entries": [
+    {
+      "id": "e-1",
+      "rowId": "row-1",
+      "title": "First mass-produced automobile",
+      "description": "Ford began assembly-line production of the Model T, making car ownership affordable for the middle class.",
+      "start": {
+        "ms": -1932940800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-2",
+      "rowId": "row-1",
+      "title": "First liquid-fueled rocket flight",
+      "description": "Robert Goddard launched the first rocket powered by liquid propellant, reaching an altitude of 12.5 meters.",
+      "start": {
+        "ms": -1382140800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-3",
+      "rowId": "row-1",
+      "title": "First commercial jet airliner service",
+      "description": "BOAC's de Havilland Comet began the world's first scheduled jet airliner service.",
+      "start": {
+        "ms": -557539200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-4",
+      "rowId": "row-1",
+      "title": "First artificial satellite",
+      "description": "The Soviet Union launched Sputnik 1, the first human-made object to orbit Earth, starting the Space Age.",
+      "start": {
+        "ms": -386380800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-5",
+      "rowId": "row-1",
+      "title": "First human spaceflight",
+      "description": "Cosmonaut Yuri Gagarin became the first person to orbit Earth, aboard Vostok 1.",
+      "start": {
+        "ms": -275270400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-6",
+      "rowId": "row-1",
+      "title": "First Moon landing",
+      "description": "Apollo 11 astronauts Neil Armstrong and Buzz Aldrin became the first humans to walk on the Moon.",
+      "start": {
+        "ms": -14256000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-7",
+      "rowId": "row-1",
+      "title": "First supersonic passenger service",
+      "description": "Concorde began the only supersonic passenger airline service ever operated commercially.",
+      "start": {
+        "ms": 191030400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-8",
+      "rowId": "row-1",
+      "title": "First Tesla Roadster delivered",
+      "description": "Tesla delivered its first Roadster, the first highway-legal all-electric car to use lithium-ion cells and the first modern mass-produced EV.",
+      "start": {
+        "ms": 1201824000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-9",
+      "rowId": "row-1",
+      "title": "First reusable orbital rocket landing",
+      "description": "SpaceX landed a Falcon 9 first stage back on Earth after an orbital launch, a first for orbital-class rockets.",
+      "start": {
+        "ms": 1450656000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-10",
+      "rowId": "row-1",
+      "title": "First private crewed orbital spaceflight",
+      "description": "SpaceX's Crew Dragon Demo-2 carried NASA astronauts to the ISS, the first crewed orbital flight by a commercially built and operated spacecraft.",
+      "start": {
+        "ms": 1590796800000,
+        "precision": "day"
+      }
+    }
+  ]
+}

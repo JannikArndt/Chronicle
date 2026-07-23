@@ -59,3 +59,16 @@ export function labelAnchorX(geom: BarGeometry, textWidth: number, viewportWidth
   x = Math.min(x, viewportWidth - textWidth - padding);
   return Math.max(x, Math.max(geom.xSolidStart + padding, 0 + padding));
 }
+
+// Falls back to shortTitle only when the full title actually overflows the
+// bar's near-opaque span — never swaps just because a shortTitle exists.
+export function pickBarLabel(
+  entry: { title: string; shortTitle?: string },
+  geom: BarGeometry,
+  measuredTitleWidth: number,
+  padding = 6,
+): "title" | "shortTitle" {
+  if (!entry.shortTitle) return "title";
+  const available = geom.xSolidEnd - geom.xSolidStart - padding * 2;
+  return measuredTitleWidth > available ? "shortTitle" : "title";
+}

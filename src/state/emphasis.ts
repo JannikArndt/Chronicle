@@ -9,7 +9,6 @@ export function hasActiveFilters(search: string, filters: Filters): boolean {
     search.trim() !== "" ||
     filters.categoryIds.length > 0 ||
     filters.personIds.length > 0 ||
-    filters.entityIds.length > 0 ||
     filters.timeRange !== undefined
   );
 }
@@ -23,7 +22,6 @@ export function computeEmphasis(
 ): Set<string> | null {
   if (!hasActiveFilters(search, filters)) return null;
   const query = search.trim().toLowerCase();
-  const entityLabelById = new Map(dataset.entities.map((e) => [e.id, e.label.toLowerCase()]));
   const rowById = new Map(dataset.rows.map((r) => [r.id, r]));
   const groupById = new Map(dataset.groups.map((g) => [g.id, g]));
 
@@ -31,8 +29,9 @@ export function computeEmphasis(
     if (query !== "") {
       const inTitle = entry.title.toLowerCase().includes(query);
       const inDescription = entry.description?.toLowerCase().includes(query) ?? false;
-      const inEntities = entry.linkedEntityIds.some((id) => entityLabelById.get(id)?.includes(query));
-      if (!inTitle && !inDescription && !inEntities) return false;
+      const inSubtitle = entry.subtitle?.toLowerCase().includes(query) ?? false;
+      const inPlace = entry.place?.fullName.toLowerCase().includes(query) ?? false;
+      if (!inTitle && !inDescription && !inSubtitle && !inPlace) return false;
     }
     const row = rowById.get(entry.rowId);
     if (filters.categoryIds.length > 0 && (!row || !filters.categoryIds.includes(row.categoryId))) {
@@ -41,9 +40,6 @@ export function computeEmphasis(
     if (filters.personIds.length > 0) {
       const personId = row?.personId ?? (row ? groupById.get(row.groupId)?.personId : undefined);
       if (!personId || !filters.personIds.includes(personId)) return false;
-    }
-    if (filters.entityIds.length > 0 && !entry.linkedEntityIds.some((id) => filters.entityIds.includes(id))) {
-      return false;
     }
     if (filters.timeRange) {
       const endMs = entry.end?.ms ?? Number.POSITIVE_INFINITY;

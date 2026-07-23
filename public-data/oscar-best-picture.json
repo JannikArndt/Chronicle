@@ -1,0 +1,725 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "id": "g-1",
+      "label": "Best Picture",
+      "collapsed": false
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-1",
+      "label": "Best Picture",
+      "color": "#c9a227",
+      "icon": "🏆",
+      "defaultVisibility": "shareable"
+    }
+  ],
+  "rows": [
+    {
+      "id": "row-1",
+      "groupId": "g-1",
+      "categoryId": "cat-1",
+      "label": "Academy Award for Best Picture"
+    }
+  ],
+  "entries": [
+    {
+      "id": "e-1",
+      "rowId": "row-1",
+      "title": "One Flew Over the Cuckoo's Nest",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1976 ceremony.",
+      "start": {
+        "ms": 189302400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 220924800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-2",
+      "rowId": "row-1",
+      "title": "Rocky",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1977 ceremony.",
+      "start": {
+        "ms": 220924800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 252460800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-3",
+      "rowId": "row-1",
+      "title": "Annie Hall",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1978 ceremony.",
+      "start": {
+        "ms": 252460800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 283996800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-4",
+      "rowId": "row-1",
+      "title": "The Deer Hunter",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1979 ceremony.",
+      "start": {
+        "ms": 283996800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 315532800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-5",
+      "rowId": "row-1",
+      "title": "Kramer vs. Kramer",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1980 ceremony.",
+      "start": {
+        "ms": 315532800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 347155200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-6",
+      "rowId": "row-1",
+      "title": "Ordinary People",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1981 ceremony.",
+      "start": {
+        "ms": 347155200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 378691200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-7",
+      "rowId": "row-1",
+      "title": "Chariots of Fire",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1982 ceremony.",
+      "start": {
+        "ms": 378691200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 410227200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-8",
+      "rowId": "row-1",
+      "title": "Gandhi",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1983 ceremony.",
+      "start": {
+        "ms": 410227200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 441763200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-9",
+      "rowId": "row-1",
+      "title": "Terms of Endearment",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1984 ceremony.",
+      "start": {
+        "ms": 441763200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 473385600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-10",
+      "rowId": "row-1",
+      "title": "Amadeus",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1985 ceremony.",
+      "start": {
+        "ms": 473385600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 504921600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-11",
+      "rowId": "row-1",
+      "title": "Out of Africa",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1986 ceremony.",
+      "start": {
+        "ms": 504921600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 536457600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-12",
+      "rowId": "row-1",
+      "title": "Platoon",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1987 ceremony.",
+      "start": {
+        "ms": 536457600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 567993600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-13",
+      "rowId": "row-1",
+      "title": "The Last Emperor",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1988 ceremony.",
+      "start": {
+        "ms": 567993600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 599616000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-14",
+      "rowId": "row-1",
+      "title": "Rain Man",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1989 ceremony.",
+      "start": {
+        "ms": 599616000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 631152000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-15",
+      "rowId": "row-1",
+      "title": "Driving Miss Daisy",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1990 ceremony.",
+      "start": {
+        "ms": 631152000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 662688000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-16",
+      "rowId": "row-1",
+      "title": "Dances with Wolves",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1991 ceremony.",
+      "start": {
+        "ms": 662688000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 694224000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-17",
+      "rowId": "row-1",
+      "title": "The Silence of the Lambs",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1992 ceremony.",
+      "start": {
+        "ms": 694224000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 725846400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-18",
+      "rowId": "row-1",
+      "title": "Unforgiven",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1993 ceremony.",
+      "start": {
+        "ms": 725846400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 757382400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-19",
+      "rowId": "row-1",
+      "title": "Schindler's List",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1994 ceremony.",
+      "start": {
+        "ms": 757382400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 788918400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-20",
+      "rowId": "row-1",
+      "title": "Forrest Gump",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1995 ceremony.",
+      "start": {
+        "ms": 788918400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 820454400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-21",
+      "rowId": "row-1",
+      "title": "Braveheart",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1996 ceremony.",
+      "start": {
+        "ms": 820454400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 852076800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-22",
+      "rowId": "row-1",
+      "title": "The English Patient",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1997 ceremony.",
+      "start": {
+        "ms": 852076800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 883612800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-23",
+      "rowId": "row-1",
+      "title": "Titanic",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1998 ceremony.",
+      "start": {
+        "ms": 883612800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 915148800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-24",
+      "rowId": "row-1",
+      "title": "Shakespeare in Love",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 1999 ceremony.",
+      "start": {
+        "ms": 915148800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 946684800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-25",
+      "rowId": "row-1",
+      "title": "American Beauty",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2000 ceremony.",
+      "start": {
+        "ms": 946684800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 978307200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-26",
+      "rowId": "row-1",
+      "title": "Gladiator",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2001 ceremony.",
+      "start": {
+        "ms": 978307200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1009843200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-27",
+      "rowId": "row-1",
+      "title": "A Beautiful Mind",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2002 ceremony.",
+      "start": {
+        "ms": 1009843200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1041379200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-28",
+      "rowId": "row-1",
+      "title": "Chicago",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2003 ceremony.",
+      "start": {
+        "ms": 1041379200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1072915200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-29",
+      "rowId": "row-1",
+      "title": "The Lord of the Rings: The Return of the King",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2004 ceremony.",
+      "start": {
+        "ms": 1072915200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1104537600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-30",
+      "rowId": "row-1",
+      "title": "Million Dollar Baby",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2005 ceremony.",
+      "start": {
+        "ms": 1104537600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1136073600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-31",
+      "rowId": "row-1",
+      "title": "Crash",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2006 ceremony.",
+      "start": {
+        "ms": 1136073600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1167609600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-32",
+      "rowId": "row-1",
+      "title": "The Departed",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2007 ceremony.",
+      "start": {
+        "ms": 1167609600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1199145600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-33",
+      "rowId": "row-1",
+      "title": "No Country for Old Men",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2008 ceremony.",
+      "start": {
+        "ms": 1199145600000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1230768000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-34",
+      "rowId": "row-1",
+      "title": "Slumdog Millionaire",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2009 ceremony.",
+      "start": {
+        "ms": 1230768000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1262304000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-35",
+      "rowId": "row-1",
+      "title": "The Hurt Locker",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2010 ceremony.",
+      "start": {
+        "ms": 1262304000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1293840000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-36",
+      "rowId": "row-1",
+      "title": "The King's Speech",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2011 ceremony.",
+      "start": {
+        "ms": 1293840000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1325376000000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-37",
+      "rowId": "row-1",
+      "title": "The Artist",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2012 ceremony.",
+      "start": {
+        "ms": 1325376000000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1356998400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-38",
+      "rowId": "row-1",
+      "title": "Argo",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2013 ceremony.",
+      "start": {
+        "ms": 1356998400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1388534400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-39",
+      "rowId": "row-1",
+      "title": "12 Years a Slave",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2014 ceremony.",
+      "start": {
+        "ms": 1388534400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1420070400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-40",
+      "rowId": "row-1",
+      "title": "Birdman",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2015 ceremony.",
+      "start": {
+        "ms": 1420070400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1451606400000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-41",
+      "rowId": "row-1",
+      "title": "Spotlight",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2016 ceremony.",
+      "start": {
+        "ms": 1451606400000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1483228800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-42",
+      "rowId": "row-1",
+      "title": "Moonlight",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2017 ceremony.",
+      "start": {
+        "ms": 1483228800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1514764800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-43",
+      "rowId": "row-1",
+      "title": "The Shape of Water",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2018 ceremony.",
+      "start": {
+        "ms": 1514764800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1546300800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-44",
+      "rowId": "row-1",
+      "title": "Green Book",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2019 ceremony.",
+      "start": {
+        "ms": 1546300800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1577836800000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-45",
+      "rowId": "row-1",
+      "title": "Parasite",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2020 ceremony.",
+      "start": {
+        "ms": 1577836800000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1609459200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-46",
+      "rowId": "row-1",
+      "title": "Nomadland",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2021 ceremony.",
+      "start": {
+        "ms": 1609459200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1640995200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-47",
+      "rowId": "row-1",
+      "title": "CODA",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2022 ceremony.",
+      "start": {
+        "ms": 1640995200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1672531200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-48",
+      "rowId": "row-1",
+      "title": "Everything Everywhere All at Once",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2023 ceremony.",
+      "start": {
+        "ms": 1672531200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1704067200000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-49",
+      "rowId": "row-1",
+      "title": "Oppenheimer",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2024 ceremony.",
+      "start": {
+        "ms": 1704067200000,
+        "precision": "day"
+      },
+      "end": {
+        "ms": 1735689600000,
+        "precision": "day"
+      }
+    },
+    {
+      "id": "e-50",
+      "rowId": "row-1",
+      "title": "Anora",
+      "description": "Winner of the Academy Award for Best Picture, awarded at the 2025 ceremony.",
+      "start": {
+        "ms": 1735689600000,
+        "precision": "day"
+      }
+    }
+  ]
+}

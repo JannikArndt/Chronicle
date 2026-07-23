@@ -3,31 +3,21 @@
 
 import { useEffect, useState } from "react";
 import { collectEntryCascade, describeCascade } from "../model/cascade";
+import { faviconUrl } from "../model/favicon";
 import { formatFuzzyDate } from "../model/fuzzyDate";
-import type { Entity, TimelineEntry } from "../model/types";
-import {
-  clearSelection,
-  deleteEntryWithCascade,
-  ensureEntity,
-  updateEntry,
-  updateRow,
-} from "../state/actions";
+import type { Place, TimelineEntry } from "../model/types";
+import { clearSelection, deleteEntryWithCascade, updateEntry, updateRow } from "../state/actions";
 import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { DateField } from "./DateField";
 import { PillSelector } from "./PillSelector";
 import type { PillOption } from "./PillSelector";
+import { PlaceAutocompleteInput } from "../onboarding/PlaceAutocompleteInput";
+import { formatSuggestionText } from "../onboarding/nominatim";
+import type { PlaceSuggestion } from "../onboarding/nominatim";
 
 const VISIBILITY_OPTIONS: PillOption<"private" | "shareable">[] = [
   { value: "private", icon: "🔒", label: "private" },
   { value: "shareable", icon: "🔗", label: "shareable" },
-];
-
-const ENTITY_KIND_OPTIONS: PillOption<Entity["kind"]>[] = [
-  { value: "person", icon: "🧑", label: "person" },
-  { value: "place", icon: "📍", label: "place" },
-  { value: "organization", icon: "🏢", label: "org" },
-  { value: "object", icon: "📦", label: "object" },
-  { value: "other", icon: "✨", label: "other" },
 ];
 
 export function DetailPanel() {
@@ -55,10 +45,6 @@ export function DetailPanel() {
   const category = merged.categories.find((c) => c.id === row?.categoryId);
   const privateCategories = state.dataset.categories;
   const change = (patch: Partial<TimelineEntry>) => updateEntry(entry.id, patch);
-
-  const linkedEntities = entry.linkedEntityIds
-    .map((id) => merged.entities.find((e) => e.id === id))
-    .filter((e): e is Entity => !!e);
 
   return (
     <aside className="detail-panel">
@@ -99,6 +85,48 @@ export function DetailPanel() {
         disabled={readOnly}
         onChange={(value) => change({ end: value })}
       />
+
+      <div className="field">
+        <label className="field-label">Subtitle</label>
+        <input
+          type="text"
+          value={entry.subtitle ?? ""}
+          disabled={readOnly}
+          onChange={(event) => change({ subtitle: event.target.value || undefined })}
+        />
+      </div>
+
+      <div className="field">
+        <label className="field-label">Short title</label>
+        <input
+          type="text"
+          value={entry.shortTitle ?? ""}
+          disabled={readOnly}
+          placeholder="Shown on the bar when the full title doesn't fit"
+          onChange={(event) => change({ shortTitle: event.target.value || undefined })}
+        />
+      </div>
+
+      <div className="field">
+        <label className="field-label">Website</label>
+        <div className="field-with-icon">
+          {entry.website && faviconUrl(entry.website, 16) && (
+            <img className="favicon-preview" src={faviconUrl(entry.website, 16)} alt="" width={16} height={16} />
+          )}
+          <input
+            type="text"
+            value={entry.website ?? ""}
+            placeholder="example.com"
+            disabled={readOnly}
+            onChange={(event) => change({ website: event.target.value || undefined })}
+          />
+        </div>
+      </div>
+
+      <div className="field">
+        <label className="field-label">Place</label>
+        <PlaceField entry={entry} readOnly={readOnly} change={change} />
+      </div>
 
       <div className="field">
         <label className="field-label">Description</label>
@@ -154,37 +182,6 @@ export function DetailPanel() {
         />
       </div>
 
-      <div className="field">
-        <label className="field-label">Linked entities</label>
-        {linkedEntities.map((entity) => (
-          <div
-            key={entity.id}
-            className="entity-chip"
-            title={[entity.place?.street, entity.place?.city, entity.place?.country].filter(Boolean).join(", ") || undefined}
-          >
-            <span className="entity-chip-text">
-              <span className="entity-chip-title">
-                {ENTITY_KIND_OPTIONS.find((o) => o.value === entity.kind)?.icon} {entity.label}
-              </span>
-              {entity.place?.subtitle && <span className="entity-chip-subtitle">{entity.place.subtitle}</span>}
-            </span>
-            {!readOnly && (
-              <button
-                type="button"
-                className="icon-button"
-                title="Unlink"
-                onClick={() =>
-                  change({ linkedEntityIds: entry.linkedEntityIds.filter((id) => id !== entity.id) })
-                }
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        ))}
-        {!readOnly && <EntityAdder entry={entry} />}
-      </div>
-
       {!readOnly && !isDraft && (
         <button
           type="button"
@@ -203,35 +200,75 @@ export function DetailPanel() {
   );
 }
 
-function EntityAdder({ entry }: { entry: TimelineEntry }) {
-  const [label, setLabel] = useState("");
-  const [kind, setKind] = useState<Entity["kind"]>("person");
+// Only one place per entry, so this toggles between a static chip (with a
+// clear button) and the search input — unlike the old multi-entity adder,
+// there's never both a chip and an input showing at once.
+function PlaceField({
+  entry,
+  readOnly,
+  change,
+}: {
+  entry: TimelineEntry;
+  readOnly: boolean;
+  change: (patch: Partial<TimelineEntry>) => void;
+}) {
+  const [text, setText] = useState("");
+  const [pendingSuggestion, setPendingSuggestion] = useState<PlaceSuggestion | null>(null);
 
-  const add = () => {
-    const trimmed = label.trim();
+  const commit = () => {
+    const trimmed = text.trim();
     if (trimmed === "") return;
-    const entity = ensureEntity(trimmed, kind);
-    if (!entry.linkedEntityIds.includes(entity.id)) {
-      updateEntry(entry.id, { linkedEntityIds: [...entry.linkedEntityIds, entity.id] });
-    }
-    setLabel("");
+    const place: Place =
+      pendingSuggestion && formatSuggestionText(pendingSuggestion) === trimmed
+        ? {
+            fullName: pendingSuggestion.fullName,
+            coordinates: { lat: Number(pendingSuggestion.lat), lon: Number(pendingSuggestion.lon) },
+            street: pendingSuggestion.street,
+            city: pendingSuggestion.city,
+            country: pendingSuggestion.country,
+          }
+        : { fullName: trimmed };
+    change({ place });
+    setText("");
+    setPendingSuggestion(null);
   };
+
+  if (entry.place) {
+    return (
+      <div
+        className="entity-chip"
+        title={[entry.place.street, entry.place.city, entry.place.country].filter(Boolean).join(", ") || undefined}
+      >
+        <span className="entity-chip-text">📍 {entry.place.fullName}</span>
+        {!readOnly && (
+          <button
+            type="button"
+            className="icon-button"
+            title="Clear place"
+            onClick={() => change({ place: undefined })}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (readOnly) return null;
 
   return (
     <div className="entity-adder">
-      <input
-        type="text"
-        value={label}
-        placeholder="Link a person, place…"
-        onChange={(event) => setLabel(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") add();
+      <PlaceAutocompleteInput
+        autoFocus={false}
+        value={text}
+        onChange={(value) => {
+          setText(value);
+          setPendingSuggestion((prev) => (prev && value !== formatSuggestionText(prev) ? null : prev));
         }}
+        onSelect={setPendingSuggestion}
+        onSubmit={commit}
+        onBlur={commit}
       />
-      <PillSelector options={ENTITY_KIND_OPTIONS} value={kind} onChange={setKind} />
-      <button type="button" className="small-button" onClick={add} disabled={label.trim() === ""}>
-        Link
-      </button>
     </div>
   );
 }
