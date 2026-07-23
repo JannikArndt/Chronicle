@@ -13,6 +13,7 @@ import {
   addSubRow,
   deleteGroupWithCascade,
   deleteRowWithCascade,
+  replaceDataset,
   selectRow,
   toggleGroupCollapsed,
   toggleRowHidden,
@@ -23,6 +24,7 @@ import {
 import { isPublicId, useAppState } from "../state/store";
 import type { Category, Person } from "../model/types";
 import { PillSelector } from "./PillSelector";
+import { triggerImportFlow } from "../storage/exportImport";
 
 const EMOJI_QUICK_PICKS = ["💼", "🏠", "❤️", "🎓", "✈️", "🎨", "⚽", "🐕"];
 
@@ -32,7 +34,15 @@ type PopoverState =
   | { kind: "category-edit"; rowId: string; top: number }
   | { kind: "add-sub-row"; rowId: string; top: number }
   | { kind: "add-group"; top: number }
+  | { kind: "add-person"; top: number }
+  | { kind: "rail-add-menu"; top: number }
   | null;
+
+// Popovers anchored to the rail footer's "+" button open upward from the
+// bottom of the rail rather than downward from a click point.
+function isFooterPopover(kind: NonNullable<PopoverState>["kind"]): boolean {
+  return kind === "add-group" || kind === "add-person" || kind === "rail-add-menu";
+}
 
 interface RowRailProps {
   layout: Layout;
@@ -79,13 +89,14 @@ export function RowRail({ layout, railContentRef, onStartOnboarding }: RowRailPr
         )}
         <button
           type="button"
-          className="small-button"
-          onClick={() => setPopover({ kind: "add-group", top: 0 })}
+          className="rail-add-button"
+          title="Add group, person, or import…"
+          onClick={() => setPopover({ kind: "rail-add-menu", top: 0 })}
         >
-          ＋ Group
+          ＋
         </button>
       </div>
-      {popover && <Popover popover={popover} close={closePopover} />}
+      {popover && <Popover popover={popover} open={setPopover} close={closePopover} />}
     </div>
   );
 }
@@ -247,12 +258,23 @@ function topOf(event: { currentTarget: EventTarget & HTMLElement }): number {
 
 // ---------- popovers ----------
 
-function Popover({ popover, close }: { popover: NonNullable<PopoverState>; close: () => void }) {
+function Popover({
+  popover,
+  open,
+  close,
+}: {
+  popover: NonNullable<PopoverState>;
+  open: (p: PopoverState) => void;
+  close: () => void;
+}) {
+  const footer = isFooterPopover(popover.kind);
   return (
     <>
       <div className="popover-backdrop" onClick={close} />
-      <div className="popover" style={{ top: popover.kind === "add-group" ? undefined : popover.top, bottom: popover.kind === "add-group" ? 48 : undefined }}>
+      <div className="popover" style={{ top: footer ? undefined : popover.top, bottom: footer ? 48 : undefined }}>
+        {popover.kind === "rail-add-menu" && <RailAddMenu open={open} close={close} />}
         {popover.kind === "add-group" && <AddGroupForm close={close} />}
+        {popover.kind === "add-person" && <AddPersonForm close={close} />}
         {popover.kind === "add-menu" && (
           <AddMenu groupId={popover.groupId} personId={popover.personId} close={close} />
         )}
@@ -261,6 +283,63 @@ function Popover({ popover, close }: { popover: NonNullable<PopoverState>; close
         {popover.kind === "add-sub-row" && <SubRowForm rowId={popover.rowId} close={close} />}
       </div>
     </>
+  );
+}
+
+function RailAddMenu({ open, close }: { open: (p: PopoverState) => void; close: () => void }) {
+  const handleImport = () => {
+    triggerImportFlow((result) => {
+      if (!result.ok) {
+        window.alert(result.error);
+        return;
+      }
+      const counts = `${result.dataset.entries.length} entries in ${result.dataset.rows.length} rows`;
+      if (window.confirm(`Replace your current data with this import (${counts})? This cannot be undone.`)) {
+        replaceDataset(result.dataset);
+      }
+    });
+    close();
+  };
+
+  return (
+    <div className="popover-form">
+      <button type="button" className="menu-item" onClick={() => open({ kind: "add-group", top: 0 })}>
+        ＋ Group
+      </button>
+      <button type="button" className="menu-item" onClick={() => open({ kind: "add-person", top: 0 })}>
+        ＋ Person
+      </button>
+      <button type="button" className="menu-item" onClick={handleImport}>
+        ＋ Import
+      </button>
+    </div>
+  );
+}
+
+function AddPersonForm({ close }: { close: () => void }) {
+  const [label, setLabel] = useState("");
+  return (
+    <div className="popover-form">
+      <div className="popover-title">New person</div>
+      <input
+        type="text"
+        autoFocus
+        placeholder="Name"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+      />
+      <button
+        type="button"
+        className="small-button"
+        disabled={label.trim() === ""}
+        onClick={() => {
+          addGroup(label.trim(), true);
+          close();
+        }}
+      >
+        Add
+      </button>
+    </div>
   );
 }
 

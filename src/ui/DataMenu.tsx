@@ -3,8 +3,8 @@
 // pasting a personal access token works for power users but is not a
 // solution for non-technical users, and that problem is still open.
 
-import { useRef, useState } from "react";
-import { parseImportFile, triggerDownload } from "../storage/exportImport";
+import { useState } from "react";
+import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
 import { replaceDataset } from "../state/actions";
 import { useAppState } from "../state/store";
 
@@ -12,19 +12,19 @@ export function DataMenu() {
   const dataset = useAppState((s) => s.dataset);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = async (file: File) => {
-    const result = parseImportFile(await file.text());
-    if (!result.ok) {
-      setMessage(result.error);
-      return;
-    }
-    const counts = `${result.dataset.entries.length} entries in ${result.dataset.rows.length} rows`;
-    if (window.confirm(`Replace your current data with this import (${counts})? This cannot be undone.`)) {
-      replaceDataset(result.dataset);
-      setMessage("Imported.");
-    }
+  const handleImport = () => {
+    triggerImportFlow((result) => {
+      if (!result.ok) {
+        setMessage(result.error);
+        return;
+      }
+      const counts = `${result.dataset.entries.length} entries in ${result.dataset.rows.length} rows`;
+      if (window.confirm(`Replace your current data with this import (${counts})? This cannot be undone.`)) {
+        replaceDataset(result.dataset);
+        setMessage("Imported.");
+      }
+    });
   };
 
   return (
@@ -40,20 +40,9 @@ export function DataMenu() {
               <button type="button" className="menu-item" onClick={() => triggerDownload(dataset)}>
                 ⬇️ Export JSON
               </button>
-              <button type="button" className="menu-item" onClick={() => fileInputRef.current?.click()}>
+              <button type="button" className="menu-item" onClick={handleImport}>
                 ⬆️ Import JSON…
               </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/json"
-                style={{ display: "none" }}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void handleFile(file);
-                  event.target.value = "";
-                }}
-              />
               <div className="hint">
                 Your data lives only in this browser (IndexedDB) — export regularly to back it up or
                 move devices.

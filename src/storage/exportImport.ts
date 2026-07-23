@@ -57,6 +57,25 @@ export function parseImportFile(text: string): ImportResult {
   }
 }
 
+// Opens a hidden file-picker, reads the chosen file as text, parses it as a
+// Chronicle export, and hands the result to the caller. Shared by every
+// "Import JSON…" entry point so the file-input plumbing exists once.
+export function triggerImportFlow(onResult: (result: ImportResult) => void): void {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json";
+  input.style.display = "none";
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    if (file) {
+      void file.text().then((text) => onResult(parseImportFile(text)));
+    }
+    input.remove();
+  });
+  document.body.appendChild(input);
+  input.click();
+}
+
 // Blob + anchor download works on iOS Safari (shows the share/save sheet).
 export function triggerDownload(dataset: TimelineDataset): void {
   const blob = new Blob([serializeDataset(dataset)], { type: "application/json" });
