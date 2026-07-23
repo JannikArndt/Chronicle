@@ -26,6 +26,10 @@
   --color-warning-bg: #fef3c7;
   --color-warning-border: #fbd38d;
 
+  --color-success: #15803d;
+  --color-success-bg: #dcfce7;
+  --color-success-border: #86efac;
+
   --color-info: #6d8bc7;
   --color-info-bg: #eaf0fb;
   --color-connector: #8b7bb8;
@@ -72,6 +76,10 @@
 
     --color-warning-bg: #4a3a1a;
     --color-warning-border: #8a6a2a;
+
+    --color-success: #4ade80;
+    --color-success-bg: #16321f;
+    --color-success-border: #2d5a3a;
 
     --color-info: #8fa8d8;
     --color-info-bg: #25304a;
@@ -791,6 +799,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: 10px;
 }
 
 /* Back/Skip are secondary actions relative to each step's primary
@@ -853,12 +862,19 @@ textarea {
 }
 
 .place-suggestion-confirmed {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
   margin: 6px 0 0;
   padding: 8px 10px;
-  border: 1px solid var(--color-accent);
+  border: 1px solid var(--color-success-border);
   border-radius: 8px;
+  background: var(--color-success-bg);
   font-size: 13px;
-  color: var(--color-accent);
+  font-weight: 600;
+  color: var(--color-success);
 }
 
 @media (max-width: 640px) {

@@ -185,7 +185,6 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
       return (
         <AssistantStepShell
           prompt={flow.phase.iteration === 1 ? "Where did you live first?" : "Where did you live next?"}
-          hint="You can fine-tune the exact address later."
           stepIndex={flow.stepIndex}
           // Reaching place{N>1} means iteration N-1's entry was already
           // committed to the dataset (commitUntil only advances here after a
@@ -196,12 +195,19 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
           // is safe: no place entries exist yet.
           onBack={flow.canGoBack && flow.phase.iteration === 1 ? flow.back : undefined}
           onSkip={onFinished}
+          skipLabel={flow.phase.iteration > 1 ? "That's all for now" : undefined}
         >
           <PlaceAutocompleteInput
+            key={flow.phase.iteration}
             value={placeText}
             onChange={(text) => {
               setPlaceText(text);
-              if (selectedSuggestion && text !== formatSuggestionText(selectedSuggestion)) setSelectedSuggestion(null);
+              // Functional updater, not the closed-over `selectedSuggestion` —
+              // reading the stale render-time value here could race with the
+              // setSelectedSuggestion(suggestion) queued moments earlier by
+              // onSelect below (same event, same batch), clobbering a fresh
+              // pick back to null before commitPlace ever sees it.
+              setSelectedSuggestion((prev) => (prev && text !== formatSuggestionText(prev) ? null : prev));
             }}
             onSubmit={commitPlace}
             onSelect={(suggestion) => setSelectedSuggestion(suggestion)}
@@ -209,11 +215,6 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
           <button type="button" className="small-button" onClick={commitPlace}>
             Next →
           </button>
-          {flow.phase.iteration > 1 && (
-            <button type="button" className="icon-button" onClick={onFinished}>
-              That's all for now
-            </button>
-          )}
         </AssistantStepShell>
       );
 

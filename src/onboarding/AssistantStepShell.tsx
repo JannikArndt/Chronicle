@@ -11,10 +11,19 @@ interface AssistantStepShellProps {
   stepIndex: number; // 0-based count of steps already completed in this flow
   onBack?: () => void;
   onSkip: () => void;
+  skipLabel?: string; // defaults to "Skip for now" — override when a step has a more accurate label for ending early (e.g. "That's all for now")
   children: ReactNode;
 }
 
-export function AssistantStepShell({ prompt, hint, stepIndex, onBack, onSkip, children }: AssistantStepShellProps) {
+export function AssistantStepShell({
+  prompt,
+  hint,
+  stepIndex,
+  onBack,
+  onSkip,
+  skipLabel = "Skip for now",
+  children,
+}: AssistantStepShellProps) {
   const dotCount = stepIndex + 1;
   return (
     <div className="assistant-shell">
@@ -38,7 +47,7 @@ export function AssistantStepShell({ prompt, hint, stepIndex, onBack, onSkip, ch
           <span />
         )}
         <button type="button" className="icon-button" onClick={onSkip}>
-          Skip for now
+          {skipLabel}
         </button>
       </div>
     </div>
