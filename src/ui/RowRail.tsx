@@ -561,11 +561,6 @@ function PersonEditor({
   );
 }
 
-const CONCURRENCY_PILLS = [
-  { value: "exclusive" as const, icon: "1️⃣", label: "exclusive" },
-  { value: "concurrent" as const, icon: "🔀", label: "concurrent" },
-];
-
 const VISIBILITY_PILLS = [
   { value: "private" as const, icon: "🔒", label: "private" },
   { value: "shareable" as const, icon: "🔗", label: "shareable" },
@@ -615,11 +610,6 @@ function CategoryEditor({ rowId, close }: { rowId: string; close: () => void }) 
           ))}
         </span>
       </div>
-      <PillSelector
-        options={CONCURRENCY_PILLS}
-        value={category.concurrency}
-        onChange={(concurrency) => updateCategory(category.id, { concurrency })}
-      />
       <PillSelector
         options={VISIBILITY_PILLS}
         value={category.defaultVisibility}

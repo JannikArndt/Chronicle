@@ -23,8 +23,9 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 ## Architecture
 
 - `src/model/` — pure data logic, no DOM. `types.ts` (schema, `SCHEMA_VERSION`),
-  `fuzzyDate.ts` (precision fuzz + fade ramps), `cascade.ts` (delete cascades),
-  `autoClose.ts` (exclusive-row insert planning: auto-close vs blocked conflict).
+  `fuzzyDate.ts` (precision fuzz + fade ramps), `cascade.ts` (delete cascades).
+  Every row is concurrent — entries on the same row may freely overlap, with no
+  insert-time conflict check (the exclusive-row concept was removed).
 - `src/render/` — the canvas engine. `engine.ts` is a **framework-agnostic** class
   (keep it free of React imports); `timeScale/timeAxis/layout/bars` are pure and
   unit-tested. Both the canvas and the DOM rail render from the same
@@ -106,12 +107,10 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   `name`/`birthYear`/`place`/`until` solo steps now — `PlacesTable` (everything past
   the first place) has no Back button at all, on purpose, because it's live-editable:
   editing a row IS the correction, so there's nothing to navigate back through. For
-  the remaining solo steps, re-answering an earlier one after Back would either
-  silently collide with an already-committed entry (`planEntryInsert` returns
-  `"conflict"`, which `addOnboardingPlaceEntry` correctly no-ops on — but silently, so
-  the data is just lost) or, for the name step, spawn a second Person/Group. The name
-  step's fix is the general pattern: check whether identity was already committed and
-  update in place (`updatePerson`/`updateGroup`) instead of re-creating.
+  the remaining solo steps, re-answering an earlier one after Back would, for the
+  name step, spawn a second Person/Group. The name step's fix is the general
+  pattern: check whether identity was already committed and update in place
+  (`updatePerson`/`updateGroup`) instead of re-creating.
 - **`PlacesTable` never puts a dataset write inside a `setState(prev => ...)`
   updater**: React may invoke updater functions more than once (dev StrictMode does
   this deliberately to catch impure ones), which would risk writing an entry twice.
@@ -133,9 +132,10 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   `IdentityBirthPlacesAssistant.tsx` looks up the existing Person/Group/"Places
   lived" row from `selfPersonId` and seeds `setup`/`name`/`birthDateMs` from it
   before the first render, so `commitName` takes its update-in-place branch
-  immediately. Known gap: re-adding a first place whose start date collides with an
-  already-recorded entry still silently no-ops via the same `"conflict"` path above —
-  acceptable for a manual testing entry point, not for the primary flow.
+  immediately. Known gap: re-adding a first place whose dates overlap an
+  already-recorded entry just creates a second, overlapping entry (rows are
+  always concurrent) — acceptable for a manual testing entry point, not for the
+  primary flow.
 - **CSS colors are custom properties, not literals**: `styles.css` defines
   `--color-*` on `:root` plus a `@media (prefers-color-scheme: dark)` override block;
   the canvas engine mirrors the same variables via `getComputedStyle`. A new rule
@@ -168,5 +168,3 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 
 - Real-device iOS Safari gesture check (pinch vs page zoom) has never been done.
 - Public-data collapse state is in-memory only; private group collapse persists.
-- Editing an *existing* entry's dates bypasses `planEntryInsert` (only drafts are
-  checked) — spec only mandates the check when adding.

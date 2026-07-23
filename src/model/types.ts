@@ -20,7 +20,6 @@ export interface Category {
   label: string;
   color: string; // any CSS color — a native color picker, not a fixed palette
   icon: string; // any emoji — free-text input, plus a few quick-picks for convenience
-  concurrency: "exclusive" | "concurrent"; // default; every entry may override this
   defaultVisibility: "private" | "shareable";
 }
 
@@ -82,7 +81,6 @@ export interface TimelineEntry {
   fadeOutDays?: number; // distinct from precision fuzziness, but combined into one continuous edge (§5)
   parentEntryId?: string; // links a sub-timeline entry to the parent entry it nests under
   linkedEntityIds: string[];
-  concurrencyOverride?: "exclusive" | "concurrent"; // overrides the row's category default
   visibility: "private" | "shareable";
 }
 

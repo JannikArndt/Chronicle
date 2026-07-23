@@ -7,7 +7,7 @@ function fixture(): TimelineDataset {
   const ds = emptyDataset();
   ds.groups = [{ id: "g-1", label: "Apple", collapsed: false }];
   ds.categories = [
-    { id: "cat-1", label: "Releases", color: "#888", icon: "📱", concurrency: "concurrent", defaultVisibility: "shareable" },
+    { id: "cat-1", label: "Releases", color: "#888", icon: "📱", defaultVisibility: "shareable" },
   ];
   ds.rows = [
     { id: "row-1", groupId: "g-1", categoryId: "cat-1", label: "iPhone" },

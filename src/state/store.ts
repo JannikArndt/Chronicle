@@ -31,7 +31,6 @@ export interface AppState {
   pickingField?: "start" | "end";
   pickedDate?: { ms: number; precision: Precision; field: "start" | "end" };
   hiddenRowIds: string[];
-  conflictMessage?: string;
 }
 
 const initialState: AppState = {

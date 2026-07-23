@@ -170,7 +170,6 @@ export function PlacesTable({ placesRowId, birthDateMs, firstRow, onFinished }: 
     } else {
       entryId = addOnboardingPlaceEntry(placesRowId, answer);
     }
-    if (!entryId) return currentRows;
 
     const next = currentRows.map((r, i) => (i === index ? { ...r, entryId } : r));
     reflowFrom(next, index + 1);

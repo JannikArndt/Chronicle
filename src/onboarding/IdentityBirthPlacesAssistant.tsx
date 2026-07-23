@@ -138,13 +138,6 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
       onFinished();
       return;
     }
-    if (!entryId) {
-      // planEntryInsert reported a conflict — shouldn't happen for the first
-      // entry in a brand-new "Places lived" row, but stay safe rather than
-      // seed the table with a nonexistent entry.
-      onFinished();
-      return;
-    }
     flow.advance({ kind: "places", firstRow: { entryId, place: firstPlaceAnswer, yearText: trimmed } });
   };
 

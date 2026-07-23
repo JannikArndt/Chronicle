@@ -18,9 +18,7 @@ const T0 = Date.UTC(2020, 0, 1);
 
 function fixture(): TimelineDataset {
   const ds = emptyDataset();
-  ds.categories = [
-    { id: "cat-1", label: "Job", color: "#333", icon: "💼", concurrency: "exclusive", defaultVisibility: "private" },
-  ];
+  ds.categories = [{ id: "cat-1", label: "Job", color: "#333", icon: "💼", defaultVisibility: "private" }];
   ds.groups = [{ id: "g1", label: "Me", collapsed: false }];
   ds.rows = [{ id: "r1", groupId: "g1", categoryId: "cat-1", label: "Job" }];
   ds.entries = [
@@ -49,24 +47,21 @@ describe("draft lifecycle", () => {
     expect(appStore.getState().draft?.description).toBe("still untitled");
   });
 
-  test("titling the draft commits it and auto-closes the previous ongoing entry", () => {
+  test("titling the draft commits it as a new entry", () => {
     startDraft("r1", T0 + 100 * DAY_MS);
     updateDraft({ title: "Second job" });
     const { dataset, draft, selectedEntryId } = appStore.getState();
     expect(draft).toBeUndefined();
     expect(dataset.entries).toHaveLength(2);
-    const first = dataset.entries.find((e) => e.id === "e1")!;
-    expect(first.end?.ms).toBe(T0 + 100 * DAY_MS);
     expect(selectedEntryId).toBe(dataset.entries[1].id);
   });
 
-  test("a conflicting draft is blocked with a message and not inserted", () => {
+  test("an overlapping draft is inserted freely — rows are always concurrent", () => {
     startDraft("r1", T0 - 200 * DAY_MS);
     updateDraft({ title: "Backfilled", end: { ms: T0 + 5 * DAY_MS, precision: "day" } });
     const state = appStore.getState();
-    expect(state.dataset.entries).toHaveLength(1);
-    expect(state.conflictMessage).toContain("First job");
-    expect(state.draft?.title).toBe("Backfilled");
+    expect(state.dataset.entries).toHaveLength(2);
+    expect(state.dataset.entries.some((e) => e.title === "Backfilled")).toBe(true);
   });
 });
 
@@ -81,7 +76,7 @@ describe("selection", () => {
 });
 
 describe("onboarding: completeIdentityStep", () => {
-  test("creates a self person, group, and an exclusive Places lived row", () => {
+  test("creates a self person, group, and a Places lived row", () => {
     replaceDataset(emptyDataset());
     const result = completeIdentityStep("Jannik");
     const state = appStore.getState();
@@ -97,9 +92,6 @@ describe("onboarding: completeIdentityStep", () => {
     const row = state.dataset.rows.find((r) => r.id === result.placesRowId);
     expect(row?.label).toBe("Places lived");
     expect(row?.groupId).toBe(result.groupId);
-
-    const category = state.dataset.categories.find((c) => c.id === row?.categoryId);
-    expect(category?.concurrency).toBe("exclusive");
   });
 });
 
@@ -124,26 +116,7 @@ describe("onboarding: addOnboardingPlaceEntry", () => {
     expect(munich.linkedEntityIds).toHaveLength(1);
   });
 
-  test("addOnboardingPlaceEntry backfills an ongoing previous entry's end via the autoClose plan", () => {
-    replaceDataset(emptyDataset());
-    const { placesRowId } = completeIdentityStep("Jannik");
-    const year1990 = Date.UTC(1990, 6, 1);
-    const year2010 = Date.UTC(2010, 6, 1);
-
-    // Berlin is added without endMs, so it's ongoing and planEntryInsert
-    // must return "autoClose" (not "ok") when Hamburg starts later.
-    addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990 });
-    addOnboardingPlaceEntry(placesRowId, { label: "Hamburg", startMs: year2010 });
-
-    const entries = appStore.getState().dataset.entries.filter((e) => e.rowId === placesRowId);
-    const berlin = entries.find((e) => e.title === "Berlin")!;
-    const hamburg = entries.find((e) => e.title === "Hamburg")!;
-
-    expect(berlin.end?.ms).toBe(year2010);
-    expect(hamburg.end).toBeUndefined();
-  });
-
-  test("addOnboardingPlaceEntry does not insert an entry when planEntryInsert reports a conflict", () => {
+  test("addOnboardingPlaceEntry allows overlapping places — rows are always concurrent", () => {
     replaceDataset(emptyDataset());
     const { placesRowId } = completeIdentityStep("Jannik");
     const year1985 = Date.UTC(1985, 6, 1);
@@ -152,33 +125,22 @@ describe("onboarding: addOnboardingPlaceEntry", () => {
     const year2005 = Date.UTC(2005, 6, 1);
 
     addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990, endMs: year2005 });
-
-    // Overlaps Berlin's span but starts before Berlin's own start, so
-    // planEntryInsert's isPlainAppend check (draft.start > last.start) fails
-    // and this is a true conflict, not a chronological append that could be
-    // auto-closed. addOnboardingPlaceEntry must bail out (mirroring
-    // commitDraft) and leave the dataset with only Berlin.
     addOnboardingPlaceEntry(placesRowId, { label: "Overlap", startMs: year1985, endMs: year2000 });
 
     const entries = appStore.getState().dataset.entries.filter((e) => e.rowId === placesRowId);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].title).toBe("Berlin");
+    expect(entries).toHaveLength(2);
+    expect(entries.map((e) => e.title).sort()).toEqual(["Berlin", "Overlap"]);
   });
 
-  test("addOnboardingPlaceEntry returns the created entry's id, or undefined on conflict", () => {
+  test("addOnboardingPlaceEntry returns the created entry's id", () => {
     replaceDataset(emptyDataset());
     const { placesRowId } = completeIdentityStep("Jannik");
     const year1990 = Date.UTC(1990, 6, 1);
-    const year1985 = Date.UTC(1985, 6, 1);
-    const year2000 = Date.UTC(2000, 6, 1);
     const year2005 = Date.UTC(2005, 6, 1);
 
     const berlinId = addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990, endMs: year2005 });
     expect(typeof berlinId).toBe("string");
     expect(appStore.getState().dataset.entries.find((e) => e.id === berlinId)?.title).toBe("Berlin");
-
-    const conflictId = addOnboardingPlaceEntry(placesRowId, { label: "Overlap", startMs: year1985, endMs: year2000 });
-    expect(conflictId).toBeUndefined();
   });
 });
 
@@ -190,7 +152,7 @@ describe("onboarding: updateOnboardingPlaceEntry", () => {
     const year2005 = Date.UTC(2005, 6, 1);
     const year2010 = Date.UTC(2010, 6, 1);
 
-    const entryId = addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990, endMs: year2005 })!;
+    const entryId = addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990, endMs: year2005 });
 
     updateOnboardingPlaceEntry(entryId, {
       label: "Munich",

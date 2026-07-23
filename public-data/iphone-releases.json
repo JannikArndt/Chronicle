@@ -13,7 +13,6 @@
       "label": "Releases",
       "color": "#5e8d9c",
       "icon": "📱",
-      "concurrency": "exclusive",
       "defaultVisibility": "shareable"
     }
   ],

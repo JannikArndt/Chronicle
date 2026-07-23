@@ -41,8 +41,8 @@ function fixture(): TimelineDataset {
     { id: "g3", label: "Friends", collapsed: false },
   ];
   ds.categories = [
-    { id: "cat-1", label: "Job", color: "#333", icon: "💼", concurrency: "exclusive", defaultVisibility: "private" },
-    { id: "cat-2", label: "Unused", color: "#666", icon: "🎈", concurrency: "concurrent", defaultVisibility: "private" },
+    { id: "cat-1", label: "Job", color: "#333", icon: "💼", defaultVisibility: "private" },
+    { id: "cat-2", label: "Unused", color: "#666", icon: "🎈", defaultVisibility: "private" },
   ];
   ds.rows = [
     makeRow("r1", "g1", undefined, "p1"),

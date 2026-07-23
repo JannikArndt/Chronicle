@@ -2,7 +2,6 @@
 // modal create screen, no Save/Cancel — every field change autosaves (§6).
 
 import { useEffect, useState } from "react";
-import { planEntryInsert } from "../model/autoClose";
 import { collectEntryCascade, describeCascade } from "../model/cascade";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import type { Entity, TimelineEntry } from "../model/types";
@@ -21,12 +20,6 @@ import type { PillOption } from "./PillSelector";
 const VISIBILITY_OPTIONS: PillOption<"private" | "shareable">[] = [
   { value: "private", icon: "🔒", label: "private" },
   { value: "shareable", icon: "🔗", label: "shareable" },
-];
-
-const CONCURRENCY_OPTIONS: PillOption<"default" | "exclusive" | "concurrent">[] = [
-  { value: "default", icon: "↩️", label: "category default" },
-  { value: "exclusive", icon: "1️⃣", label: "exclusive" },
-  { value: "concurrent", icon: "🔀", label: "concurrent" },
 ];
 
 const ENTITY_KIND_OPTIONS: PillOption<Entity["kind"]>[] = [
@@ -63,9 +56,6 @@ export function DetailPanel() {
   const privateCategories = state.dataset.categories;
   const change = (patch: Partial<TimelineEntry>) => updateEntry(entry.id, patch);
 
-  // Inline note before an exclusive-row auto-close actually happens (§6).
-  const plan = isDraft ? planEntryInsert(state.dataset, entry) : null;
-
   const linkedEntities = entry.linkedEntityIds
     .map((id) => merged.entities.find((e) => e.id === id))
     .filter((e): e is Entity => !!e);
@@ -93,9 +83,6 @@ export function DetailPanel() {
         />
         {isDraft && <div className="hint">Drafts are saved once they have a title.</div>}
       </div>
-
-      {plan?.kind === "autoClose" && <div className="note">{plan.note}</div>}
-      {state.conflictMessage && <div className="note note-error">{state.conflictMessage}</div>}
 
       <DateField
         label="Start"
@@ -156,18 +143,6 @@ export function DetailPanel() {
           />
         </div>
       )}
-
-      <div className="field">
-        <label className="field-label">Concurrency</label>
-        <PillSelector
-          options={CONCURRENCY_OPTIONS}
-          value={entry.concurrencyOverride ?? "default"}
-          disabled={readOnly}
-          onChange={(value) =>
-            change({ concurrencyOverride: value === "default" ? undefined : value })
-          }
-        />
-      </div>
 
       <div className="field">
         <label className="field-label">Visibility</label>

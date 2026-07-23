@@ -16,7 +16,7 @@ function fixture(): TimelineDataset {
     { id: "g-family", label: "Family", collapsed: false },
   ];
   ds.categories = [
-    { id: "c1", label: "Job", color: "#333", icon: "💼", concurrency: "exclusive", defaultVisibility: "private" },
+    { id: "c1", label: "Job", color: "#333", icon: "💼", defaultVisibility: "private" },
   ];
   ds.rows = [
     { id: "r1", groupId: "g-me", categoryId: "c1", label: "Job" },

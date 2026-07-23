@@ -26,13 +26,12 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "label", "color", "icon", "concurrency", "defaultVisibility"],
+        "required": ["id", "label", "color", "icon", "defaultVisibility"],
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "label": { "type": "string", "minLength": 1 },
           "color": { "type": "string", "minLength": 1 },
           "icon": { "type": "string", "minLength": 1 },
-          "concurrency": { "enum": ["exclusive", "concurrent"] },
           "defaultVisibility": { "const": "shareable" }
         }
       }
@@ -81,8 +80,7 @@
           "fadeInDays": { "type": "number", "minimum": 0 },
           "fadeOutDays": { "type": "number", "minimum": 0 },
           "parentEntryId": { "type": "string", "minLength": 1 },
-          "linkedEntityIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
-          "concurrencyOverride": { "enum": ["exclusive", "concurrent"] }
+          "linkedEntityIds": { "type": "array", "items": { "type": "string", "minLength": 1 } }
         }
       }
     }

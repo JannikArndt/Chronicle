@@ -2,7 +2,6 @@
 // IndexedDB — there are no Save buttons anywhere (§6). Public datasets are
 // never written back.
 
-import { planEntryInsert } from "../model/autoClose";
 import { applyDelete, collectEntryCascade, collectGroupCascade, collectRowCascade } from "../model/cascade";
 import { emptyDataset, newId } from "../model/dataset";
 import { loadDataset, saveDataset } from "../storage/db";
@@ -45,7 +44,6 @@ export function selectEntry(entryId: string | undefined): void {
     selectedEntryId: entryId,
     selectedRowId: undefined,
     draft: undefined,
-    conflictMessage: undefined,
   });
 }
 
@@ -54,7 +52,6 @@ export function selectRow(rowId: string | undefined): void {
     selectedRowId: rowId,
     selectedEntryId: undefined,
     draft: undefined,
-    conflictMessage: undefined,
   });
 }
 
@@ -64,7 +61,6 @@ export function clearSelection(): void {
     selectedRowId: undefined,
     draft: undefined,
     pickingField: undefined,
-    conflictMessage: undefined,
   });
 }
 
@@ -84,32 +80,23 @@ export function startDraft(rowId: string, startMs: number): void {
     linkedEntityIds: [],
     visibility: category?.defaultVisibility ?? "private",
   };
-  appStore.setState({ draft, selectedEntryId: undefined, selectedRowId: rowId, conflictMessage: undefined });
+  appStore.setState({ draft, selectedEntryId: undefined, selectedRowId: rowId });
 }
 
 export function updateDraft(patch: Partial<TimelineEntry>): void {
   const { draft } = appStore.getState();
   if (!draft) return;
   const updated = { ...draft, ...patch };
-  appStore.setState({ draft: updated, conflictMessage: undefined });
+  appStore.setState({ draft: updated });
   if (updated.title.trim() !== "") commitDraft(updated);
 }
 
 function commitDraft(draft: TimelineEntry): void {
-  const plan = planEntryInsert(appStore.getState().dataset, draft);
-  if (plan.kind === "conflict") {
-    appStore.setState({ conflictMessage: plan.message });
-    return;
-  }
   updateDataset((dataset) => {
-    if (plan.kind === "autoClose") {
-      const previous = dataset.entries.find((e) => e.id === plan.previousEntry.id);
-      if (previous) previous.end = plan.closeAt;
-    }
     dataset.entries.push(draft);
     return dataset;
   });
-  appStore.setState({ draft: undefined, selectedEntryId: draft.id, conflictMessage: undefined });
+  appStore.setState({ draft: undefined, selectedEntryId: draft.id });
 }
 
 // ---------- entry editing (autosave per field) ----------
@@ -151,7 +138,7 @@ export function completeIdentityStep(name: string): IdentitySetupResult {
     const group: Group = { id: newId("group"), label: name, personId: person.id, collapsed: false };
     dataset.groups.push(group);
     dataset.selfPersonId = person.id;
-    const category = ensureCategory(dataset, "Places lived", "#8ba66f", "🏠", "exclusive");
+    const category = ensureCategory(dataset, "Places lived", "#8ba66f", "🏠");
     const row: TimelineRow = { id: newId("row"), groupId: group.id, categoryId: category.id, label: "Places lived" };
     dataset.rows.push(row);
     result = { personId: person.id, groupId: group.id, placesRowId: row.id };
@@ -173,12 +160,9 @@ export interface OnboardingPlaceAnswer {
 }
 
 // Onboarding places loop: entries are built directly (not through the
-// click-driven startDraft flow) but still pass through planEntryInsert,
-// preserving the invariant that every insert is checked — by construction
-// these are always chronological appends, so it's a defensive no-op here.
-// Returns the created entry's id (for the caller to track for later edits),
-// or undefined if planEntryInsert reported a conflict and nothing was written.
-export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAnswer): string | undefined {
+// click-driven startDraft flow). Returns the created entry's id, for the
+// caller to track for later edits.
+export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAnswer): string {
   const entity = ensureEntity(
     place.label,
     "place",
@@ -202,15 +186,7 @@ export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAns
     linkedEntityIds: [entity.id],
     visibility: "private",
   };
-  const plan = planEntryInsert(appStore.getState().dataset, draft);
-  if (plan.kind === "conflict") {
-    return undefined;
-  }
   updateDataset((dataset) => {
-    if (plan.kind === "autoClose") {
-      const previous = dataset.entries.find((e) => e.id === plan.previousEntry.id);
-      if (previous) previous.end = plan.closeAt;
-    }
     dataset.entries.push(draft);
     return dataset;
   });
@@ -219,11 +195,10 @@ export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAns
 
 // Onboarding places TABLE (unlike addOnboardingPlaceEntry's append-only path):
 // every row stays live-editable, so editing an earlier row's place or year has
-// to update its already-saved entry directly, the same way DetailPanel edits
-// bypass planEntryInsert (only drafts are checked — see CLAUDE.md "Still open /
-// untested"). Chaining consistency (row N's start = row N-1's end) is kept by
-// the caller always recomputing and rewriting every row's start from the
-// edited row forward, not by any check in here.
+// to update its already-saved entry directly. Chaining consistency (row N's
+// start = row N-1's end) is kept by the caller always recomputing and
+// rewriting every row's start from the edited row forward, not by any check
+// in here.
 export function updateOnboardingPlaceEntry(entryId: string, place: OnboardingPlaceAnswer): void {
   const entity = ensureEntity(
     place.label,
@@ -284,13 +259,7 @@ export function addPersonToGroup(groupId: string, label: string): void {
   });
 }
 
-function ensureCategory(
-  dataset: TimelineDataset,
-  label: string,
-  color: string,
-  icon: string,
-  concurrency: Category["concurrency"] = "concurrent",
-): Category {
+function ensureCategory(dataset: TimelineDataset, label: string, color: string, icon: string): Category {
   const existing = dataset.categories.find((c) => c.label === label);
   if (existing) return existing;
   const category: Category = {
@@ -298,7 +267,6 @@ function ensureCategory(
     label,
     color,
     icon,
-    concurrency,
     defaultVisibility: "private",
   };
   dataset.categories.push(category);

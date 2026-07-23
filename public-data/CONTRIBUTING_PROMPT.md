@@ -36,7 +36,6 @@ The JSON must conform exactly to this structure (no extra fields anywhere):
       "label": "<category name>",
       "color": "<any CSS color, pick something fitting the topic>",
       "icon": "<one fitting emoji>",
-      "concurrency": "exclusive or concurrent",
       "defaultVisibility": "shareable"
     }
   ],
@@ -68,8 +67,8 @@ Rules:
   `month`, `year`, or `circa` (rough). Use the coarsest precision that is honest —
   for a "sometime in 1994" event use `year` with `ms` at mid-1994.
 - Omit `end` entirely for things that are still ongoing.
-- Consecutive terms/holders/versions on the same row: use an `exclusive` category and
-  make each entry's `end` equal the next entry's `start`.
+- Consecutive terms/holders/versions on the same row: make each entry's `end` equal
+  the next entry's `start` so they read as a continuous sequence.
 - Ids: short and unique within this file only (`g-1`, `cat-1`, `row-1`, `ent-1`, `e-1`, …).
 - Link entries to the people/places/organizations they involve via `entities` +
   `linkedEntityIds`.

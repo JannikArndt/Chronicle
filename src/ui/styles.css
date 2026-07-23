@@ -618,11 +618,6 @@ textarea {
   padding: 6px 8px;
 }
 
-.note-error {
-  background: var(--color-danger-bg);
-  border-color: var(--color-danger-bg-border);
-}
-
 .entity-chip {
   display: flex;
   justify-content: space-between;
