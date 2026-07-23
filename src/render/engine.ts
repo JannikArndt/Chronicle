@@ -18,7 +18,9 @@ export const AXIS_HEIGHT = 46;
 const PLUS_RADIUS = 11;
 const MIN_GAP_FOR_PLUS_PX = 48;
 
-const COLORS = {
+// Fallback palette used if CSS custom properties aren't resolvable (e.g. no
+// document, as in unit tests) — mirrors the light theme in src/ui/styles.css.
+const FALLBACK_COLORS = {
   background: "#fafaf8",
   axisBackground: "#f1f0ec",
   axisBorder: "#d8d6d0",
@@ -34,7 +36,40 @@ const COLORS = {
   guide: "#c2410c",
   inactiveHatch: "rgba(120, 120, 120, 0.18)",
   plusFill: "#6d8bc7",
+  bracket: "rgba(80, 76, 70, 0.55)",
 };
+
+type ColorTable = typeof FALLBACK_COLORS;
+
+// The canvas is painted by JS, not CSS, so it can't pick up the OS dark-mode
+// media query on its own — read the same custom properties the DOM UI uses
+// (defined in src/ui/styles.css) so the two never mismatch.
+function readThemeColors(): ColorTable {
+  if (typeof document === "undefined") return FALLBACK_COLORS;
+  const style = getComputedStyle(document.documentElement);
+  const read = (name: string, fallback: string) => {
+    const value = style.getPropertyValue(name).trim();
+    return value.length > 0 ? value : fallback;
+  };
+  return {
+    background: read("--color-bg", FALLBACK_COLORS.background),
+    axisBackground: read("--color-bg-hover", FALLBACK_COLORS.axisBackground),
+    axisBorder: read("--color-border-strong", FALLBACK_COLORS.axisBorder),
+    axisCoarseText: read("--color-text-secondary", FALLBACK_COLORS.axisCoarseText),
+    axisFineText: read("--color-text-faint", FALLBACK_COLORS.axisFineText),
+    gridline: read("--color-canvas-gridline", FALLBACK_COLORS.gridline),
+    gridlineCoarse: read("--color-canvas-gridline-strong", FALLBACK_COLORS.gridlineCoarse),
+    groupBand: read("--color-bg-subtle", FALLBACK_COLORS.groupBand),
+    rowSelected: read("--color-canvas-row-selected", FALLBACK_COLORS.rowSelected),
+    barText: read("--color-text", FALLBACK_COLORS.barText),
+    barTextInverse: FALLBACK_COLORS.barTextInverse, // white-on-accent stays white in both themes
+    connector: read("--color-connector", FALLBACK_COLORS.connector),
+    guide: read("--color-accent", FALLBACK_COLORS.guide),
+    inactiveHatch: read("--color-hatch", FALLBACK_COLORS.inactiveHatch),
+    plusFill: read("--color-info", FALLBACK_COLORS.plusFill),
+    bracket: read("--color-canvas-bracket", FALLBACK_COLORS.bracket),
+  };
+}
 
 export interface EngineCallbacks {
   onSelectEntry: (entryId: string) => void;
@@ -91,6 +126,10 @@ export class TimelineEngine {
   private pinchStart?: { distance: number; midX: number; scale: TimeScale };
   private hoverX: number | null = null;
   private hatchPattern: CanvasPattern | null = null;
+  // Resolved once at construction and re-resolved on OS theme change (see
+  // attachEvents) — never a second hardcoded color table that could drift
+  // from the DOM UI's CSS custom properties.
+  private colors: ColorTable = FALLBACK_COLORS;
   // Removes all canvas listeners on destroy — without this, React StrictMode's
   // dev double-mount leaves a zombie engine still handling pointer input.
   private eventAbort = new AbortController();
@@ -103,6 +142,7 @@ export class TimelineEngine {
     private callbacks: EngineCallbacks,
   ) {
     this.ctx = canvas.getContext("2d")!;
+    this.colors = readThemeColors();
     const now = Date.now();
     const YEAR_MS = 365.25 * 86_400_000;
     // Initial view: the last ~30 years with a little future margin.
@@ -194,6 +234,23 @@ export class TimelineEngine {
     // touch-action: none is what stops iOS Safari page zoom/scroll from
     // fighting the canvas gestures (§9) — set here so it can't be forgotten.
     this.canvas.style.touchAction = "none";
+
+    // Re-read the CSS custom properties and repaint when the OS flips
+    // light/dark live — otherwise the canvas would only ever match whichever
+    // theme was active at mount time.
+    if (typeof window !== "undefined" && window.matchMedia) {
+      window
+        .matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener(
+          "change",
+          () => {
+            this.colors = readThemeColors();
+            this.hatchPattern = null; // cached pattern baked in the old hatch color
+            this.requestDraw();
+          },
+          { signal: this.eventAbort.signal },
+        );
+    }
 
     this.canvas.addEventListener("pointerdown", (event) => {
       this.canvas.setPointerCapture(event.pointerId);
@@ -321,7 +378,7 @@ export class TimelineEngine {
   private draw(): void {
     const { ctx } = this;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = COLORS.background;
+    ctx.fillStyle = this.colors.background;
     ctx.fillRect(0, 0, this.width, this.height);
 
     this.entryHits = [];
@@ -352,8 +409,8 @@ export class TimelineEngine {
     const y0 = this.scrollY;
     const y1 = this.scrollY + this.height - AXIS_HEIGHT;
     for (const [tickList, color] of [
-      [ticks.fine, COLORS.gridline],
-      [ticks.coarse, COLORS.gridlineCoarse],
+      [ticks.fine, this.colors.gridline],
+      [ticks.coarse, this.colors.gridlineCoarse],
     ] as const) {
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
@@ -386,7 +443,7 @@ export class TimelineEngine {
 
     for (const item of visible) {
       if (item.kind === "group") {
-        ctx.fillStyle = COLORS.groupBand;
+        ctx.fillStyle = this.colors.groupBand;
         ctx.fillRect(0, item.y, this.width, item.height - 6);
         continue;
       }
@@ -420,7 +477,7 @@ export class TimelineEngine {
     const color = category?.color ?? "#888";
 
     if (row.id === this.input.selectedRowId) {
-      ctx.fillStyle = COLORS.rowSelected;
+      ctx.fillStyle = this.colors.rowSelected;
       ctx.fillRect(0, item.y - 2, this.width, item.height + 4);
     }
 
@@ -514,7 +571,7 @@ export class TimelineEngine {
     }
 
     if (selected) {
-      ctx.strokeStyle = COLORS.barText;
+      ctx.strokeStyle = this.colors.barText;
       ctx.lineWidth = 2;
       ctx.stroke();
     }
@@ -523,7 +580,7 @@ export class TimelineEngine {
     ctx.font = "12px -apple-system, system-ui, sans-serif";
     const textWidth = ctx.measureText(entry.title).width;
     const labelX = labelAnchorX(geom, textWidth, this.width);
-    ctx.fillStyle = readableTextColor(colorToRgb(this.ctx, color));
+    ctx.fillStyle = readableTextColor(colorToRgb(this.ctx, color), this.colors);
     ctx.textBaseline = "middle";
     ctx.fillText(entry.title, labelX, top + barHeight / 2);
     ctx.restore();
@@ -570,7 +627,7 @@ export class TimelineEngine {
     const subMid = item.y + item.height / 2;
 
     ctx.save();
-    ctx.strokeStyle = "rgba(80, 76, 70, 0.55)";
+    ctx.strokeStyle = this.colors.bracket;
     ctx.lineWidth = 1.5;
     // Notch across the parent bar where the bracket meets it.
     ctx.beginPath();
@@ -619,7 +676,7 @@ export class TimelineEngine {
       if (spot.x < -PLUS_RADIUS || spot.x > this.width + PLUS_RADIUS) continue;
       const y = item.y + item.height / 2;
       ctx.save();
-      ctx.fillStyle = COLORS.plusFill;
+      ctx.fillStyle = this.colors.plusFill;
       ctx.beginPath();
       ctx.arc(spot.x, y, PLUS_RADIUS, 0, Math.PI * 2);
       ctx.fill();
@@ -664,7 +721,7 @@ export class TimelineEngine {
       y: selectedItem.y + selectedItem.height / 2,
     };
     ctx.save();
-    ctx.strokeStyle = COLORS.connector;
+    ctx.strokeStyle = this.colors.connector;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([5, 4]);
     for (const id of this.relatedEntryIds(selected)) {
@@ -703,9 +760,9 @@ export class TimelineEngine {
   private drawAxisHeader(ticks: ReturnType<typeof computeTicks>): void {
     const { ctx } = this;
     // 1. Background and border FIRST.
-    ctx.fillStyle = COLORS.axisBackground;
+    ctx.fillStyle = this.colors.axisBackground;
     ctx.fillRect(0, 0, this.width, AXIS_HEIGHT);
-    ctx.strokeStyle = COLORS.axisBorder;
+    ctx.strokeStyle = this.colors.axisBorder;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, AXIS_HEIGHT - 0.5);
@@ -715,14 +772,14 @@ export class TimelineEngine {
     // 2. Tick marks and text ON TOP — never repaint the background after this.
     ctx.textBaseline = "middle";
     ctx.font = "600 12px -apple-system, system-ui, sans-serif";
-    ctx.fillStyle = COLORS.axisCoarseText;
+    ctx.fillStyle = this.colors.axisCoarseText;
     for (const tick of ticks.coarse) {
       const x = msToX(this.scale, tick.ms);
       if (x < -60 || x > this.width) continue;
       ctx.fillText(tick.label, Math.max(x + 4, 4), 14);
     }
     ctx.font = "11px -apple-system, system-ui, sans-serif";
-    ctx.fillStyle = COLORS.axisFineText;
+    ctx.fillStyle = this.colors.axisFineText;
     for (const tick of ticks.fine) {
       const x = msToX(this.scale, tick.ms);
       if (x < -60 || x > this.width) continue;
@@ -735,7 +792,7 @@ export class TimelineEngine {
     const snapped = snapForScale(this.scale, xToMs(this.scale, x));
     const guideX = Math.round(msToX(this.scale, snapped.ms)) + 0.5;
     ctx.save();
-    ctx.strokeStyle = COLORS.guide;
+    ctx.strokeStyle = this.colors.guide;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(guideX, 0);
@@ -746,7 +803,7 @@ export class TimelineEngine {
     ctx.font = "12px -apple-system, system-ui, sans-serif";
     const width = ctx.measureText(label).width + 14;
     const boxX = Math.min(guideX + 8, this.width - width - 4);
-    ctx.fillStyle = COLORS.guide;
+    ctx.fillStyle = this.colors.guide;
     roundRectPath(ctx, boxX, 52, width, 22, 5);
     ctx.fill();
     ctx.fillStyle = "#fff";
@@ -761,7 +818,7 @@ export class TimelineEngine {
     tile.width = 8;
     tile.height = 8;
     const tctx = tile.getContext("2d")!;
-    tctx.strokeStyle = COLORS.inactiveHatch;
+    tctx.strokeStyle = this.colors.inactiveHatch;
     tctx.lineWidth = 1.5;
     tctx.beginPath();
     tctx.moveTo(-2, 10);
@@ -831,7 +888,7 @@ function colorWithAlpha(color: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function readableTextColor(rgb: { r: number; g: number; b: number }): string {
+function readableTextColor(rgb: { r: number; g: number; b: number }, colors: ColorTable): string {
   const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
-  return luminance > 0.6 ? COLORS.barText : COLORS.barTextInverse;
+  return luminance > 0.6 ? colors.barText : colors.barTextInverse;
 }
