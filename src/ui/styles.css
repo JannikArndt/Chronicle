@@ -768,6 +768,17 @@ textarea {
   align-items: center;
 }
 
+/* Back/Skip are secondary actions relative to each step's primary
+   "Next →" button — recede visually until hovered. */
+.assistant-nav .icon-button {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.assistant-nav .icon-button:hover {
+  opacity: 1;
+}
+
 .place-autocomplete {
   position: relative;
 }
@@ -810,6 +821,19 @@ textarea {
 .place-suggestion-subtitle {
   font-size: 11px;
   color: var(--color-text-muted);
+}
+
+.place-suggestion-highlighted {
+  background: var(--color-bg-hover);
+}
+
+.place-suggestion-confirmed {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-accent);
 }
 
 @media (max-width: 640px) {
