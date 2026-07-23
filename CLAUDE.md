@@ -66,15 +66,21 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   (`BirthDateInput` — locale-ordered DD/MM/YYYY segment fields, auto-advancing,
   defaulting to DD/MM/YYYY and only switching to MM/DD/YYYY for `en-US`, since
   `Intl`-resolved locale is an unreliable signal for actual date-format preference)
-  → a chained places-lived loop via `completeIdentityStep`/`addOnboardingPlaceEntry`
-  in `actions.ts`. `PlaceAutocompleteInput`/`nominatim.ts` hit OpenStreetMap
-  Nominatim directly (no API key, no backend to hide one behind), request
-  `addressdetails=1`, and derive a short `title`/`subtitle` (street+city, or just
-  city) plus structured `street`/`city`/`country`/`coordinates` — the full Nominatim
-  string is kept as `fullName` but never shown as the entry/entity label. Selecting
-  a suggestion (click, or arrow-keys + Enter) fills the field with `formatSuggestion
-  Text()` ("Street, City"), locks the debounced search for that programmatic change,
-  shows a brief confirmed state, then auto-advances the step after ~450ms.
+  → the first place lived + its year (each still its own step) → `PlacesTable`, a
+  single step showing every subsequent place as a live-editable row (place field +
+  year field), not a step-per-place wizard — see the invariant below on why that
+  needed a different mutation strategy than the rest of onboarding.
+  `PlaceAutocompleteInput`/`nominatim.ts` hit OpenStreetMap Nominatim directly (no
+  API key, no backend to hide one behind), request `addressdetails=1`, and derive a
+  short `title`/`subtitle` (street+city, or just city) plus structured
+  `street`/`city`/`country`/`coordinates` — the full Nominatim string is kept as
+  `fullName` but never shown as the entry/entity label. Selecting a suggestion
+  (click, or arrow-keys + Enter) fills the field with `formatSuggestionText()`
+  ("Street, City"), locks the debounced search for that programmatic change, shows
+  a brief confirmed state, then hands off to `onAfterSelect` (or `onSubmit` if
+  unset) after ~450ms — the table uses `onAfterSelect` to focus that row's year
+  field; the two solo place/until steps use the default (`onSubmit` advances the
+  step), same as before `PlacesTable` existed.
 
 ## Hard-won invariants (violating these reintroduces known bugs)
 
@@ -96,14 +102,30 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 - **Privacy**: personal data exists only in IndexedDB and user-initiated exports.
   Nothing personal may ever be written to the repo/filesystem; only `public-data/`
   is repo-tracked data.
-- **Onboarding Back must never cross a commit boundary**: `IdentityBirthPlacesAssistant`
-  disables its Back button at `place{iteration > 1}` on purpose — reaching that step
-  means the previous iteration's entry already committed, and re-answering an earlier
-  step after Back would either silently collide with it (`planEntryInsert` returns
+- **Onboarding Back must never cross a commit boundary**: this only applies to the
+  `name`/`birthYear`/`place`/`until` solo steps now — `PlacesTable` (everything past
+  the first place) has no Back button at all, on purpose, because it's live-editable:
+  editing a row IS the correction, so there's nothing to navigate back through. For
+  the remaining solo steps, re-answering an earlier one after Back would either
+  silently collide with an already-committed entry (`planEntryInsert` returns
   `"conflict"`, which `addOnboardingPlaceEntry` correctly no-ops on — but silently, so
   the data is just lost) or, for the name step, spawn a second Person/Group. The name
   step's fix is the general pattern: check whether identity was already committed and
   update in place (`updatePerson`/`updateGroup`) instead of re-creating.
+- **`PlacesTable` never puts a dataset write inside a `setState(prev => ...)`
+  updater**: React may invoke updater functions more than once (dev StrictMode does
+  this deliberately to catch impure ones), which would risk writing an entry twice.
+  Its row array lives in a plain `useRef` (`rowsRef`), mutated synchronously by
+  ordinary functions, with a `useReducer` counter (`forceRender`) only to trigger a
+  re-render after the ref changes. This also solves a second problem: selecting a
+  place suggestion defers its "row done" commit by ~450ms (the same confirm delay
+  used everywhere else — see `PlaceAutocompleteInput` above), and a closure captured
+  at click time would see stale row data if the fix relied on React state directly.
+  Reading/writing `rowsRef.current` is safe regardless of which render's closure
+  calls it. Every row edit — including deleting a row by clearing its place field —
+  recomputes and rewrites every later row's `start` from the edited row forward
+  (`reflowFrom`), since row N's start is never stored, only ever derived from row
+  N-1's saved `end`.
 - **Onboarding resume must never re-create identity either**: the same duplication
   risk above applies on fresh mount, not just after Back — replaying the assistant
   (rail "+" menu) on a dataset that already has `selfPersonId` set must NOT call

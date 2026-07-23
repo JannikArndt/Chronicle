@@ -758,6 +758,32 @@ textarea {
   gap: 8px;
 }
 
+.places-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 45vh;
+  overflow-y: auto;
+  overflow-x: visible;
+  padding: 2px;
+}
+
+.places-table-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.places-table-row .place-autocomplete {
+  flex: 1;
+  min-width: 0;
+}
+
+.places-table-year {
+  width: 64px;
+  flex: none;
+}
+
 .assistant-input-area input {
   font-size: 15px;
   padding: 8px 10px;

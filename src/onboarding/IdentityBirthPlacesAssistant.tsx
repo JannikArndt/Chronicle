@@ -1,13 +1,17 @@
 // Sub-project 1 of the onboarding-assistant initiative
 // (docs/superpowers/specs/2026-07-22-onboarding-assistant-design.md):
-// name -> birth year -> a chained loop of places lived, each with an
-// optional "until" year. A blank "until" means "still living here" and
-// ends the loop; "That's all for now" is always available as well.
+// name -> birth date -> first place lived + its year (each its own step) ->
+// a live-editable table of every place after that (PlacesTable). The table
+// exists because a step-per-place wizard punishes the very human habit of
+// "thinking about where I lived next reminds me of something about an
+// earlier place" — so past the first place, editing replaces re-answering.
 
 import { useState } from "react";
 import { AssistantStepShell } from "./AssistantStepShell";
 import { BirthDateInput } from "./BirthDateInput";
 import { PlaceAutocompleteInput } from "./PlaceAutocompleteInput";
+import { PlacesTable } from "./PlacesTable";
+import type { PlaceAnswer } from "./PlacesTable";
 import { formatSuggestionText } from "./nominatim";
 import { useAssistantFlow } from "./useAssistantFlow";
 import { addOnboardingPlaceEntry, completeIdentityStep, updateGroup, updatePerson } from "../state/actions";
@@ -33,18 +37,9 @@ function findExistingSetup(): { personId: string; groupId: string; placesRowId: 
 type Phase =
   | { kind: "name" }
   | { kind: "birthYear" }
-  | { kind: "place"; iteration: number }
-  | { kind: "until"; iteration: number };
-
-interface PlaceAnswer {
-  title: string;
-  subtitle?: string;
-  fullName: string;
-  coordinates?: { lat: number; lon: number };
-  street?: string;
-  city?: string;
-  country?: string;
-}
+  | { kind: "place" }
+  | { kind: "until" }
+  | { kind: "places"; firstRow: { entryId: string; place: PlaceAnswer; yearText: string } };
 
 interface IdentityBirthPlacesAssistantProps {
   onFinished: () => void;
@@ -67,8 +62,7 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
   });
   const [placeText, setPlaceText] = useState("");
   const [untilText, setUntilText] = useState("");
-  const [startMsByIteration, setStartMsByIteration] = useState<Record<number, number>>({});
-  const [placeAnswerByIteration, setPlaceAnswerByIteration] = useState<Record<number, PlaceAnswer>>({});
+  const [firstPlaceAnswer, setFirstPlaceAnswer] = useState<PlaceAnswer | null>(null);
   const [selectedSuggestion, setSelectedSuggestion] = useState<import("./nominatim").PlaceSuggestion | null>(null);
 
   const commitName = () => {
@@ -91,14 +85,12 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
   const commitBirthDate = () => {
     if (birthDateMs === undefined) return;
     if (setup) updatePerson(setup.personId, { birthDate: birthDateMs });
-    setStartMsByIteration((prev) => ({ ...prev, 1: birthDateMs }));
-    flow.advance({ kind: "place", iteration: 1 });
+    flow.advance({ kind: "place" });
   };
 
   const commitPlace = () => {
     const trimmed = placeText.trim();
-    if (trimmed === "" || flow.phase.kind !== "place") return;
-    const iteration = flow.phase.iteration;
+    if (trimmed === "") return;
     const answer: PlaceAnswer =
       selectedSuggestion && formatSuggestionText(selectedSuggestion) === trimmed
         ? {
@@ -111,41 +103,49 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
             country: selectedSuggestion.country,
           }
         : { title: trimmed, subtitle: undefined, fullName: trimmed, coordinates: undefined };
-    setPlaceAnswerByIteration((prev) => ({ ...prev, [iteration]: answer }));
+    setFirstPlaceAnswer(answer);
     setSelectedSuggestion(null);
     setPlaceText("");
-    flow.advance({ kind: "until", iteration });
+    flow.advance({ kind: "until" });
   };
 
   const commitUntil = () => {
     const trimmed = untilText.trim();
     const endParsed = trimmed === "" ? null : parseDateInput(trimmed);
     if (trimmed !== "" && !endParsed) return;
-    if (flow.phase.kind !== "until") return;
-    const iteration = flow.phase.iteration;
-    const startMs = startMsByIteration[iteration];
-    const place = placeAnswerByIteration[iteration];
-    if (!setup || startMs === undefined || place === undefined) return;
+    if (!setup || birthDateMs === undefined || firstPlaceAnswer === null) return;
 
-    addOnboardingPlaceEntry(setup.placesRowId, {
-      label: place.title,
-      startMs,
+    const entryId = addOnboardingPlaceEntry(setup.placesRowId, {
+      label: firstPlaceAnswer.title,
+      startMs: birthDateMs,
       endMs: endParsed?.ms,
-      subtitle: place.subtitle,
-      fullName: place.fullName,
-      coordinates: place.coordinates,
-      street: place.street,
-      city: place.city,
-      country: place.country,
+      subtitle: firstPlaceAnswer.subtitle,
+      fullName: firstPlaceAnswer.fullName,
+      coordinates: firstPlaceAnswer.coordinates,
+      street: firstPlaceAnswer.street,
+      city: firstPlaceAnswer.city,
+      country: firstPlaceAnswer.country,
     });
     setUntilText("");
 
     if (!endParsed) {
+      // No year given: this reads as "still living there" only once the
+      // user explicitly finishes (see PlacesTable) — but there's no table to
+      // finish from yet if the very first place has no entry to seed it
+      // with. Treat a blank year on the very first place as done for now,
+      // same as the rest of the app treats an ongoing entry: nothing further
+      // to enter until the user comes back and adds a move.
       onFinished();
       return;
     }
-    setStartMsByIteration((prev) => ({ ...prev, [iteration + 1]: endParsed.ms }));
-    flow.advance({ kind: "place", iteration: iteration + 1 });
+    if (!entryId) {
+      // planEntryInsert reported a conflict — shouldn't happen for the first
+      // entry in a brand-new "Places lived" row, but stay safe rather than
+      // seed the table with a nonexistent entry.
+      onFinished();
+      return;
+    }
+    flow.advance({ kind: "places", firstRow: { entryId, place: firstPlaceAnswer, yearText: trimmed } });
   };
 
   switch (flow.phase.kind) {
@@ -184,29 +184,15 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     case "place":
       return (
         <AssistantStepShell
-          prompt={flow.phase.iteration === 1 ? "Where did you live first?" : "Where did you live next?"}
+          prompt="Where did you live first?"
           stepIndex={flow.stepIndex}
-          // Reaching place{N>1} means iteration N-1's entry was already
-          // committed to the dataset (commitUntil only advances here after a
-          // successful write). Going back from there would re-enter until{N-1}
-          // and, on resubmit, collide with the still-present committed entry
-          // (same start ms -> planEntryInsert reports a conflict, which
-          // addOnboardingPlaceEntry silently no-ops on). Back from place{1}
-          // is safe: no place entries exist yet.
-          onBack={flow.canGoBack && flow.phase.iteration === 1 ? flow.back : undefined}
+          onBack={flow.canGoBack ? flow.back : undefined}
           onSkip={onFinished}
-          skipLabel={flow.phase.iteration > 1 ? "That's all for now" : undefined}
         >
           <PlaceAutocompleteInput
-            key={flow.phase.iteration}
             value={placeText}
             onChange={(text) => {
               setPlaceText(text);
-              // Functional updater, not the closed-over `selectedSuggestion` —
-              // reading the stale render-time value here could race with the
-              // setSelectedSuggestion(suggestion) queued moments earlier by
-              // onSelect below (same event, same batch), clobbering a fresh
-              // pick back to null before commitPlace ever sees it.
               setSelectedSuggestion((prev) => (prev && text !== formatSuggestionText(prev) ? null : prev));
             }}
             onSubmit={commitPlace}
@@ -221,7 +207,7 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     case "until":
       return (
         <AssistantStepShell
-          prompt={`Until when did you live in ${placeAnswerByIteration[flow.phase.iteration]?.title ?? "this place"}?`}
+          prompt={`Until when did you live in ${firstPlaceAnswer?.title ?? "this place"}?`}
           hint="Leave blank if you still live there. You can fine-tune the exact month or day later."
           stepIndex={flow.stepIndex}
           onBack={flow.canGoBack ? flow.back : undefined}
@@ -238,6 +224,23 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
           <button type="button" className="small-button" onClick={commitUntil}>
             {untilText.trim() === "" ? "Still living here →" : "Next →"}
           </button>
+        </AssistantStepShell>
+      );
+
+    case "places":
+      return (
+        <AssistantStepShell
+          prompt="Where else have you lived?"
+          hint="Press Tab to move between fields. Edit any row any time — Enter or Finish when you're done."
+          stepIndex={flow.stepIndex}
+          onSkip={onFinished}
+        >
+          <PlacesTable
+            placesRowId={setup!.placesRowId}
+            birthDateMs={birthDateMs!}
+            firstRow={flow.phase.firstRow}
+            onFinished={onFinished}
+          />
         </AssistantStepShell>
       );
   }

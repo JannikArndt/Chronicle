@@ -11,14 +11,29 @@ interface PlaceAutocompleteInputProps {
   onChange: (value: string) => void;
   onSubmit: () => void;
   onSelect: (suggestion: PlaceSuggestion) => void;
+  // Fires after the brief post-selection confirmation instead of onSubmit —
+  // e.g. a table row wants to move focus to its own year field, not submit
+  // the whole surrounding step. Defaults to onSubmit, preserving the original
+  // single-step behavior (select a place -> confirm -> advance the step).
+  onAfterSelect?: () => void;
+  autoFocus?: boolean;
+  onBlur?: () => void;
 }
 
 const DEBOUNCE_MS = 500;
 // Long enough to register as "the app understood me," short enough not to
-// feel laggy before the flow auto-advances past the confirmed pick.
+// feel laggy before the confirmed pick hands off to onAfterSelect/onSubmit.
 const CONFIRM_AUTO_ADVANCE_MS = 450;
 
-export function PlaceAutocompleteInput({ value, onChange, onSubmit, onSelect }: PlaceAutocompleteInputProps) {
+export function PlaceAutocompleteInput({
+  value,
+  onChange,
+  onSubmit,
+  onSelect,
+  onAfterSelect,
+  autoFocus = true,
+  onBlur,
+}: PlaceAutocompleteInputProps) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [confirmedSuggestion, setConfirmedSuggestion] = useState<PlaceSuggestion | null>(null);
@@ -65,7 +80,7 @@ export function PlaceAutocompleteInput({ value, onChange, onSubmit, onSelect }: 
     setConfirmedSuggestion(suggestion);
     autoAdvanceRef.current = setTimeout(() => {
       setConfirmedSuggestion(null);
-      onSubmit();
+      (onAfterSelect ?? onSubmit)();
     }, CONFIRM_AUTO_ADVANCE_MS);
   };
 
@@ -98,10 +113,11 @@ export function PlaceAutocompleteInput({ value, onChange, onSubmit, onSelect }: 
   return (
     <div className="place-autocomplete">
       <input
-        autoFocus
+        autoFocus={autoFocus}
         value={value}
         onChange={(event) => handleTextChange(event.target.value)}
         onKeyDown={handleKeyDown}
+        onBlur={onBlur}
         placeholder="City, region, or country"
       />
       {confirmedSuggestion && (

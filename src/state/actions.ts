@@ -176,7 +176,9 @@ export interface OnboardingPlaceAnswer {
 // click-driven startDraft flow) but still pass through planEntryInsert,
 // preserving the invariant that every insert is checked — by construction
 // these are always chronological appends, so it's a defensive no-op here.
-export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAnswer): void {
+// Returns the created entry's id (for the caller to track for later edits),
+// or undefined if planEntryInsert reported a conflict and nothing was written.
+export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAnswer): string | undefined {
   const entity = ensureEntity(
     place.label,
     "place",
@@ -202,7 +204,7 @@ export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAns
   };
   const plan = planEntryInsert(appStore.getState().dataset, draft);
   if (plan.kind === "conflict") {
-    return;
+    return undefined;
   }
   updateDataset((dataset) => {
     if (plan.kind === "autoClose") {
@@ -210,6 +212,40 @@ export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAns
       if (previous) previous.end = plan.closeAt;
     }
     dataset.entries.push(draft);
+    return dataset;
+  });
+  return draft.id;
+}
+
+// Onboarding places TABLE (unlike addOnboardingPlaceEntry's append-only path):
+// every row stays live-editable, so editing an earlier row's place or year has
+// to update its already-saved entry directly, the same way DetailPanel edits
+// bypass planEntryInsert (only drafts are checked — see CLAUDE.md "Still open /
+// untested"). Chaining consistency (row N's start = row N-1's end) is kept by
+// the caller always recomputing and rewriting every row's start from the
+// edited row forward, not by any check in here.
+export function updateOnboardingPlaceEntry(entryId: string, place: OnboardingPlaceAnswer): void {
+  const entity = ensureEntity(
+    place.label,
+    "place",
+    place.fullName
+      ? {
+          fullName: place.fullName,
+          coordinates: place.coordinates,
+          subtitle: place.subtitle,
+          street: place.street,
+          city: place.city,
+          country: place.country,
+        }
+      : undefined,
+  );
+  updateDataset((dataset) => {
+    const entry = dataset.entries.find((e) => e.id === entryId);
+    if (!entry) return dataset;
+    entry.title = place.label;
+    entry.start = { ms: place.startMs, precision: "year" };
+    entry.end = place.endMs !== undefined ? { ms: place.endMs, precision: "year" } : undefined;
+    entry.linkedEntityIds = [entity.id];
     return dataset;
   });
 }

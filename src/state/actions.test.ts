@@ -1,6 +1,14 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, test } from "vitest";
-import { addOnboardingPlaceEntry, completeIdentityStep, replaceDataset, selectRow, startDraft, updateDraft } from "./actions";
+import {
+  addOnboardingPlaceEntry,
+  completeIdentityStep,
+  replaceDataset,
+  selectRow,
+  startDraft,
+  updateDraft,
+  updateOnboardingPlaceEntry,
+} from "./actions";
 import { appStore } from "./store";
 import { emptyDataset } from "../model/dataset";
 import { DAY_MS } from "../model/fuzzyDate";
@@ -155,5 +163,65 @@ describe("onboarding: addOnboardingPlaceEntry", () => {
     const entries = appStore.getState().dataset.entries.filter((e) => e.rowId === placesRowId);
     expect(entries).toHaveLength(1);
     expect(entries[0].title).toBe("Berlin");
+  });
+
+  test("addOnboardingPlaceEntry returns the created entry's id, or undefined on conflict", () => {
+    replaceDataset(emptyDataset());
+    const { placesRowId } = completeIdentityStep("Jannik");
+    const year1990 = Date.UTC(1990, 6, 1);
+    const year1985 = Date.UTC(1985, 6, 1);
+    const year2000 = Date.UTC(2000, 6, 1);
+    const year2005 = Date.UTC(2005, 6, 1);
+
+    const berlinId = addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990, endMs: year2005 });
+    expect(typeof berlinId).toBe("string");
+    expect(appStore.getState().dataset.entries.find((e) => e.id === berlinId)?.title).toBe("Berlin");
+
+    const conflictId = addOnboardingPlaceEntry(placesRowId, { label: "Overlap", startMs: year1985, endMs: year2000 });
+    expect(conflictId).toBeUndefined();
+  });
+});
+
+describe("onboarding: updateOnboardingPlaceEntry", () => {
+  test("updates an existing entry's title, dates, and linked entity in place", () => {
+    replaceDataset(emptyDataset());
+    const { placesRowId } = completeIdentityStep("Jannik");
+    const year1990 = Date.UTC(1990, 6, 1);
+    const year2005 = Date.UTC(2005, 6, 1);
+    const year2010 = Date.UTC(2010, 6, 1);
+
+    const entryId = addOnboardingPlaceEntry(placesRowId, { label: "Berlin", startMs: year1990, endMs: year2005 })!;
+
+    updateOnboardingPlaceEntry(entryId, {
+      label: "Munich",
+      startMs: year1990,
+      endMs: year2010,
+      fullName: "Munich, Bavaria, Germany",
+      city: "Munich",
+      country: "Germany",
+    });
+
+    const state = appStore.getState();
+    const entries = state.dataset.entries.filter((e) => e.rowId === placesRowId);
+    expect(entries).toHaveLength(1); // still one entry — an update, not an append
+    const entry = entries[0];
+    expect(entry.id).toBe(entryId);
+    expect(entry.title).toBe("Munich");
+    expect(entry.start.ms).toBe(year1990);
+    expect(entry.end?.ms).toBe(year2010);
+
+    const entity = state.dataset.entities.find((e) => e.id === entry.linkedEntityIds[0]);
+    expect(entity?.label).toBe("Munich");
+    expect(entity?.place?.city).toBe("Munich");
+  });
+
+  test("does nothing if the entry id no longer exists", () => {
+    replaceDataset(emptyDataset());
+    completeIdentityStep("Jannik");
+    const before = appStore.getState().dataset.entries.length;
+
+    updateOnboardingPlaceEntry("no-such-entry", { label: "Ghost", startMs: Date.UTC(2000, 0, 1) });
+
+    expect(appStore.getState().dataset.entries).toHaveLength(before);
   });
 });
