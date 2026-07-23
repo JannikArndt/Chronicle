@@ -3,9 +3,10 @@
 // uses and is translated by the canvas scroll position every frame.
 
 import { useState } from "react";
-import type { RefObject } from "react";
+import type { MutableRefObject, RefObject } from "react";
 import { categoryDeleteBlockers, collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import type { Layout, LayoutItem } from "../render/layout";
+import type { TimelineEngine } from "../render/engine";
 import {
   addGroup,
   addPersonToGroup,
@@ -48,9 +49,10 @@ interface RowRailProps {
   layout: Layout;
   railContentRef: RefObject<HTMLDivElement>;
   onStartOnboarding: () => void;
+  engineRef: MutableRefObject<TimelineEngine | null>;
 }
 
-export function RowRail({ layout, railContentRef, onStartOnboarding }: RowRailProps) {
+export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }: RowRailProps) {
   const dataset = useAppState((s) => s.dataset);
   const publicDatasets = useAppState((s) => s.publicDatasets);
   const hiddenRowIds = useAppState((s) => s.hiddenRowIds);
@@ -77,6 +79,7 @@ export function RowRail({ layout, railContentRef, onStartOnboarding }: RowRailPr
               hiddenRowIds={hiddenRowIds}
               selectedRowId={selectedRowId}
               openPopover={setPopover}
+              engineRef={engineRef}
             />
           ))}
         </div>
@@ -109,6 +112,12 @@ function computedAge(person: Person): string | null {
   return years >= 0 ? `${Math.floor(years)}` : null;
 }
 
+function lifeSpanRange(birthDate: number): { startMs: number; endMs: number } {
+  const now = Date.now();
+  const padding = (now - birthDate) * 0.05;
+  return { startMs: birthDate - padding, endMs: now + padding };
+}
+
 interface RailItemProps {
   item: LayoutItem;
   personById: Map<string, Person>;
@@ -116,9 +125,10 @@ interface RailItemProps {
   hiddenRowIds: string[];
   selectedRowId?: string;
   openPopover: (p: PopoverState) => void;
+  engineRef: MutableRefObject<TimelineEngine | null>;
 }
 
-function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId, openPopover }: RailItemProps) {
+function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId, openPopover, engineRef }: RailItemProps) {
   const style = { top: item.y, height: item.height };
   const readOnly = isPublicId(item.id);
 
@@ -135,30 +145,45 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
           {group.label}
           {age !== null && <span className="age-badge">{age}</span>}
         </span>
-        {!readOnly && (
-          <span className="rail-actions">
-            {person && (
-              <button
-                type="button"
-                className="icon-button hover-reveal"
-                title="Edit person"
-                onClick={(e) =>
-                  openPopover({ kind: "person-edit", personId: person.id, groupId: group.id, top: topOf(e) })
-                }
-              >
-                ⚙
-              </button>
-            )}
+        <span className="rail-actions">
+          {person && person.birthDate !== undefined && (
             <button
               type="button"
               className="icon-button hover-reveal"
-              title="Add…"
-              onClick={(e) => openPopover({ kind: "add-menu", groupId: group.id, top: topOf(e) })}
+              title="Zoom to life span"
+              onClick={() => {
+                const { startMs, endMs } = lifeSpanRange(person.birthDate!);
+                engineRef.current?.zoomToRange(startMs, endMs);
+              }}
             >
-              ＋
+              ⇔
             </button>
-          </span>
-        )}
+          )}
+          {!readOnly && (
+            <>
+              {person && (
+                <button
+                  type="button"
+                  className="icon-button hover-reveal"
+                  title="Edit person"
+                  onClick={(e) =>
+                    openPopover({ kind: "person-edit", personId: person.id, groupId: group.id, top: topOf(e) })
+                  }
+                >
+                  ⚙
+                </button>
+              )}
+              <button
+                type="button"
+                className="icon-button hover-reveal"
+                title="Add…"
+                onClick={(e) => openPopover({ kind: "add-menu", groupId: group.id, top: topOf(e) })}
+              >
+                ＋
+              </button>
+            </>
+          )}
+        </span>
       </div>
     );
   }
@@ -173,28 +198,43 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
           {person.label}
           {age !== null && <span className="age-badge">{age}</span>}
         </span>
-        {!readOnlyPerson && (
-          <span className="rail-actions">
+        <span className="rail-actions">
+          {person.birthDate !== undefined && (
             <button
               type="button"
               className="icon-button hover-reveal"
-              title="Edit person"
-              onClick={(e) => openPopover({ kind: "person-edit", personId: person.id, top: topOf(e) })}
+              title="Zoom to life span"
+              onClick={() => {
+                const { startMs, endMs } = lifeSpanRange(person.birthDate!);
+                engineRef.current?.zoomToRange(startMs, endMs);
+              }}
             >
-              ⚙
+              ⇔
             </button>
-            <button
-              type="button"
-              className="icon-button hover-reveal"
-              title="Add…"
-              onClick={(e) =>
-                openPopover({ kind: "add-menu", groupId: item.group!.id, personId: person.id, top: topOf(e) })
-              }
-            >
-              ＋
-            </button>
-          </span>
-        )}
+          )}
+          {!readOnlyPerson && (
+            <>
+              <button
+                type="button"
+                className="icon-button hover-reveal"
+                title="Edit person"
+                onClick={(e) => openPopover({ kind: "person-edit", personId: person.id, top: topOf(e) })}
+              >
+                ⚙
+              </button>
+              <button
+                type="button"
+                className="icon-button hover-reveal"
+                title="Add…"
+                onClick={(e) =>
+                  openPopover({ kind: "add-menu", groupId: item.group!.id, personId: person.id, top: topOf(e) })
+                }
+              >
+                ＋
+              </button>
+            </>
+          )}
+        </span>
       </div>
     );
   }

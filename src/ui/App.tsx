@@ -112,6 +112,7 @@ export function App() {
           layout={layout}
           railContentRef={railContentRef}
           onStartOnboarding={() => setOnboardingOpen(true)}
+          engineRef={engineRef}
         />
         <CanvasHost layout={layout} railContentRef={railContentRef} engineRef={engineRef} />
         {isEmpty && (
