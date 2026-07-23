@@ -11,6 +11,7 @@ export type DateSegmentKind = "day" | "month" | "year";
 interface BirthDateInputProps {
   value: number | undefined; // UTC ms, or undefined if incomplete/invalid
   onChange: (value: number | undefined) => void;
+  onSubmit?: () => void; // called when the user presses Enter in any segment
 }
 
 const SEGMENT_LABEL: Record<DateSegmentKind, string> = {
@@ -25,18 +26,20 @@ const SEGMENT_MAX_LENGTH: Record<DateSegmentKind, number> = {
   year: 4,
 };
 
-// Derives day/month/year field order from the runtime locale instead of a
-// hardcoded list, so en-US naturally gets MM/DD/YYYY and most other locales
-// get DD/MM/YYYY.
+// Derives day/month/year field order. `Intl.DateTimeFormat(undefined, ...)`
+// resolves against the browser's runtime default locale, which is an
+// unreliable signal for actual date-format preference — a browser installed
+// in English (or an OS regional format left at a US default) resolves to
+// en-US even for users who want DD/MM/YYYY. So we default to DD/MM/YYYY (the
+// globally dominant order) and only switch to MM/DD/YYYY on a clear,
+// deliberate signal: `navigator.language` itself (not full Intl resolution)
+// being exactly "en-US" or a region variant of it.
 export function localeDateOrder(): DateSegmentKind[] {
-  const parts = new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  return parts
-    .map((part) => part.type)
-    .filter((type): type is DateSegmentKind => type === "day" || type === "month" || type === "year");
+  const language = typeof navigator !== "undefined" ? navigator.language : "en-US";
+  if (language === "en-US" || language.startsWith("en-US-")) {
+    return ["month", "day", "year"];
+  }
+  return ["day", "month", "year"];
 }
 
 // A day/month/year triple is a real calendar date only if constructing it
@@ -61,7 +64,7 @@ function decomposeUtcMs(ms: number | undefined): Record<DateSegmentKind, string>
   };
 }
 
-export function BirthDateInput({ value, onChange }: BirthDateInputProps) {
+export function BirthDateInput({ value, onChange, onSubmit }: BirthDateInputProps) {
   const order = useRef(localeDateOrder()).current;
   const [segments, setSegments] = useState<Record<DateSegmentKind, string>>(() => decomposeUtcMs(value));
   const inputRefs = useRef<Record<DateSegmentKind, HTMLInputElement | null>>({ day: null, month: null, year: null });
@@ -100,11 +103,14 @@ export function BirthDateInput({ value, onChange }: BirthDateInputProps) {
       const previousKind = order[indexInOrder - 1];
       if (previousKind) focusSegment(previousKind);
     }
+    if (event.key === "Enter") {
+      onSubmit?.();
+    }
   };
 
   return (
     <div className="birth-date-input">
-      {order.map((kind) => (
+      {order.map((kind, index) => (
         <label key={kind} className={`birth-date-segment birth-date-segment-${kind}`}>
           <span className="birth-date-segment-label">{SEGMENT_LABEL[kind]}</span>
           <input
@@ -115,6 +121,7 @@ export function BirthDateInput({ value, onChange }: BirthDateInputProps) {
             inputMode="numeric"
             maxLength={SEGMENT_MAX_LENGTH[kind]}
             value={segments[kind]}
+            autoFocus={index === 0}
             onChange={(event) => handleSegmentChange(kind, event.target.value)}
             onKeyDown={(event) => handleSegmentKeyDown(kind, event)}
             placeholder={SEGMENT_LABEL[kind]}

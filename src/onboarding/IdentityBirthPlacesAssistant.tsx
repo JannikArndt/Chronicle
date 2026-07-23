@@ -137,7 +137,7 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
           onBack={flow.canGoBack ? flow.back : undefined}
           onSkip={onFinished}
         >
-          <BirthDateInput value={birthDateMs} onChange={setBirthDateMs} />
+          <BirthDateInput value={birthDateMs} onChange={setBirthDateMs} onSubmit={commitBirthDate} />
           <button type="button" className="small-button" onClick={commitBirthDate}>
             Next →
           </button>

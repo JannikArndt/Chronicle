@@ -2,7 +2,7 @@
 // testing precedent/dependency (no @testing-library), so we exercise the
 // extracted pure functions directly rather than rendering the component.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isValidCalendarDate, localeDateOrder } from "./BirthDateInput";
 
 describe("isValidCalendarDate", () => {
@@ -38,9 +38,33 @@ describe("isValidCalendarDate", () => {
 });
 
 describe("localeDateOrder", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("returns exactly the three date segment kinds", () => {
     const order = localeDateOrder();
     expect(order).toHaveLength(3);
     expect(new Set(order)).toEqual(new Set(["day", "month", "year"]));
+  });
+
+  it("returns month/day/year for navigator.language exactly en-US", () => {
+    vi.stubGlobal("navigator", { language: "en-US" });
+    expect(localeDateOrder()).toEqual(["month", "day", "year"]);
+  });
+
+  it("returns month/day/year for an en-US region variant", () => {
+    vi.stubGlobal("navigator", { language: "en-US-x-test" });
+    expect(localeDateOrder()).toEqual(["month", "day", "year"]);
+  });
+
+  it("returns day/month/year for a non-US locale like de-DE, regardless of Intl resolution", () => {
+    vi.stubGlobal("navigator", { language: "de-DE" });
+    expect(localeDateOrder()).toEqual(["day", "month", "year"]);
+  });
+
+  it("returns day/month/year for plain en (not en-US)", () => {
+    vi.stubGlobal("navigator", { language: "en" });
+    expect(localeDateOrder()).toEqual(["day", "month", "year"]);
   });
 });
