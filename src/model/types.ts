@@ -64,6 +64,9 @@ export interface Entity {
   place?: {
     fullName: string; // the complete address/name as returned by the source (or as typed, if free-text)
     coordinates?: { lat: number; lon: number }; // absent for free-text entries with no picked suggestion
+    street?: string; // e.g. "Hauptstraße 12" (house_number + road combined) — undefined if not resolvable
+    city?: string;
+    country?: string;
     subtitle?: string; // secondary context line, e.g. the city when the title is a street; state/country when the title is a city
   };
 }

@@ -8,6 +8,7 @@ import { useState } from "react";
 import { AssistantStepShell } from "./AssistantStepShell";
 import { BirthDateInput } from "./BirthDateInput";
 import { PlaceAutocompleteInput } from "./PlaceAutocompleteInput";
+import { formatSuggestionText } from "./nominatim";
 import { useAssistantFlow } from "./useAssistantFlow";
 import { addOnboardingPlaceEntry, completeIdentityStep, updateGroup, updatePerson } from "../state/actions";
 import { parseDateInput } from "../model/fuzzyDate";
@@ -23,6 +24,9 @@ interface PlaceAnswer {
   subtitle?: string;
   fullName: string;
   coordinates?: { lat: number; lon: number };
+  street?: string;
+  city?: string;
+  country?: string;
 }
 
 interface IdentityBirthPlacesAssistantProps {
@@ -69,12 +73,15 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     if (trimmed === "" || flow.phase.kind !== "place") return;
     const iteration = flow.phase.iteration;
     const answer: PlaceAnswer =
-      selectedSuggestion && selectedSuggestion.title === trimmed
+      selectedSuggestion && formatSuggestionText(selectedSuggestion) === trimmed
         ? {
             title: selectedSuggestion.title,
             subtitle: selectedSuggestion.subtitle,
             fullName: selectedSuggestion.fullName,
             coordinates: { lat: Number(selectedSuggestion.lat), lon: Number(selectedSuggestion.lon) },
+            street: selectedSuggestion.street,
+            city: selectedSuggestion.city,
+            country: selectedSuggestion.country,
           }
         : { title: trimmed, subtitle: undefined, fullName: trimmed, coordinates: undefined };
     setPlaceAnswerByIteration((prev) => ({ ...prev, [iteration]: answer }));
@@ -100,6 +107,9 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
       subtitle: place.subtitle,
       fullName: place.fullName,
       coordinates: place.coordinates,
+      street: place.street,
+      city: place.city,
+      country: place.country,
     });
     setUntilText("");
 
@@ -164,7 +174,7 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
             value={placeText}
             onChange={(text) => {
               setPlaceText(text);
-              if (selectedSuggestion && text !== selectedSuggestion.title) setSelectedSuggestion(null);
+              if (selectedSuggestion && text !== formatSuggestionText(selectedSuggestion)) setSelectedSuggestion(null);
             }}
             onSubmit={commitPlace}
             onSelect={(suggestion) => setSelectedSuggestion(suggestion)}

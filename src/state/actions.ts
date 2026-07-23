@@ -167,6 +167,9 @@ export interface OnboardingPlaceAnswer {
   subtitle?: string;
   fullName?: string;
   coordinates?: { lat: number; lon: number };
+  street?: string;
+  city?: string;
+  country?: string;
 }
 
 // Onboarding places loop: entries are built directly (not through the
@@ -177,7 +180,16 @@ export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAns
   const entity = ensureEntity(
     place.label,
     "place",
-    place.fullName ? { fullName: place.fullName, coordinates: place.coordinates, subtitle: place.subtitle } : undefined,
+    place.fullName
+      ? {
+          fullName: place.fullName,
+          coordinates: place.coordinates,
+          subtitle: place.subtitle,
+          street: place.street,
+          city: place.city,
+          country: place.country,
+        }
+      : undefined,
   );
   const draft: TimelineEntry = {
     id: newId("entry"),
@@ -331,7 +343,14 @@ export function updatePerson(personId: string, patch: Partial<Person>): void {
 export function ensureEntity(
   label: string,
   kind: Entity["kind"],
-  placeDetails?: { fullName: string; coordinates?: { lat: number; lon: number }; subtitle?: string },
+  placeDetails?: {
+    fullName: string;
+    coordinates?: { lat: number; lon: number };
+    street?: string;
+    city?: string;
+    country?: string;
+    subtitle?: string;
+  },
 ): Entity {
   const existing = appStore
     .getState()

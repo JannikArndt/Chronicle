@@ -182,7 +182,11 @@ export function DetailPanel() {
       <div className="field">
         <label className="field-label">Linked entities</label>
         {linkedEntities.map((entity) => (
-          <div key={entity.id} className="entity-chip">
+          <div
+            key={entity.id}
+            className="entity-chip"
+            title={[entity.place?.street, entity.place?.city, entity.place?.country].filter(Boolean).join(", ") || undefined}
+          >
             <span className="entity-chip-text">
               <span className="entity-chip-title">
                 {ENTITY_KIND_OPTIONS.find((o) => o.value === entity.kind)?.icon} {entity.label}

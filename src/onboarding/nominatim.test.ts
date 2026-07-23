@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { deriveTitleSubtitle, searchPlaces } from "./nominatim";
+import { deriveAddressComponents, deriveTitleSubtitle, formatSuggestionText, searchPlaces } from "./nominatim";
 
 function mockFetch(body: unknown, ok = true): typeof fetch {
   return vi.fn().mockResolvedValue({ ok, json: () => Promise.resolve(body) }) as unknown as typeof fetch;
@@ -34,6 +34,9 @@ describe("searchPlaces", () => {
         title: "123 Main Street",
         subtitle: "Springfield",
         fullName: "123, Main Street, Springfield, Sangamon County, Illinois, 62704, United States",
+        street: "123 Main Street",
+        city: "Springfield",
+        country: "United States",
         lat: "39.78",
         lon: "-89.65",
       },
@@ -52,6 +55,64 @@ describe("searchPlaces", () => {
     const fetchImpl = mockFetch([], false);
     const result = await searchPlaces("Berlin", fetchImpl);
     expect(result).toEqual([]);
+  });
+
+  test("deduplicates results with identical title/subtitle/fullName", async () => {
+    const duplicateResult = {
+      display_name: "Berlin, Germany",
+      lat: "52.52",
+      lon: "13.4",
+      address: { city: "Berlin", country: "Germany" },
+    };
+    const fetchImpl = mockFetch([
+      duplicateResult,
+      // Same address details (and thus same derived title/subtitle/fullName)
+      // but a different Nominatim internal id/coordinate precision — this is
+      // the kind of near-duplicate Nominatim actually returns.
+      { ...duplicateResult, lat: "52.5200001" },
+    ]);
+    const result = await searchPlaces("Berlin", fetchImpl);
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("Berlin");
+  });
+});
+
+describe("formatSuggestionText", () => {
+  test("joins title and subtitle with a comma when subtitle is present", () => {
+    expect(formatSuggestionText({ title: "Hauptstraße 12", subtitle: "Berlin", fullName: "x", lat: "0", lon: "0" })).toBe(
+      "Hauptstraße 12, Berlin",
+    );
+  });
+
+  test("returns just the title when there is no subtitle", () => {
+    expect(formatSuggestionText({ title: "Berlin", fullName: "x", lat: "0", lon: "0" })).toBe("Berlin");
+  });
+});
+
+describe("deriveAddressComponents", () => {
+  test("combines house_number and road into street, and reads city/country", () => {
+    const result = deriveAddressComponents({
+      display_name: "123, Main Street, Springfield, Illinois, United States",
+      lat: "0",
+      lon: "0",
+      address: { house_number: "123", road: "Main Street", city: "Springfield", country: "United States" },
+    });
+    expect(result).toEqual({ street: "123 Main Street", city: "Springfield", country: "United States" });
+  });
+
+  test("falls back to town/village/municipality when city is absent", () => {
+    const result = deriveAddressComponents({
+      display_name: "Somewhere, Germany",
+      lat: "0",
+      lon: "0",
+      address: { village: "Somewhere", country: "Germany" },
+    });
+    expect(result).toEqual({ street: undefined, city: "Somewhere", country: "Germany" });
+  });
+
+  test("returns all-undefined fields when there is no address block", () => {
+    const result = deriveAddressComponents({ display_name: "Unstructured", lat: "0", lon: "0" });
+    expect(result).toEqual({ street: undefined, city: undefined, country: undefined });
   });
 });
 
