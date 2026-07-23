@@ -251,12 +251,13 @@ function RailItem({ item, personById, categoryById, hiddenRowIds, selectedRowId,
       >
         <input
           type="checkbox"
+          className="rail-row-checkbox"
           checked={!hidden}
           title="Show row"
+          style={{ accentColor: category?.color ?? "#888" }}
           onClick={(e) => e.stopPropagation()}
           onChange={() => toggleRowHidden(row.id)}
         />
-        <span className="swatch" style={{ background: category?.color ?? "#888" }} />
         <span className="row-icon">{category?.icon}</span>
         <span className="rail-row-label" title={row.label}>
           <span className="label-full">{row.label}</span>

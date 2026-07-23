@@ -294,6 +294,11 @@ textarea {
   margin: 0;
 }
 
+.rail-row-checkbox {
+  width: 14px;
+  height: 14px;
+}
+
 .rail-group-label,
 .rail-person-label,
 .rail-row-label {
@@ -312,13 +317,6 @@ textarea {
   font-weight: 400;
   font-size: 11px;
   color: var(--color-text-faint);
-}
-
-.swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
-  flex: none;
 }
 
 .row-icon {
