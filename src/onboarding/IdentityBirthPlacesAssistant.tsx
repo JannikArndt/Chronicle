@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { AssistantStepShell } from "./AssistantStepShell";
+import { BirthDateInput } from "./BirthDateInput";
 import { PlaceAutocompleteInput } from "./PlaceAutocompleteInput";
 import { useAssistantFlow } from "./useAssistantFlow";
 import { addOnboardingPlaceEntry, completeIdentityStep, updateGroup, updatePerson } from "../state/actions";
@@ -31,7 +32,7 @@ interface IdentityBirthPlacesAssistantProps {
 export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlacesAssistantProps) {
   const flow = useAssistantFlow<Phase>({ kind: "name" });
   const [name, setName] = useState("");
-  const [birthYearText, setBirthYearText] = useState("");
+  const [birthDateMs, setBirthDateMs] = useState<number | undefined>(undefined);
   const [placeText, setPlaceText] = useState("");
   const [untilText, setUntilText] = useState("");
   const [setup, setSetup] = useState<{ personId: string; groupId: string; placesRowId: string } | null>(null);
@@ -56,11 +57,10 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     flow.advance({ kind: "birthYear" });
   };
 
-  const commitBirthYear = () => {
-    const parsed = parseDateInput(birthYearText.trim());
-    if (!parsed) return;
-    if (setup) updatePerson(setup.personId, { birthDate: parsed.ms });
-    setStartMsByIteration((prev) => ({ ...prev, 1: parsed.ms }));
+  const commitBirthDate = () => {
+    if (birthDateMs === undefined) return;
+    if (setup) updatePerson(setup.personId, { birthDate: birthDateMs });
+    setStartMsByIteration((prev) => ({ ...prev, 1: birthDateMs }));
     flow.advance({ kind: "place", iteration: 1 });
   };
 
@@ -132,20 +132,13 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
       return (
         <AssistantStepShell
           prompt="When were you born?"
-          hint="Just the year is enough for now — you can fine-tune the exact month or day later."
+          hint="This is used to compute your age on your timeline."
           stepIndex={flow.stepIndex}
           onBack={flow.canGoBack ? flow.back : undefined}
           onSkip={onFinished}
         >
-          <input
-            autoFocus
-            value={birthYearText}
-            onChange={(event) => setBirthYearText(event.target.value)}
-            onKeyDown={(event) => event.key === "Enter" && commitBirthYear()}
-            placeholder="e.g. 1990"
-            inputMode="numeric"
-          />
-          <button type="button" className="small-button" onClick={commitBirthYear}>
+          <BirthDateInput value={birthDateMs} onChange={setBirthDateMs} />
+          <button type="button" className="small-button" onClick={commitBirthDate}>
             Next →
           </button>
         </AssistantStepShell>

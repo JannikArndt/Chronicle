@@ -633,6 +633,38 @@ textarea {
   padding: 8px 10px;
 }
 
+.birth-date-input {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.birth-date-segment {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.birth-date-segment-label {
+  font-size: 12px;
+  color: #78716c;
+}
+
+.birth-date-segment input {
+  font-size: 15px;
+  padding: 8px 10px;
+  border: 1px solid #d6d3cd;
+}
+
+.birth-date-segment-day input,
+.birth-date-segment-month input {
+  width: 48px;
+}
+
+.birth-date-segment-year input {
+  width: 70px;
+}
+
 .assistant-nav {
   display: flex;
   justify-content: space-between;
