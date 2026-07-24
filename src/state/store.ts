@@ -30,6 +30,10 @@ export interface AppState {
   pickingField?: "start" | "end";
   pickedDate?: { ms: number; precision: Precision; field: "start" | "end" };
   hiddenRowIds: string[];
+  // Which optional public data the user has switched on. Nothing loads by
+  // default — `publicDatasets` is rebuilt from these selections (see actions).
+  activeWorldKeys: string[];
+  activeFamous: { personId: string; aligned: boolean }[];
 }
 
 const initialState: AppState = {
@@ -39,6 +43,8 @@ const initialState: AppState = {
   search: "",
   filters: { categoryIds: [], personIds: [] },
   hiddenRowIds: [],
+  activeWorldKeys: [],
+  activeFamous: [],
 };
 
 type Listener = () => void;
@@ -80,4 +86,12 @@ export function mergedDataset(state: AppState): TimelineDataset {
 
 export function isPublicId(id: string): boolean {
   return id.startsWith("pub:");
+}
+
+// The user's own birth instant, used to align a famous person's life "to your
+// age". Undefined until identity onboarding sets it — the picker hides the
+// alignment option in that case.
+export function userBirthMs(state: AppState): number | undefined {
+  const self = state.dataset.people.find((person) => person.id === state.dataset.selfPersonId);
+  return self?.birthDate;
 }

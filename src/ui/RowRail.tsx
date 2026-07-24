@@ -18,15 +18,20 @@ import {
   reorderGroup,
   replaceDataset,
   selectRow,
+  setFamousAlignment,
+  toggleFamousPerson,
   toggleGroupCollapsed,
   toggleRowHidden,
+  toggleWorldEvents,
   updateCategory,
   updatePerson,
   updateRow,
 } from "../state/actions";
-import { isPublicId, useAppState } from "../state/store";
+import { isPublicId, useAppState, userBirthMs } from "../state/store";
 import type { Category, Person } from "../model/types";
 import { triggerImportFlow } from "../storage/exportImport";
+import { loadPublicCatalog } from "../publicData/loader";
+import { famousCatalog } from "../publicData/famous/catalog";
 
 const EMOJI_QUICK_PICKS = ["💼", "🏠", "❤️", "🎓", "✈️", "🎨", "⚽", "🐕"];
 
@@ -718,6 +723,11 @@ function RailAddMenu({
     close();
   };
 
+  const [mode, setMode] = useState<"menu" | "world" | "famous">("menu");
+
+  if (mode === "world") return <WorldEventsPicker back={() => setMode("menu")} />;
+  if (mode === "famous") return <FamousPeoplePicker back={() => setMode("menu")} />;
+
   return (
     <div className="popover-form">
       <button type="button" className="menu-item" onClick={() => open({ kind: "add-group", top: 0 })}>
@@ -729,6 +739,12 @@ function RailAddMenu({
       <button type="button" className="menu-item" onClick={handleImport}>
         ＋ Import
       </button>
+      <button type="button" className="menu-item" onClick={() => setMode("world")}>
+        🌍 World events ▸
+      </button>
+      <button type="button" className="menu-item" onClick={() => setMode("famous")}>
+        🌟 Famous people ▸
+      </button>
       <button
         type="button"
         className="menu-item"
@@ -739,6 +755,76 @@ function RailAddMenu({
       >
         ✨ Replay setup assistant
       </button>
+    </div>
+  );
+}
+
+// Toggle any of the bundled world-events datasets on/off. Nothing shows until
+// picked here, so the catalog can grow without cluttering a fresh timeline.
+function WorldEventsPicker({ back }: { back: () => void }) {
+  const catalog = loadPublicCatalog();
+  const activeKeys = useAppState((s) => s.activeWorldKeys);
+
+  return (
+    <div className="popover-form">
+      <button type="button" className="menu-item" onClick={back}>
+        ◂ Back
+      </button>
+      <div className="popover-title">World events</div>
+      {catalog.map((item) => (
+        <label key={item.key} className="menu-item picker-row">
+          <input
+            type="checkbox"
+            checked={activeKeys.includes(item.key)}
+            onChange={() => toggleWorldEvents(item.key)}
+          />
+          <span>{item.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// Add a famous person's life to the timeline, optionally shifted so their birth
+// lines up with yours — "what did they do at my age?".
+function FamousPeoplePicker({ back }: { back: () => void }) {
+  const activeFamous = useAppState((s) => s.activeFamous);
+  const canAlign = useAppState((s) => userBirthMs(s) !== undefined);
+
+  return (
+    <div className="popover-form">
+      <button type="button" className="menu-item" onClick={back}>
+        ◂ Back
+      </button>
+      <div className="popover-title">Famous people</div>
+      {famousCatalog.map((person) => {
+        const selection = activeFamous.find((s) => s.personId === person.id);
+        return (
+          <div key={person.id} className="picker-group">
+            <label className="menu-item picker-row">
+              <input
+                type="checkbox"
+                checked={selection !== undefined}
+                onChange={() => toggleFamousPerson(person.id)}
+              />
+              <span>
+                {person.emoji} {person.name}
+                <small className="picker-blurb"> — {person.blurb}</small>
+              </span>
+            </label>
+            {selection && canAlign && (
+              <label className="menu-item picker-row picker-subrow">
+                <input
+                  type="checkbox"
+                  checked={selection.aligned}
+                  onChange={(e) => setFamousAlignment(person.id, e.target.checked)}
+                />
+                <span>At my age</span>
+              </label>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

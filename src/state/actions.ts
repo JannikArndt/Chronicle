@@ -5,8 +5,11 @@
 import { applyDelete, collectEntryCascade, collectGroupCascade, collectRowCascade } from "../model/cascade";
 import { emptyDataset, newId } from "../model/dataset";
 import { loadDataset, saveDataset } from "../storage/db";
-import { loadPublicDatasets } from "../publicData/loader";
-import { appStore } from "./store";
+import { loadPublicCatalog } from "../publicData/loader";
+import { buildFamousDataset } from "../publicData/famous/alignToAge";
+import { findFamousPerson } from "../publicData/famous/catalog";
+import { appStore, userBirthMs } from "./store";
+import type { AppState } from "./store";
 import type {
   Category,
   Group,
@@ -33,7 +36,65 @@ function updateDataset(mutate: (dataset: TimelineDataset) => TimelineDataset): v
 
 export async function initializeApp(): Promise<void> {
   const dataset = (await loadDataset()) ?? emptyDataset();
-  appStore.setState({ dataset, publicDatasets: loadPublicDatasets(), loaded: true });
+  // Public data is opt-in now: nothing is merged until the user picks it from
+  // the rail's "+" menu, so the growing catalog doesn't flood a fresh timeline.
+  appStore.setState({ dataset, publicDatasets: [], loaded: true });
+}
+
+// ---------- optional public data (world events + famous people) ----------
+
+// Loaded once per session; the files are bundled at build time and never change.
+let worldCatalogCache: ReturnType<typeof loadPublicCatalog> | null = null;
+function worldCatalog(): ReturnType<typeof loadPublicCatalog> {
+  worldCatalogCache ??= loadPublicCatalog();
+  return worldCatalogCache;
+}
+
+// Rebuild the merged-in `publicDatasets` from the user's current selections.
+// Famous people are (re)built here so an alignment toggle re-shifts the life
+// against the latest birth date without any stored copy going stale.
+function rebuildPublicDatasets(state: AppState): void {
+  const world = worldCatalog()
+    .filter((item) => state.activeWorldKeys.includes(item.key))
+    .map((item) => item.dataset);
+
+  const famous = state.activeFamous.flatMap((selection) => {
+    const person = findFamousPerson(selection.personId);
+    if (!person) return [];
+    const birth = selection.aligned ? userBirthMs(state) : undefined;
+    return [buildFamousDataset(person, birth)];
+  });
+
+  appStore.setState({ publicDatasets: [...world, ...famous] });
+}
+
+export function toggleWorldEvents(key: string): void {
+  const state = appStore.getState();
+  const active = state.activeWorldKeys.includes(key)
+    ? state.activeWorldKeys.filter((k) => k !== key)
+    : [...state.activeWorldKeys, key];
+  appStore.setState({ activeWorldKeys: active });
+  rebuildPublicDatasets(appStore.getState());
+}
+
+export function toggleFamousPerson(personId: string): void {
+  const state = appStore.getState();
+  const isActive = state.activeFamous.some((selection) => selection.personId === personId);
+  const active = isActive
+    ? state.activeFamous.filter((selection) => selection.personId !== personId)
+    : [...state.activeFamous, { personId, aligned: false }];
+  appStore.setState({ activeFamous: active });
+  rebuildPublicDatasets(appStore.getState());
+}
+
+// Flip one famous person between real calendar dates and "aligned to your age".
+export function setFamousAlignment(personId: string, aligned: boolean): void {
+  const state = appStore.getState();
+  const active = state.activeFamous.map((selection) =>
+    selection.personId === personId ? { ...selection, aligned } : selection,
+  );
+  appStore.setState({ activeFamous: active });
+  rebuildPublicDatasets(appStore.getState());
 }
 
 // ---------- selection ----------
