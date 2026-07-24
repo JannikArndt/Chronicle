@@ -31,6 +31,19 @@ export function parseFamousGroupId(groupId: string): { personId: string; aligned
   return { personId, aligned };
 }
 
+// Same, for a namespaced row id, recovering the pre-namespacing base row id so
+// a single famous timeline can be removed. `pub:famous-mozart:r-works` → base
+// row key `r-works`.
+export function parseFamousRowId(
+  rowId: string,
+): { personId: string; aligned: boolean; rowKey: string } | null {
+  const match = /^pub:famous-(.+?):(.+)$/.exec(rowId);
+  if (!match) return null;
+  const aligned = match[1].endsWith("-aligned");
+  const personId = aligned ? match[1].slice(0, -"-aligned".length) : match[1];
+  return { personId, aligned, rowKey: match[2] };
+}
+
 function shiftFuzzyDate(date: FuzzyDate, offsetMs: number): FuzzyDate {
   return { ...date, ms: date.ms + offsetMs };
 }
@@ -38,10 +51,18 @@ function shiftFuzzyDate(date: FuzzyDate, offsetMs: number): FuzzyDate {
 // Build the dataset for one famous person, ready to merge into the view.
 // When `userBirthMs` is provided, the whole life is shifted so the person's
 // birth aligns to the user's birth; otherwise the real calendar dates are used.
-export function buildFamousDataset(person: FamousPerson, userBirthMs?: number): TimelineDataset {
+// `removedRowKeys` drops individual timelines (by their base row id) the user
+// has taken away, along with their entries.
+export function buildFamousDataset(
+  person: FamousPerson,
+  userBirthMs?: number,
+  removedRowKeys: string[] = [],
+): TimelineDataset {
   const aligned = userBirthMs !== undefined;
   const offsetMs = aligned ? userBirthMs - person.birthMs : 0;
+  const removed = new Set(removedRowKeys);
 
+  const rows = person.biography.rows.filter((row) => !removed.has(row.id));
   const raw: TimelineDataset = {
     schemaVersion: 1,
     people: [],
@@ -50,13 +71,22 @@ export function buildFamousDataset(person: FamousPerson, userBirthMs?: number): 
       label: aligned ? `${group.label}${ALIGNED_LABEL_SUFFIX}` : group.label,
     })),
     categories: person.biography.categories,
-    rows: person.biography.rows,
-    entries: person.biography.entries.map((entry) => ({
-      ...entry,
-      start: shiftFuzzyDate(entry.start, offsetMs),
-      end: entry.end ? shiftFuzzyDate(entry.end, offsetMs) : undefined,
-    })),
+    rows,
+    entries: person.biography.entries
+      .filter((entry) => !removed.has(entry.rowId))
+      .map((entry) => ({
+        ...entry,
+        start: shiftFuzzyDate(entry.start, offsetMs),
+        end: entry.end ? shiftFuzzyDate(entry.end, offsetMs) : undefined,
+      })),
   };
 
   return namespaceDataset(raw, famousKey(person.id, aligned));
+}
+
+// The base row ids that still remain for a person after removals — used to
+// decide whether removing one more row should drop the whole person.
+export function remainingRowKeys(person: FamousPerson, removedRowKeys: string[]): string[] {
+  const removed = new Set(removedRowKeys);
+  return person.biography.rows.map((row) => row.id).filter((id) => !removed.has(id));
 }

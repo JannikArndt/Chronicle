@@ -36,7 +36,10 @@ export interface AppState {
   // `activeFamous` holds the whole FamousPerson (not just an id) so a person
   // fetched from Wikidata at runtime survives a rebuild without a catalog.
   activeWorldKeys: string[];
-  activeFamous: { person: FamousPerson; aligned: boolean }[];
+  // `removedRowKeys` are base row ids (pre-namespacing) the user has removed
+  // from that person's overlay — a single timeline can be taken away without
+  // removing the whole person.
+  activeFamous: { person: FamousPerson; aligned: boolean; removedRowKeys: string[] }[];
 }
 
 const initialState: AppState = {

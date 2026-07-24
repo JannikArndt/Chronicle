@@ -604,6 +604,16 @@ textarea {
   filter: none;
 }
 
+/* Remove-from-view "✕" on overlay (public) groups and famous rows. */
+.remove-overlay {
+  opacity: 0.45;
+}
+
+.remove-overlay:hover {
+  opacity: 1;
+  color: var(--color-danger);
+}
+
 .color-emoji-line input[type="color"] {
   width: 40px;
   height: 30px;

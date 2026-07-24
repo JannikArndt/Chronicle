@@ -5,10 +5,21 @@
 
 import { SCHEMA_VERSION } from "../model/types";
 import type { TimelineDataset } from "../model/types";
+import type { FamousPerson } from "../publicData/famous/types";
 
 const DB_NAME = "chronicle";
 const STORE_NAME = "datasets";
 const DATASET_KEY = "main";
+const OVERLAYS_KEY = "overlays";
+
+// Which optional public data (world events + famous people) the user has added.
+// Persisted next to the dataset so the overlay survives a reload. Famous people
+// are stored whole because a Wikidata-fetched person has no catalog to rehydrate
+// from. This is public-figure preference data, not personal data.
+export interface StoredOverlays {
+  activeWorldKeys: string[];
+  activeFamous: { person: FamousPerson; aligned: boolean; removedRowKeys: string[] }[];
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -43,6 +54,33 @@ export async function saveDataset(dataset: TimelineDataset): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORE_NAME, "readwrite");
       transaction.objectStore(STORE_NAME).put(dataset, DATASET_KEY);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function loadOverlays(): Promise<StoredOverlays | null> {
+  const db = await openDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(OVERLAYS_KEY);
+      request.onsuccess = () => resolve((request.result as StoredOverlays | undefined) ?? null);
+      request.onerror = () => reject(request.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function saveOverlays(overlays: StoredOverlays): Promise<void> {
+  const db = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      transaction.objectStore(STORE_NAME).put(overlays, OVERLAYS_KEY);
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
     });

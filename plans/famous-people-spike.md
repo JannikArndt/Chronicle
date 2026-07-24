@@ -53,11 +53,23 @@ returns hits; the SPARQL query returns 200 with sensible ranges for Marie Curie
 send a real UA (WDQS's own GUI is browser-based), so the app path is expected to
 work, but this was **not** confirmed in-browser here (extension not connected).
 
+## Update — round 3 (feedback applied)
+
+- **Removal.** An "✕" on every overlay group header removes it — a famous person
+  (`removeFamousPerson`) or a world-events dataset (`removePublicGroup` routes by
+  namespace). Each famous timeline (row) has its own "✕" (`removeFamousRow`),
+  filtered out of the rebuilt dataset via per-person `removedRowKeys`; removing
+  the last remaining row drops the whole person.
+- **Persistence across reload.** Overlay selections (world keys + the full
+  `activeFamous`, including Wikidata-fetched biographies) are stored in the same
+  IndexedDB under an `overlays` key and restored in `initializeApp`. Persist is
+  debounced and centralised in `rebuildPublicDatasets`, so every add/remove/align
+  is saved. Verified end-to-end with fake-indexeddb.
+
 ## Deliberate spike shortcuts (not production-ready)
 
 - Static biographies are hand-authored TS, kept out of `public-data/` on purpose
   so they don't have to satisfy the validated public schema (no `birthMs` there).
-- Selections are view state only — **not persisted**, so a reload clears them.
 - No client-side caching of Wikidata responses yet (each add re-queries).
 - Date precision from Wikidata is coarsened to `year`; real per-statement
   precision is not read.
@@ -66,5 +78,5 @@ work, but this was **not** confirmed in-browser here (extension not connected).
 ## Still open / next
 
 - Confirm WDQS works from the actual browser (UA policy) — the one unverified link.
-- Persist selections; cache Wikidata biographies; read real date precision;
-  optionally filter search to humans (`P31 wd:Q5`).
+- Cache Wikidata biographies; read real date precision; optionally filter search
+  to humans (`P31 wd:Q5`).

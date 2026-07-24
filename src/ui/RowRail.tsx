@@ -19,6 +19,8 @@ import {
   replaceDataset,
   selectRow,
   addFamousPerson,
+  removeFamousRow,
+  removePublicGroup,
   setFamousAlignment,
   toggleFamousPerson,
   toggleGroupCollapsed,
@@ -33,7 +35,7 @@ import type { Category, Person } from "../model/types";
 import { triggerImportFlow } from "../storage/exportImport";
 import { loadPublicCatalog } from "../publicData/loader";
 import { famousCatalog } from "../publicData/famous/catalog";
-import { parseFamousGroupId } from "../publicData/famous/alignToAge";
+import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
 import { fetchWikidataBiography, searchWikidataPeople } from "../publicData/famous/wikidata";
 import type { WikidataSearchResult } from "../publicData/famous/wikidata";
 
@@ -497,6 +499,16 @@ function RailItem({
               🎂
             </button>
           )}
+          {readOnly && (
+            <button
+              type="button"
+              className="icon-button remove-overlay"
+              title="Remove from timeline"
+              onClick={() => removePublicGroup(group.id)}
+            >
+              ✕
+            </button>
+          )}
           {person && person.birthDate !== undefined && (
             <button
               type="button"
@@ -669,6 +681,24 @@ function RailItem({
             </button>
           </span>
         )}
+        {(() => {
+          const famousRow = parseFamousRowId(row.id);
+          return famousRow ? (
+            <span className="rail-actions">
+              <button
+                type="button"
+                className="icon-button remove-overlay"
+                title="Remove this timeline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeFamousRow(famousRow.personId, famousRow.rowKey);
+                }}
+              >
+                ✕
+              </button>
+            </span>
+          ) : null;
+        })()}
       </div>
     );
   }
