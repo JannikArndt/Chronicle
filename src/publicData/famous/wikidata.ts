@@ -17,23 +17,58 @@ export interface WikidataSearchResult {
   description?: string;
 }
 
+// A search hit annotated with what kind of thing it is, so the picker can keep
+// only people (P31 = human, Q5) and the debug view can show what got filtered
+// out and why.
+export interface WikidataCandidate extends WikidataSearchResult {
+  isHuman: boolean;
+  instanceOfIds: string[]; // P31 values, e.g. ["Q5"] for a human, ["Q515"] for a city
+}
+
+const HUMAN_QID = "Q5";
 const SEARCH_ENDPOINT = "https://www.wikidata.org/w/api.php";
 const SPARQL_ENDPOINT = "https://query.wikidata.org/sparql";
 
-export async function searchWikidataPeople(query: string): Promise<WikidataSearchResult[]> {
+// wbsearchentities can't filter by type, so we search, then fetch P31 (instance
+// of) for every hit in one wbgetentities call and mark which ones are people.
+// Both calls are on the CORS-open action API (origin=*), no WDQS UA policy.
+export async function searchWikidataCandidates(query: string): Promise<WikidataCandidate[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
-  const url =
+  const searchUrl =
     `${SEARCH_ENDPOINT}?action=wbsearchentities&type=item&limit=8&language=en&uselang=en&format=json&origin=*` +
     `&search=${encodeURIComponent(trimmed)}`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Wikidata search failed (${response.status})`);
-  const data = (await response.json()) as { search?: { id: string; label?: string; description?: string }[] };
-  return (data.search ?? []).map((hit) => ({
+  const searchResponse = await fetch(searchUrl);
+  if (!searchResponse.ok) throw new Error(`Wikidata search failed (${searchResponse.status})`);
+  const searchData = (await searchResponse.json()) as {
+    search?: { id: string; label?: string; description?: string }[];
+  };
+  const hits = (searchData.search ?? []).map((hit) => ({
     id: hit.id,
     label: hit.label ?? hit.id,
     description: hit.description,
   }));
+  if (hits.length === 0) return [];
+
+  const ids = hits.map((hit) => hit.id).join("|");
+  const claimsUrl = `${SEARCH_ENDPOINT}?action=wbgetentities&ids=${ids}&props=claims&format=json&origin=*`;
+  const claimsResponse = await fetch(claimsUrl);
+  const entities = claimsResponse.ok
+    ? ((await claimsResponse.json()) as { entities?: Record<string, { claims?: Record<string, unknown[]> }> }).entities
+    : undefined;
+
+  return hits.map((hit) => {
+    const claims = entities?.[hit.id]?.claims ?? {};
+    const instanceOfIds = (claims.P31 ?? [])
+      .map((claim) => (claim as { mainsnak?: { datavalue?: { value?: { id?: string } } } }).mainsnak?.datavalue?.value?.id)
+      .filter((id): id is string => Boolean(id));
+    return { ...hit, instanceOfIds, isHuman: instanceOfIds.includes(HUMAN_QID) };
+  });
+}
+
+// People-only search for the picker's happy path.
+export async function searchWikidataPeople(query: string): Promise<WikidataSearchResult[]> {
+  return (await searchWikidataCandidates(query)).filter((candidate) => candidate.isHuman);
 }
 
 // The four rows a Wikidata life maps onto. `key` also names the SPARQL ?type.
@@ -69,7 +104,7 @@ function buildQuery(qid: string): string {
   } LIMIT 300`;
 }
 
-interface SparqlBinding {
+export interface SparqlBinding {
   type: { value: string };
   itemLabel?: { value: string };
   startDate?: { value: string };
@@ -165,7 +200,13 @@ export function bindingsToPerson(
   };
 }
 
-export async function fetchWikidataBiography(result: WikidataSearchResult): Promise<FamousPerson> {
+export interface WikidataFetchResult {
+  person: FamousPerson;
+  bindings: SparqlBinding[]; // the raw SPARQL rows, kept for the debug view
+}
+
+export async function fetchWikidataBiography(result: WikidataSearchResult): Promise<WikidataFetchResult> {
   const bindings = await runSparql(result.id);
-  return bindingsToPerson(result.id, result.label, result.description, bindings);
+  const person = bindingsToPerson(result.id, result.label, result.description, bindings);
+  return { person, bindings };
 }

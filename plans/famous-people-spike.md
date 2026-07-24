@@ -66,6 +66,33 @@ work, but this was **not** confirmed in-browser here (extension not connected).
   debounced and centralised in `rebuildPublicDatasets`, so every add/remove/align
   is saved. Verified end-to-end with fake-indexeddb.
 
+## Update — round 4 (feedback applied)
+
+- **Remove ✕ is hover-reveal** now, like the other rail controls (`.hover-reveal`),
+  not always-on.
+- **Search filtered to people.** `wbsearchentities` can't filter by type, so we
+  now follow it with one `wbgetentities?props=claims` call, read each hit's `P31`
+  (instance of), and keep only humans (`Q5`). Both calls are on the CORS-open
+  action API (`origin=*`) — no WDQS. "Napoleon" now shows the emperor + Napoleon III
+  and drops the given-names, the Ohio city and the video game.
+- **🐞 Debug view.** A toggle in the picker opens a panel showing exactly what
+  came back and how we read it:
+  - the raw search hits, each marked kept/dropped with its `P31` ids and
+    description (so you see *why* something was filtered out);
+  - for the last loaded person: birth + entry/row counts, our interpreted rows
+    and entries with year spans, side by side with the raw SPARQL bindings.
+
+### What the Wikidata API gives us (for reference)
+
+- **Search** (`wbsearchentities`): id, label, description, match — good ranking,
+  no type info (hence the P31 follow-up).
+- **Biography** (one WDQS SPARQL query): residences `P551`, education `P69`,
+  positions `P39` + employers `P108`, notable works `P800`, plus birth `P569`
+  and death `P570`. Ranges come from statement qualifiers `P580`/`P582` (start/
+  end) or, for works, the work's publication date `P577`. Coverage is uneven —
+  many statements have no dates and are dropped; open-ended ranges are closed at
+  death/today; point works get a +1yr span.
+
 ## Deliberate spike shortcuts (not production-ready)
 
 - Static biographies are hand-authored TS, kept out of `public-data/` on purpose
