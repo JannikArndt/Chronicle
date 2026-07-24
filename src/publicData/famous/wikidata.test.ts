@@ -3,7 +3,7 @@ import { bindingsToPerson } from "./wikidata";
 
 // Minimal SPARQL bindings resembling what WDQS returns for a person.
 const bindings = [
-  { type: { value: "meta" }, birth: { value: "1879-03-14T00:00:00Z" }, death: { value: "1955-04-18T00:00:00Z" } },
+  { type: { value: "meta" }, birthDate: { value: "1879-03-14T00:00:00Z" }, deathDate: { value: "1955-04-18T00:00:00Z" } },
   {
     type: { value: "place" },
     itemLabel: { value: "Bern" },
@@ -39,8 +39,14 @@ const bindings = [
     startDate: { value: "1903-01-01T00:00:00Z" },
     endDate: { value: "1919-01-01T00:00:00Z" },
   },
-  // A child — birth date is on the child, no end (still alive → capped at today).
-  { type: { value: "child" }, itemLabel: { value: "Hans Albert Einstein" }, startDate: { value: "1904-01-01T00:00:00Z" } },
+  // A child with an EXACT (day-precision) birth date — must not be flattened to
+  // the year. No end → still alive → capped at today.
+  {
+    type: { value: "child" },
+    itemLabel: { value: "Hans Albert Einstein" },
+    startDate: { value: "1904-05-14T00:00:00Z" },
+    startPrec: { value: "11" },
+  },
 ];
 
 describe("bindingsToPerson", () => {
@@ -75,6 +81,19 @@ describe("bindingsToPerson", () => {
     expect(childEntry.end!.ms).toBeGreaterThan(childEntry.start.ms); // capped, not open-ended
   });
 
+  it("keeps a child's exact birth date and precision (not flattened to the year)", () => {
+    const person = bindingsToPerson("Q937", "Albert Einstein", "physicist", bindings);
+    const childEntry = person.biography.entries.find((e) => e.title === "Hans Albert Einstein")!;
+    expect(childEntry.start.precision).toBe("day");
+    expect(childEntry.start.ms).toBe(Date.UTC(1904, 4, 14));
+  });
+
+  it("defaults to year precision when Wikidata gives no precision code", () => {
+    const person = bindingsToPerson("Q937", "Albert Einstein", "physicist", bindings);
+    const bern = person.biography.entries.find((e) => e.title === "Bern")!;
+    expect(bern.start.precision).toBe("year");
+  });
+
   it("closes an open-ended residence at the death date, not an ongoing arrow", () => {
     const person = bindingsToPerson("Q937", "Albert Einstein", "physicist", bindings);
     const princeton = person.biography.entries.find((e) => e.title === "Princeton")!;
@@ -89,7 +108,7 @@ describe("bindingsToPerson", () => {
   });
 
   it("throws when Wikidata has no dated events to place", () => {
-    const onlyMeta = [{ type: { value: "meta" }, birth: { value: "1900-01-01T00:00:00Z" } }];
+    const onlyMeta = [{ type: { value: "meta" }, birthDate: { value: "1900-01-01T00:00:00Z" } }];
     expect(() => bindingsToPerson("Q1", "Nobody", undefined, onlyMeta)).toThrow(/No timeline data/);
   });
 });

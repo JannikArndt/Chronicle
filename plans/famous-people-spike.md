@@ -132,6 +132,16 @@ dense band, giving an overview of that life area.
 - **Verified live**: collapsing Career compacts its 11 company lanes into a dense
   labelled band; Children compacts its 14 kids; expand restores full lanes.
 
+## Update — round 7 (preserve Wikidata date precision)
+
+Dates were all imported as `year`, flattening exact birth dates. Now each date is
+read from its **value node** (`wikibase:timeValue` + `wikibase:timePrecision`),
+so day/month/year precision is kept: Nevada Musk → 2002-05-18 (day), Strider →
+2021-11 (month), Griffin → 2004 (year, all Wikidata has). Person birth/death use
+the **best-rank** statement. Fixed a bound-variable-name mismatch along the way
+(`?birthDate` vs `?birth`) that had been silently dropping the person's birth and
+falling back to their first event's year.
+
 Deferred (agreed): **Stage 2** — regroup Career so each company lane holds its
 *position* bars (Chairperson/CEO inside Tesla). The data is available — P39
 positions carry a `P108` employer qualifier — but positions overlap, so it needs
@@ -142,8 +152,6 @@ a third nesting level. Next step, not in this change.
 - Static biographies are hand-authored TS, kept out of `public-data/` on purpose
   so they don't have to satisfy the validated public schema (no `birthMs` there).
 - No client-side caching of Wikidata responses yet (each add re-queries).
-- Date precision from Wikidata is coarsened to `year`; real per-statement
-  precision is not read.
 - Alignment requires the user's birth date; the 🎂 toggle is hidden until it's set.
 
 ## Still open / next

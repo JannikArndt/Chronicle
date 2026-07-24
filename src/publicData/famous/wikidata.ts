@@ -10,6 +10,7 @@
 // for a historical life (see the "generally include an end date" requirement).
 
 import type { FamousBiography, FamousPerson } from "./types";
+import type { FuzzyDate, Precision } from "../../model/types";
 
 export interface WikidataSearchResult {
   id: string; // Q-number, e.g. "Q254"
@@ -91,16 +92,29 @@ type RowKey = (typeof WIKIDATA_ROWS)[number]["key"];
 // rail; the debug view still shows everything that came back.
 const MAX_LANES_PER_ROW = 14;
 
+// Each date is read from its value node so we keep Wikidata's own precision
+// (wikibase:timePrecision: 11=day, 10=month, 9=year …) — otherwise a child's
+// exact birth date would be flattened to just the year.
 export function buildQuery(qid: string): string {
+  // Bind ?<v>Date + ?<v>Prec from a statement's date-valued qualifier.
+  const qual = (property: string, node: string, v: string) =>
+    `OPTIONAL { ?st pqv:${property} ?${node}. ?${node} wikibase:timeValue ?${v}Date; wikibase:timePrecision ?${v}Prec. }`;
+  // Bind ?<v>Date + ?<v>Prec from a date-valued property on an item. Restricted
+  // to the best-rank statement so a deprecated/duplicate value (e.g. a wrong
+  // birth date left on the item) can't be picked instead of the accepted one.
+  const direct = (subject: string, property: string, node: string, v: string) =>
+    `OPTIONAL { ${subject} p:${property} ?${node}St. ?${node}St a wikibase:BestRank; psv:${property} ?${node}. ?${node} wikibase:timeValue ?${v}Date; wikibase:timePrecision ?${v}Prec. }`;
+
   // A statement with start/end date qualifiers (P580/P582): residence, job, marriage.
   const ranged = (property: string, type: RowKey) => `{
     wd:${qid} p:${property} ?st. ?st ps:${property} ?item.
-    OPTIONAL { ?st pq:P580 ?startDate. } OPTIONAL { ?st pq:P582 ?endDate. }
+    ${qual("P580", "sNode", "start")} ${qual("P582", "eNode", "end")}
     BIND("${type}" AS ?type)
   }`;
-  return `SELECT ?type ?itemLabel ?startDate ?endDate ?pointDate ?birth ?death WHERE {
-    OPTIONAL { wd:${qid} wdt:P569 ?birth. }
-    OPTIONAL { wd:${qid} wdt:P570 ?death. }
+
+  return `SELECT ?type ?itemLabel ?startDate ?startPrec ?endDate ?endPrec ?pointDate ?pointPrec ?birthDate ?birthPrec ?deathDate ?deathPrec WHERE {
+    ${direct(`wd:${qid}`, "P569", "bMeta", "birth")}
+    ${direct(`wd:${qid}`, "P570", "dMeta", "death")}
     { BIND("meta" AS ?type) }
     UNION ${ranged("P551", "place")}
     UNION ${ranged("P69", "education")}
@@ -110,17 +124,17 @@ export function buildQuery(qid: string): string {
     UNION ${ranged("P451", "partner")}
     UNION {
       wd:${qid} wdt:P40 ?item.
-      OPTIONAL { ?item wdt:P569 ?startDate. } OPTIONAL { ?item wdt:P570 ?endDate. }
+      ${direct("?item", "P569", "cbNode", "start")} ${direct("?item", "P570", "cdNode", "end")}
       BIND("child" AS ?type)
     }
     UNION {
       wd:${qid} p:P800 ?st. ?st ps:P800 ?item.
-      OPTIONAL { ?item wdt:P577 ?pointDate. }
+      ${direct("?item", "P577", "pNode", "point")}
       BIND("work" AS ?type)
     }
     UNION {
       wd:${qid} p:P166 ?st. ?st ps:P166 ?item.
-      OPTIONAL { ?st pq:P585 ?pointDate. }
+      ${qual("P585", "awNode", "point")}
       BIND("award" AS ?type)
     }
     SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul". }
@@ -131,10 +145,15 @@ export interface SparqlBinding {
   type: { value: string };
   itemLabel?: { value: string };
   startDate?: { value: string };
+  startPrec?: { value: string };
   endDate?: { value: string };
+  endPrec?: { value: string };
   pointDate?: { value: string };
-  birth?: { value: string };
-  death?: { value: string };
+  pointPrec?: { value: string };
+  birthDate?: { value: string };
+  birthPrec?: { value: string };
+  deathDate?: { value: string };
+  deathPrec?: { value: string };
 }
 
 async function runSparql(qid: string): Promise<SparqlBinding[]> {
@@ -147,6 +166,22 @@ async function runSparql(qid: string): Promise<SparqlBinding[]> {
 
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000;
 
+// Wikidata time precision codes → our FuzzyDate precision. 11=day, 10=month,
+// 9=year; anything coarser (decade/century) we keep as a fuzzy "circa". Missing
+// precision defaults to year (the safe, non-misleading choice).
+function precisionFromCode(code: string | undefined): Precision {
+  switch (code) {
+    case "11":
+      return "day";
+    case "10":
+      return "month";
+    case "9":
+      return "year";
+    default:
+      return code !== undefined && Number(code) < 9 ? "circa" : "year";
+  }
+}
+
 // Assemble a FamousPerson from raw SPARQL bindings. Exported for unit testing
 // with fixture bindings, so the mapping is verified without a network call.
 export function bindingsToPerson(
@@ -155,21 +190,25 @@ export function bindingsToPerson(
   description: string | undefined,
   bindings: SparqlBinding[],
 ): FamousPerson {
-  const ms = (binding?: { value: string }): number | undefined => {
-    if (!binding) return undefined;
-    const parsed = Date.parse(binding.value);
-    return Number.isNaN(parsed) ? undefined : parsed;
+  // A date + its Wikidata precision, or undefined when the value is absent/unparseable.
+  const fuzzy = (date?: { value: string }, prec?: { value: string }): FuzzyDate | undefined => {
+    if (!date) return undefined;
+    const parsed = Date.parse(date.value);
+    return Number.isNaN(parsed) ? undefined : { ms: parsed, precision: precisionFromCode(prec?.value) };
   };
 
-  const birthMs = ms(bindings.find((b) => b.birth)?.birth);
-  const deathMs = ms(bindings.find((b) => b.death)?.death);
-  const fallbackEnd = deathMs ?? Date.now();
+  const birthBinding = bindings.find((b) => b.birthDate);
+  const deathBinding = bindings.find((b) => b.deathDate);
+  const birth = fuzzy(birthBinding?.birthDate, birthBinding?.birthPrec);
+  const death = fuzzy(deathBinding?.deathDate, deathBinding?.deathPrec);
+  // A still-living person's open ranges close at "today" (exact-ish, so "day").
+  const fallbackEnd: FuzzyDate = death ?? { ms: Date.now(), precision: "day" };
 
   // First pass: reduce each binding to a dated item, deduped per type by label.
   interface Item {
     title: string;
-    startMs: number;
-    endMs: number;
+    start: FuzzyDate;
+    end: FuzzyDate;
   }
   const byType = new Map<RowKey, Item[]>();
   const seen = new Set<string>();
@@ -181,20 +220,25 @@ export function bindingsToPerson(
     const label = binding.itemLabel?.value;
     if (!label) continue;
 
-    const start = ms(binding.startDate) ?? ms(binding.pointDate) ?? ms(binding.endDate);
+    const start =
+      fuzzy(binding.startDate, binding.startPrec) ??
+      fuzzy(binding.pointDate, binding.pointPrec) ??
+      fuzzy(binding.endDate, binding.endPrec);
     if (start === undefined) continue;
 
     const isPoint = binding.startDate === undefined && binding.pointDate !== undefined;
-    let end = ms(binding.endDate) ?? (isPoint ? start + YEAR_MS : fallbackEnd);
-    if (end <= start) end = start + YEAR_MS;
+    let end =
+      fuzzy(binding.endDate, binding.endPrec) ??
+      (isPoint ? { ms: start.ms + YEAR_MS, precision: "year" as Precision } : fallbackEnd);
+    if (end.ms <= start.ms) end = { ms: start.ms + YEAR_MS, precision: end.precision };
 
     const dedupeKey = `${type}|${label}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
-    earliestStart = Math.min(earliestStart, start);
+    earliestStart = Math.min(earliestStart, start.ms);
 
     const items = byType.get(type) ?? [];
-    items.push({ title: label, startMs: start, endMs: end });
+    items.push({ title: label, start, end });
     byType.set(type, items);
   }
 
@@ -211,7 +255,7 @@ export function bindingsToPerson(
   const entries: FamousBiography["entries"] = [];
 
   for (const spec of usedSpecs) {
-    const items = byType.get(spec.key)!.sort((a, b) => a.startMs - b.startMs);
+    const items = byType.get(spec.key)!.sort((a, b) => a.start.ms - b.start.ms);
     const categoryId = `c-${spec.key}`;
     const parentRowId = `r-${spec.key}`;
     categories.push({ id: categoryId, label: spec.label, color: spec.color, icon: spec.icon });
@@ -221,23 +265,11 @@ export function bindingsToPerson(
       items.slice(0, MAX_LANES_PER_ROW).forEach((item, index) => {
         const rowId = `${parentRowId}-${index}`;
         rows.push({ id: rowId, groupId: "g", categoryId, label: item.title, parentRowId });
-        entries.push({
-          id: `${spec.key}-${index}`,
-          rowId,
-          title: item.title,
-          start: { ms: item.startMs, precision: "year" },
-          end: { ms: item.endMs, precision: "year" },
-        });
+        entries.push({ id: `${spec.key}-${index}`, rowId, title: item.title, start: item.start, end: item.end });
       });
     } else {
       items.forEach((item, index) => {
-        entries.push({
-          id: `${spec.key}-${index}`,
-          rowId: parentRowId,
-          title: item.title,
-          start: { ms: item.startMs, precision: "year" },
-          end: { ms: item.endMs, precision: "year" },
-        });
+        entries.push({ id: `${spec.key}-${index}`, rowId: parentRowId, title: item.title, start: item.start, end: item.end });
       });
     }
   }
@@ -255,7 +287,7 @@ export function bindingsToPerson(
     emoji: "⭐",
     // Alignment needs a real birth; if Wikidata has none, anchor on the first
     // dated event so "at my age" still does something sensible.
-    birthMs: birthMs ?? (earliestStart === Number.POSITIVE_INFINITY ? Date.now() : earliestStart),
+    birthMs: birth?.ms ?? (earliestStart === Number.POSITIVE_INFINITY ? Date.now() : earliestStart),
     blurb: description ?? "From Wikidata",
     biography,
   };
