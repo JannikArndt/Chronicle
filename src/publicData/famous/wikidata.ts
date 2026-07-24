@@ -71,17 +71,28 @@ export async function searchWikidataPeople(query: string): Promise<WikidataSearc
   return (await searchWikidataCandidates(query)).filter((candidate) => candidate.isHuman);
 }
 
-// The four rows a Wikidata life maps onto. `key` also names the SPARQL ?type.
+// The rows a Wikidata life maps onto. `key` also names the SPARQL ?type.
+// `layout: "lanes"` means each item gets its own sub-row, so overlapping things
+// (concurrent jobs, siblings growing up in parallel) are visible as separate
+// lanes instead of bars stacked on top of each other.
 const WIKIDATA_ROWS = [
-  { key: "place", label: "Places lived", icon: "🏠", color: "#6b8e6b" },
-  { key: "education", label: "Education", icon: "🎓", color: "#4a6fa5" },
-  { key: "career", label: "Career", icon: "💼", color: "#8a6d3b" },
-  { key: "work", label: "Works", icon: "🎨", color: "#b08968" },
+  { key: "place", label: "Places lived", icon: "🏠", color: "#6b8e6b", layout: "flat" },
+  { key: "education", label: "Education", icon: "🎓", color: "#4a6fa5", layout: "flat" },
+  { key: "career", label: "Career", icon: "💼", color: "#8a6d3b", layout: "lanes" },
+  { key: "partner", label: "Partners", icon: "❤️", color: "#c1424f", layout: "flat" },
+  { key: "child", label: "Children", icon: "👶", color: "#d08c34", layout: "lanes" },
+  { key: "work", label: "Works", icon: "🎨", color: "#b08968", layout: "flat" },
+  { key: "award", label: "Awards", icon: "🏆", color: "#b8973a", layout: "flat" },
 ] as const;
 
 type RowKey = (typeof WIKIDATA_ROWS)[number]["key"];
 
-function buildQuery(qid: string): string {
+// Cap lane rows so a person with dozens of children/positions can't explode the
+// rail; the debug view still shows everything that came back.
+const MAX_LANES_PER_ROW = 14;
+
+export function buildQuery(qid: string): string {
+  // A statement with start/end date qualifiers (P580/P582): residence, job, marriage.
   const ranged = (property: string, type: RowKey) => `{
     wd:${qid} p:${property} ?st. ?st ps:${property} ?item.
     OPTIONAL { ?st pq:P580 ?startDate. } OPTIONAL { ?st pq:P582 ?endDate. }
@@ -95,13 +106,25 @@ function buildQuery(qid: string): string {
     UNION ${ranged("P69", "education")}
     UNION ${ranged("P39", "career")}
     UNION ${ranged("P108", "career")}
+    UNION ${ranged("P26", "partner")}
+    UNION ${ranged("P451", "partner")}
+    UNION {
+      wd:${qid} wdt:P40 ?item.
+      OPTIONAL { ?item wdt:P569 ?startDate. } OPTIONAL { ?item wdt:P570 ?endDate. }
+      BIND("child" AS ?type)
+    }
     UNION {
       wd:${qid} p:P800 ?st. ?st ps:P800 ?item.
       OPTIONAL { ?item wdt:P577 ?pointDate. }
       BIND("work" AS ?type)
     }
+    UNION {
+      wd:${qid} p:P166 ?st. ?st ps:P166 ?item.
+      OPTIONAL { ?st pq:P585 ?pointDate. }
+      BIND("award" AS ?type)
+    }
     SERVICE wikibase:label { bd:serviceParam wikibase:language "en,mul". }
-  } LIMIT 300`;
+  } LIMIT 400`;
 }
 
 export interface SparqlBinding {
@@ -142,8 +165,13 @@ export function bindingsToPerson(
   const deathMs = ms(bindings.find((b) => b.death)?.death);
   const fallbackEnd = deathMs ?? Date.now();
 
-  // Group entries by row, deduping identical items and dropping undated ones.
-  const byRow = new Map<RowKey, FamousBiography["entries"]>();
+  // First pass: reduce each binding to a dated item, deduped per type by label.
+  interface Item {
+    title: string;
+    startMs: number;
+    endMs: number;
+  }
+  const byType = new Map<RowKey, Item[]>();
   const seen = new Set<string>();
   let earliestStart = Number.POSITIVE_INFINITY;
 
@@ -160,32 +188,65 @@ export function bindingsToPerson(
     let end = ms(binding.endDate) ?? (isPoint ? start + YEAR_MS : fallbackEnd);
     if (end <= start) end = start + YEAR_MS;
 
-    const dedupeKey = `${type}|${label}|${start}`;
+    const dedupeKey = `${type}|${label}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
     earliestStart = Math.min(earliestStart, start);
 
-    const rowEntries = byRow.get(type) ?? [];
-    rowEntries.push({
-      id: `${type}-${rowEntries.length}`,
-      rowId: `r-${type}`,
-      title: label,
-      start: { ms: start, precision: "year" },
-      end: { ms: end, precision: "year" },
-    });
-    byRow.set(type, rowEntries);
+    const items = byType.get(type) ?? [];
+    items.push({ title: label, startMs: start, endMs: end });
+    byType.set(type, items);
   }
 
-  const usedRows = WIKIDATA_ROWS.filter((row) => byRow.has(row.key));
-  if (usedRows.length === 0) {
+  // Second pass: turn items into rows. Flat rows hold their items as entries;
+  // "lanes" rows become a parent header row with one sub-row per item, so
+  // overlaps read as parallel lanes.
+  const usedSpecs = WIKIDATA_ROWS.filter((spec) => byType.has(spec.key));
+  if (usedSpecs.length === 0) {
     throw new Error(`No timeline data found on Wikidata for ${name}.`);
+  }
+
+  const categories: FamousBiography["categories"] = [];
+  const rows: FamousBiography["rows"] = [];
+  const entries: FamousBiography["entries"] = [];
+
+  for (const spec of usedSpecs) {
+    const items = byType.get(spec.key)!.sort((a, b) => a.startMs - b.startMs);
+    const categoryId = `c-${spec.key}`;
+    const parentRowId = `r-${spec.key}`;
+    categories.push({ id: categoryId, label: spec.label, color: spec.color, icon: spec.icon });
+    rows.push({ id: parentRowId, groupId: "g", categoryId, label: spec.label });
+
+    if (spec.layout === "lanes") {
+      items.slice(0, MAX_LANES_PER_ROW).forEach((item, index) => {
+        const rowId = `${parentRowId}-${index}`;
+        rows.push({ id: rowId, groupId: "g", categoryId, label: item.title, parentRowId });
+        entries.push({
+          id: `${spec.key}-${index}`,
+          rowId,
+          title: item.title,
+          start: { ms: item.startMs, precision: "year" },
+          end: { ms: item.endMs, precision: "year" },
+        });
+      });
+    } else {
+      items.forEach((item, index) => {
+        entries.push({
+          id: `${spec.key}-${index}`,
+          rowId: parentRowId,
+          title: item.title,
+          start: { ms: item.startMs, precision: "year" },
+          end: { ms: item.endMs, precision: "year" },
+        });
+      });
+    }
   }
 
   const biography: FamousBiography = {
     groups: [{ id: "g", label: name, collapsed: false }],
-    categories: usedRows.map((r) => ({ id: `c-${r.key}`, label: r.label, color: r.color, icon: r.icon })),
-    rows: usedRows.map((r) => ({ id: `r-${r.key}`, groupId: "g", categoryId: `c-${r.key}`, label: r.label })),
-    entries: usedRows.flatMap((r) => byRow.get(r.key)!),
+    categories,
+    rows,
+    entries,
   };
 
   return {

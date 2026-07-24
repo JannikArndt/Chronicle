@@ -60,9 +60,8 @@ export function buildFamousDataset(
 ): TimelineDataset {
   const aligned = userBirthMs !== undefined;
   const offsetMs = aligned ? userBirthMs - person.birthMs : 0;
-  const removed = new Set(removedRowKeys);
 
-  const rows = person.biography.rows.filter((row) => !removed.has(row.id));
+  const keptRowIds = new Set(remainingRowKeys(person, removedRowKeys));
   const raw: TimelineDataset = {
     schemaVersion: 1,
     people: [],
@@ -71,9 +70,9 @@ export function buildFamousDataset(
       label: aligned ? `${group.label}${ALIGNED_LABEL_SUFFIX}` : group.label,
     })),
     categories: person.biography.categories,
-    rows,
+    rows: person.biography.rows.filter((row) => keptRowIds.has(row.id)),
     entries: person.biography.entries
-      .filter((entry) => !removed.has(entry.rowId))
+      .filter((entry) => keptRowIds.has(entry.rowId))
       .map((entry) => ({
         ...entry,
         start: shiftFuzzyDate(entry.start, offsetMs),
@@ -84,9 +83,11 @@ export function buildFamousDataset(
   return namespaceDataset(raw, famousKey(person.id, aligned));
 }
 
-// The base row ids that still remain for a person after removals — used to
-// decide whether removing one more row should drop the whole person.
+// The base row ids that still remain for a person after removals. Removing a
+// parent row cascades to its sub-rows (a sub-timeline can't outlive its parent).
 export function remainingRowKeys(person: FamousPerson, removedRowKeys: string[]): string[] {
   const removed = new Set(removedRowKeys);
-  return person.biography.rows.map((row) => row.id).filter((id) => !removed.has(id));
+  const isRemoved = (row: { id: string; parentRowId?: string }): boolean =>
+    removed.has(row.id) || (row.parentRowId !== undefined && removed.has(row.parentRowId));
+  return person.biography.rows.filter((row) => !isRemoved(row)).map((row) => row.id);
 }

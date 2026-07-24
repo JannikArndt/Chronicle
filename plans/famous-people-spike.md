@@ -93,6 +93,27 @@ work, but this was **not** confirmed in-browser here (extension not connected).
   many statements have no dates and are dropped; open-ended ranges are closed at
   death/today; point works get a +1yr span.
 
+## Update — round 5 (richer biographies + verified in-browser)
+
+Used Elon Musk (Q317521) as the shaping example. The SPARQL query now also pulls
+partners (`P26` spouse, `P451` partner), children (`P40`, dated by the child's
+own `P569`/`P570`), and awards (`P166`, dated by `P585`).
+
+- **Overlapping items become sub-row lanes.** Career and Children map to a parent
+  header row with one sub-row per item, so concurrent companies (PayPal/SpaceX/
+  Tesla/OpenAI/Neuralink/Boring Co. all at once) and siblings growing up in
+  parallel each get their own lane instead of stacking. Flat rows (places,
+  education, partners, works, awards) keep entries on one row. Lanes capped at 14.
+- **Partners & children are sub-timelines, not persons** — exactly as asked; they
+  never become Person entities/sub-groups.
+- **Removal cascades**: removing a parent row (e.g. "Career") drops its sub-rows;
+  a single lane can still be removed on its own.
+- **Verified live in a real browser** (localhost:5174): search → filtered to the
+  one human "Elon Musk" → add fetched the biography over WDQS, rendered 11 career
+  lanes / 14 children / 6 partners / 17 awards, and the group-header 🎂 shifted the
+  whole life to "at your age". **This resolves the last open risk — the WDQS
+  SPARQL fetch works from the browser** (only Node's default User-Agent was blocked).
+
 ## Deliberate spike shortcuts (not production-ready)
 
 - Static biographies are hand-authored TS, kept out of `public-data/` on purpose
@@ -104,6 +125,7 @@ work, but this was **not** confirmed in-browser here (extension not connected).
 
 ## Still open / next
 
-- Confirm WDQS works from the actual browser (UA policy) — the one unverified link.
-- Cache Wikidata biographies; read real date precision; optionally filter search
-  to humans (`P31 wd:Q5`).
+- Cache Wikidata biographies; read real per-statement date precision.
+- Residence/date coverage is uneven on Wikidata (e.g. Musk's early homes are
+  missing) — nothing we can fix, but worth surfacing in the UI.
+- Awards render as many overlapping point-events on one row; could be tidied.

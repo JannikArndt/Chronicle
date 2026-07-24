@@ -62,6 +62,42 @@ describe("buildFamousDataset — aligned to the user's age", () => {
   });
 });
 
+describe("buildFamousDataset — removing rows cascades to sub-rows", () => {
+  const withLanes: import("./types").FamousPerson = {
+    id: "x",
+    name: "X",
+    emoji: "⭐",
+    birthMs: Date.UTC(1970, 0, 1),
+    blurb: "test",
+    biography: {
+      groups: [{ id: "g", label: "X", collapsed: false }],
+      categories: [{ id: "c", label: "Career", color: "#000", icon: "💼" }],
+      rows: [
+        { id: "r-career", groupId: "g", categoryId: "c", label: "Career" },
+        { id: "r-career-0", groupId: "g", categoryId: "c", label: "Job A", parentRowId: "r-career" },
+        { id: "r-career-1", groupId: "g", categoryId: "c", label: "Job B", parentRowId: "r-career" },
+        { id: "r-places", groupId: "g", categoryId: "c", label: "Places lived" },
+      ],
+      entries: [
+        { id: "a", rowId: "r-career-0", title: "Job A", start: { ms: Date.UTC(1990, 0, 1), precision: "year" }, end: { ms: Date.UTC(2000, 0, 1), precision: "year" } },
+        { id: "b", rowId: "r-career-1", title: "Job B", start: { ms: Date.UTC(1995, 0, 1), precision: "year" }, end: { ms: Date.UTC(2005, 0, 1), precision: "year" } },
+        { id: "p", rowId: "r-places", title: "Home", start: { ms: Date.UTC(1970, 0, 1), precision: "year" }, end: { ms: Date.UTC(2020, 0, 1), precision: "year" } },
+      ],
+    },
+  };
+
+  it("drops a parent row's sub-rows and their entries", () => {
+    const dataset = buildFamousDataset(withLanes, undefined, ["r-career"]);
+    expect(dataset.rows.map((r) => r.label)).toEqual(["Places lived"]);
+    expect(dataset.entries.map((e) => e.title)).toEqual(["Home"]);
+  });
+
+  it("can drop just one lane, keeping the parent and its sibling lane", () => {
+    const dataset = buildFamousDataset(withLanes, undefined, ["r-career-0"]);
+    expect(dataset.rows.map((r) => r.label)).toEqual(["Career", "Job B", "Places lived"]);
+  });
+});
+
 describe("parseFamousGroupId", () => {
   it("recovers person and alignment from a rendered group id", () => {
     expect(parseFamousGroupId("pub:famous-mozart:g")).toEqual({ personId: "mozart", aligned: false });
