@@ -156,7 +156,11 @@ a third nesting level. Next step, not in this change.
 
 ## Still open / next
 
-- Cache Wikidata biographies; read real per-statement date precision.
+- Cache Wikidata biographies (each add re-queries).
+- The 🐞 debug panel is a developer tool — decide whether to gate/remove before
+  this ships to end users.
+- Row-collapse state is in-memory (resets on reload), unlike overlay selections.
 - Residence/date coverage is uneven on Wikidata (e.g. Musk's early homes are
   missing) — nothing we can fix, but worth surfacing in the UI.
 - Awards render as many overlapping point-events on one row; could be tidied.
+- Stage 2 (positions nested inside company lanes) not built — see round 6.
