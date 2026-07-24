@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from "react";
 import { emptyDataset, mergeDatasets } from "../model/dataset";
 import type { TimelineDataset, TimelineEntry, Precision } from "../model/types";
+import type { FamousPerson } from "../publicData/famous/types";
 
 export interface TimeRangeFilter {
   startMs: number;
@@ -32,8 +33,10 @@ export interface AppState {
   hiddenRowIds: string[];
   // Which optional public data the user has switched on. Nothing loads by
   // default — `publicDatasets` is rebuilt from these selections (see actions).
+  // `activeFamous` holds the whole FamousPerson (not just an id) so a person
+  // fetched from Wikidata at runtime survives a rebuild without a catalog.
   activeWorldKeys: string[];
-  activeFamous: { personId: string; aligned: boolean }[];
+  activeFamous: { person: FamousPerson; aligned: boolean }[];
 }
 
 const initialState: AppState = {

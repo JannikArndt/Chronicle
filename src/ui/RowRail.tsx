@@ -18,6 +18,7 @@ import {
   reorderGroup,
   replaceDataset,
   selectRow,
+  addFamousPerson,
   setFamousAlignment,
   toggleFamousPerson,
   toggleGroupCollapsed,
@@ -32,6 +33,9 @@ import type { Category, Person } from "../model/types";
 import { triggerImportFlow } from "../storage/exportImport";
 import { loadPublicCatalog } from "../publicData/loader";
 import { famousCatalog } from "../publicData/famous/catalog";
+import { parseFamousGroupId } from "../publicData/famous/alignToAge";
+import { fetchWikidataBiography, searchWikidataPeople } from "../publicData/famous/wikidata";
+import type { WikidataSearchResult } from "../publicData/famous/wikidata";
 
 const EMOJI_QUICK_PICKS = ["💼", "🏠", "❤️", "🎓", "✈️", "🎨", "⚽", "🐕"];
 
@@ -455,6 +459,8 @@ function RailItem({
 }: RailItemProps) {
   const style = { top: item.y, height: item.height };
   const readOnly = isPublicId(item.id);
+  // Whether the "align to my age" toggle can do anything (needs the user's birth date).
+  const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
   const key = `${item.kind}:${item.id}`;
   const hoverReveal = (visible: boolean) => `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`;
 
@@ -463,6 +469,7 @@ function RailItem({
     const person = group.personId ? personById.get(group.personId) : undefined;
     const age = person ? computedAge(person) : null;
     const visible = hoveredKey === key;
+    const famous = parseFamousGroupId(group.id);
     return (
       <div
         className="rail-group"
@@ -480,6 +487,16 @@ function RailItem({
           {age !== null && <span className="age-badge">{age}</span>}
         </span>
         <span className="rail-actions">
+          {famous && canAlignFamous && (
+            <button
+              type="button"
+              className={`icon-button align-toggle ${famous.aligned ? "align-toggle-on" : ""}`}
+              title={famous.aligned ? "Show real dates" : "Align to my age"}
+              onClick={() => setFamousAlignment(famous.personId, !famous.aligned)}
+            >
+              🎂
+            </button>
+          )}
           {person && person.birthDate !== undefined && (
             <button
               type="button"
@@ -785,11 +802,60 @@ function WorldEventsPicker({ back }: { back: () => void }) {
   );
 }
 
-// Add a famous person's life to the timeline, optionally shifted so their birth
-// lines up with yours — "what did they do at my age?".
+// Add a famous person's life to the timeline — a few curated suggestions plus a
+// live search of Wikidata. Once added, the "🎂 align to my age" toggle lives on
+// the person's group header in the rail (not here).
 function FamousPeoplePicker({ back }: { back: () => void }) {
   const activeFamous = useAppState((s) => s.activeFamous);
-  const canAlign = useAppState((s) => userBirthMs(s) !== undefined);
+  const activeIds = new Set(activeFamous.map((s) => s.person.id));
+
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<WikidataSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Debounced Wikidata search; the trailing request wins even if earlier ones
+  // resolve late (guarded by `cancelled`).
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const hits = await searchWikidataPeople(term);
+        if (!cancelled) setResults(hits);
+      } catch {
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  const addFromWikidata = async (hit: WikidataSearchResult) => {
+    setLoadingId(hit.id);
+    setError(null);
+    try {
+      const person = await fetchWikidataBiography(hit);
+      addFamousPerson(person);
+      setQuery("");
+      setResults([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load from Wikidata.");
+    } finally {
+      setLoadingId(null);
+    }
+  };
 
   return (
     <div className="popover-form">
@@ -797,34 +863,49 @@ function FamousPeoplePicker({ back }: { back: () => void }) {
         ◂ Back
       </button>
       <div className="popover-title">Famous people</div>
-      {famousCatalog.map((person) => {
-        const selection = activeFamous.find((s) => s.personId === person.id);
-        return (
-          <div key={person.id} className="picker-group">
-            <label className="menu-item picker-row">
+
+      <input
+        type="text"
+        className="famous-search"
+        placeholder="Search Wikidata (e.g. Napoleon)…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {searching && <div className="picker-hint">Searching…</div>}
+      {error && <div className="picker-hint picker-error">{error}</div>}
+      {results.map((hit) => (
+        <button
+          key={hit.id}
+          type="button"
+          className="menu-item picker-row"
+          disabled={activeIds.has(hit.id) || loadingId !== null}
+          onClick={() => addFromWikidata(hit)}
+        >
+          <span>
+            {loadingId === hit.id ? "⏳" : activeIds.has(hit.id) ? "✓" : "＋"} {hit.label}
+            {hit.description && <small className="picker-blurb"> — {hit.description}</small>}
+          </span>
+        </button>
+      ))}
+
+      {results.length === 0 && !searching && (
+        <>
+          <div className="picker-subtitle">Suggestions</div>
+          {famousCatalog.map((person) => (
+            <label key={person.id} className="menu-item picker-row">
               <input
                 type="checkbox"
-                checked={selection !== undefined}
-                onChange={() => toggleFamousPerson(person.id)}
+                checked={activeIds.has(person.id)}
+                onChange={() => toggleFamousPerson(person)}
               />
               <span>
                 {person.emoji} {person.name}
                 <small className="picker-blurb"> — {person.blurb}</small>
               </span>
             </label>
-            {selection && canAlign && (
-              <label className="menu-item picker-row picker-subrow">
-                <input
-                  type="checkbox"
-                  checked={selection.aligned}
-                  onChange={(e) => setFamousAlignment(person.id, e.target.checked)}
-                />
-                <span>At my age</span>
-              </label>
-            )}
-          </div>
-        );
-      })}
+          ))}
+        </>
+      )}
     </div>
   );
 }

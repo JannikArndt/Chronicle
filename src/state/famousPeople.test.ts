@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { appStore } from "./store";
 import { setFamousAlignment, toggleFamousPerson, toggleWorldEvents } from "./actions";
-import { mozart } from "../publicData/famous/lives";
+import { einstein, mozart } from "../publicData/famous/lives";
 import { emptyDataset } from "../model/dataset";
 
 const userBirthMs = Date.UTC(1990, 5, 15);
@@ -30,32 +30,33 @@ describe("famous-people store wiring", () => {
   });
 
   it("adds a person's real life on toggle, and removes it on a second toggle", () => {
-    toggleFamousPerson("mozart");
+    toggleFamousPerson(mozart);
     const mergedIn = appStore.getState().publicDatasets;
     expect(mergedIn).toHaveLength(1);
-    const born = mergedIn[0].entries.find((entry) => entry.title.startsWith("Born"))!;
-    expect(born.start.ms).toBe(mozart.birthMs); // real calendar date, unaligned
+    const salzburg = mergedIn[0].entries.find((entry) => entry.title === "Salzburg")!;
+    expect(salzburg.start.ms).toBe(Date.UTC(1756, 0, 1)); // real calendar date, unaligned
 
-    toggleFamousPerson("mozart");
+    toggleFamousPerson(mozart);
     expect(appStore.getState().publicDatasets).toEqual([]);
   });
 
   it("re-shifts the life to the user's age when alignment is turned on", () => {
-    toggleFamousPerson("mozart");
+    toggleFamousPerson(mozart);
     setFamousAlignment("mozart", true);
 
     const dataset = appStore.getState().publicDatasets[0];
-    const born = dataset.entries.find((entry) => entry.title.startsWith("Born"))!;
-    expect(born.start.ms).toBe(userBirthMs); // Mozart's birth now sits on the user's
+    const salzburg = dataset.entries.find((entry) => entry.title === "Salzburg")!;
+    const offset = userBirthMs - mozart.birthMs;
+    expect(salzburg.start.ms).toBe(Date.UTC(1756, 0, 1) + offset); // shifted onto the user's age
     expect(dataset.groups[0].label).toContain("at your age");
   });
 
   it("keeps world events and famous people as independent selections", () => {
-    toggleFamousPerson("einstein");
+    toggleFamousPerson(einstein);
     toggleWorldEvents("us-presidents");
     expect(appStore.getState().publicDatasets).toHaveLength(2);
 
-    toggleFamousPerson("einstein");
+    toggleFamousPerson(einstein);
     const remaining = appStore.getState().publicDatasets;
     expect(remaining).toHaveLength(1);
     expect(remaining[0].groups[0].id).toContain("us-presidents");

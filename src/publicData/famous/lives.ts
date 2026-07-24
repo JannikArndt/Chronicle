@@ -1,11 +1,57 @@
-// Hand-authored biographies for the famous-people spike. Dates are deliberately
-// coarse (mostly year precision) — biographies aren't day-accurate and the fuzz
-// ramp reads better than false exactness. `year(y)` is a UTC Jan 1 instant.
+// Hand-authored biographies for the famous-people spike, used as the picker's
+// "Suggestions" and as offline examples of the multi-row shape the Wikidata
+// loader targets. Every entry has an explicit end date on purpose: an open end
+// renders as an ongoing arrow, which looks wrong for a finished historical life.
+//
+// Each person is split into the same three rows the Wikidata mapping produces —
+// Places lived, Education, Works — so aligned overlays read consistently.
 
-import type { FamousPerson } from "./types";
+import type { FamousBiography, FamousPerson } from "./types";
 
 function year(y: number): number {
   return Date.UTC(y, 0, 1);
+}
+
+interface LifeItem {
+  title: string;
+  from: number; // year
+  to: number; // year
+  shortTitle?: string;
+}
+
+interface LifeRows {
+  places: LifeItem[];
+  education: LifeItem[];
+  works: LifeItem[];
+}
+
+// The three rows share ids/colors across people; namespacing keeps them unique.
+const ROW_DEFINITIONS = [
+  { key: "places", label: "Places lived", icon: "🏠", color: "#6b8e6b" },
+  { key: "education", label: "Education", icon: "🎓", color: "#4a6fa5" },
+  { key: "works", label: "Works", icon: "🎨", color: "#b08968" },
+] as const;
+
+function buildBiography(name: string, rows: LifeRows): FamousBiography {
+  const entries: FamousBiography["entries"] = [];
+  for (const definition of ROW_DEFINITIONS) {
+    rows[definition.key].forEach((item, index) => {
+      entries.push({
+        id: `${definition.key}-${index}`,
+        rowId: `r-${definition.key}`,
+        title: item.title,
+        shortTitle: item.shortTitle,
+        start: { ms: year(item.from), precision: "year" },
+        end: { ms: year(item.to), precision: "year" },
+      });
+    });
+  }
+  return {
+    groups: [{ id: "g", label: name, collapsed: false }],
+    categories: ROW_DEFINITIONS.map((d) => ({ id: `c-${d.key}`, label: d.label, color: d.color, icon: d.icon })),
+    rows: ROW_DEFINITIONS.map((d) => ({ id: `r-${d.key}`, groupId: "g", categoryId: `c-${d.key}`, label: d.label })),
+    entries,
+  };
 }
 
 export const mozart: FamousPerson = {
@@ -14,23 +60,20 @@ export const mozart: FamousPerson = {
   emoji: "🎼",
   birthMs: Date.UTC(1756, 0, 27),
   blurb: "Composer, 1756–1791",
-  biography: {
-    groups: [{ id: "g", label: "W. A. Mozart", collapsed: false }],
-    categories: [{ id: "c", label: "Mozart", color: "#b08968", icon: "🎼" }],
-    rows: [{ id: "r", groupId: "g", categoryId: "c", label: "Life & works" }],
-    entries: [
-      { id: "e1", rowId: "r", title: "Born in Salzburg", start: { ms: Date.UTC(1756, 0, 27), precision: "day" }, end: { ms: year(1762), precision: "year" } },
-      { id: "e2", rowId: "r", title: "Child-prodigy grand tour of Europe", subtitle: "Munich, Vienna, Paris, London", start: { ms: year(1762), precision: "year" }, end: { ms: year(1766), precision: "year" } },
-      { id: "e3", rowId: "r", title: "First symphony", shortTitle: "Symphony No. 1", start: { ms: year(1764), precision: "year" } },
-      { id: "e4", rowId: "r", title: "Court musician, Salzburg", start: { ms: year(1773), precision: "year" }, end: { ms: year(1781), precision: "year" } },
-      { id: "e5", rowId: "r", title: "Moved to Vienna as a freelance composer", start: { ms: year(1781), precision: "year" } },
-      { id: "e6", rowId: "r", title: "Married Constanze Weber", start: { ms: year(1782), precision: "year" } },
-      { id: "e7", rowId: "r", title: "The Marriage of Figaro", shortTitle: "Figaro", start: { ms: year(1786), precision: "year" } },
-      { id: "e8", rowId: "r", title: "Don Giovanni", start: { ms: year(1787), precision: "year" } },
-      { id: "e9", rowId: "r", title: "The Magic Flute", start: { ms: year(1791), precision: "year" } },
-      { id: "e10", rowId: "r", title: "Died in Vienna, aged 35", start: { ms: Date.UTC(1791, 11, 5), precision: "day" } },
+  biography: buildBiography("W. A. Mozart", {
+    places: [
+      { title: "Salzburg", from: 1756, to: 1781 },
+      { title: "Vienna", from: 1781, to: 1791 },
     ],
-  },
+    education: [{ title: "Taught by his father Leopold", from: 1761, to: 1773, shortTitle: "Tutored by Leopold" }],
+    works: [
+      { title: "Grand tour of Europe as a child prodigy", from: 1762, to: 1766, shortTitle: "Grand tour" },
+      { title: "Symphony No. 1", from: 1764, to: 1765 },
+      { title: "The Marriage of Figaro", from: 1786, to: 1787, shortTitle: "Figaro" },
+      { title: "Don Giovanni", from: 1787, to: 1788 },
+      { title: "The Magic Flute", from: 1791, to: 1791 },
+    ],
+  }),
 };
 
 export const einstein: FamousPerson = {
@@ -39,21 +82,24 @@ export const einstein: FamousPerson = {
   emoji: "🧠",
   birthMs: Date.UTC(1879, 2, 14),
   blurb: "Physicist, 1879–1955",
-  biography: {
-    groups: [{ id: "g", label: "Albert Einstein", collapsed: false }],
-    categories: [{ id: "c", label: "Einstein", color: "#4a6fa5", icon: "🧠" }],
-    rows: [{ id: "r", groupId: "g", categoryId: "c", label: "Life & work" }],
-    entries: [
-      { id: "e1", rowId: "r", title: "Born in Ulm", start: { ms: Date.UTC(1879, 2, 14), precision: "day" } },
-      { id: "e2", rowId: "r", title: "Patent clerk, Bern", start: { ms: year(1902), precision: "year" }, end: { ms: year(1909), precision: "year" } },
-      { id: "e3", rowId: "r", title: "Annus Mirabilis — special relativity, E=mc²", shortTitle: "Annus Mirabilis", start: { ms: year(1905), precision: "year" } },
-      { id: "e4", rowId: "r", title: "General theory of relativity", shortTitle: "General relativity", start: { ms: year(1915), precision: "year" } },
-      { id: "e5", rowId: "r", title: "Nobel Prize in Physics", start: { ms: year(1921), precision: "year" } },
-      { id: "e6", rowId: "r", title: "Emigrated to the US — Princeton", start: { ms: year(1933), precision: "year" }, end: { ms: year(1955), precision: "year" } },
-      { id: "e7", rowId: "r", title: "Letter to Roosevelt", start: { ms: year(1939), precision: "year" } },
-      { id: "e8", rowId: "r", title: "Died in Princeton, aged 76", start: { ms: Date.UTC(1955, 3, 18), precision: "day" } },
+  biography: buildBiography("Albert Einstein", {
+    places: [
+      { title: "Ulm & Munich", from: 1879, to: 1895 },
+      { title: "Zurich", from: 1896, to: 1902 },
+      { title: "Bern", from: 1902, to: 1909 },
+      { title: "Berlin", from: 1914, to: 1933 },
+      { title: "Princeton", from: 1933, to: 1955 },
     ],
-  },
+    education: [
+      { title: "ETH Zurich", from: 1896, to: 1900 },
+      { title: "PhD, University of Zurich", from: 1901, to: 1905, shortTitle: "PhD Zurich" },
+    ],
+    works: [
+      { title: "Special relativity (Annus Mirabilis)", from: 1905, to: 1906, shortTitle: "Special relativity" },
+      { title: "General theory of relativity", from: 1915, to: 1916, shortTitle: "General relativity" },
+      { title: "Nobel Prize in Physics", from: 1921, to: 1922 },
+    ],
+  }),
 };
 
 export const frida: FamousPerson = {
@@ -62,18 +108,17 @@ export const frida: FamousPerson = {
   emoji: "🎨",
   birthMs: Date.UTC(1907, 6, 6),
   blurb: "Painter, 1907–1954",
-  biography: {
-    groups: [{ id: "g", label: "Frida Kahlo", collapsed: false }],
-    categories: [{ id: "c", label: "Frida Kahlo", color: "#c1424f", icon: "🎨" }],
-    rows: [{ id: "r", groupId: "g", categoryId: "c", label: "Life & art" }],
-    entries: [
-      { id: "e1", rowId: "r", title: "Born in Coyoacán, Mexico City", start: { ms: Date.UTC(1907, 6, 6), precision: "day" } },
-      { id: "e2", rowId: "r", title: "Streetcar accident — began painting while recovering", shortTitle: "Accident", start: { ms: year(1925), precision: "year" } },
-      { id: "e3", rowId: "r", title: "Married Diego Rivera", start: { ms: year(1929), precision: "year" } },
-      { id: "e4", rowId: "r", title: "Years in the United States", start: { ms: year(1930), precision: "year" }, end: { ms: year(1933), precision: "year" } },
-      { id: "e5", rowId: "r", title: "The Two Fridas", start: { ms: year(1939), precision: "year" } },
-      { id: "e6", rowId: "r", title: "First solo exhibition in Mexico", start: { ms: year(1953), precision: "year" } },
-      { id: "e7", rowId: "r", title: "Died in Coyoacán, aged 47", start: { ms: Date.UTC(1954, 6, 13), precision: "day" } },
+  biography: buildBiography("Frida Kahlo", {
+    places: [
+      { title: "Coyoacán, Mexico City", from: 1907, to: 1930, shortTitle: "Coyoacán" },
+      { title: "United States", from: 1930, to: 1933 },
+      { title: "Coyoacán, Mexico City", from: 1933, to: 1954, shortTitle: "Coyoacán" },
     ],
-  },
+    education: [{ title: "National Preparatory School", from: 1922, to: 1925, shortTitle: "Prep School" }],
+    works: [
+      { title: "The Two Fridas", from: 1939, to: 1940 },
+      { title: "The Broken Column", from: 1944, to: 1945 },
+      { title: "First solo exhibition in Mexico", from: 1953, to: 1954, shortTitle: "Solo exhibition" },
+    ],
+  }),
 };

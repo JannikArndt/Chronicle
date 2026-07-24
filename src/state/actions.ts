@@ -7,9 +7,9 @@ import { emptyDataset, newId } from "../model/dataset";
 import { loadDataset, saveDataset } from "../storage/db";
 import { loadPublicCatalog } from "../publicData/loader";
 import { buildFamousDataset } from "../publicData/famous/alignToAge";
-import { findFamousPerson } from "../publicData/famous/catalog";
 import { appStore, userBirthMs } from "./store";
 import type { AppState } from "./store";
+import type { FamousPerson } from "../publicData/famous/types";
 import type {
   Category,
   Group,
@@ -58,11 +58,9 @@ function rebuildPublicDatasets(state: AppState): void {
     .filter((item) => state.activeWorldKeys.includes(item.key))
     .map((item) => item.dataset);
 
-  const famous = state.activeFamous.flatMap((selection) => {
-    const person = findFamousPerson(selection.personId);
-    if (!person) return [];
+  const famous = state.activeFamous.map((selection) => {
     const birth = selection.aligned ? userBirthMs(state) : undefined;
-    return [buildFamousDataset(person, birth)];
+    return buildFamousDataset(selection.person, birth);
   });
 
   appStore.setState({ publicDatasets: [...world, ...famous] });
@@ -77,21 +75,31 @@ export function toggleWorldEvents(key: string): void {
   rebuildPublicDatasets(appStore.getState());
 }
 
-export function toggleFamousPerson(personId: string): void {
-  const state = appStore.getState();
-  const isActive = state.activeFamous.some((selection) => selection.personId === personId);
-  const active = isActive
-    ? state.activeFamous.filter((selection) => selection.personId !== personId)
-    : [...state.activeFamous, { personId, aligned: false }];
+export function isFamousActive(personId: string): boolean {
+  return appStore.getState().activeFamous.some((selection) => selection.person.id === personId);
+}
+
+export function addFamousPerson(person: FamousPerson): void {
+  if (isFamousActive(person.id)) return;
+  appStore.setState({ activeFamous: [...appStore.getState().activeFamous, { person, aligned: false }] });
+  rebuildPublicDatasets(appStore.getState());
+}
+
+export function removeFamousPerson(personId: string): void {
+  const active = appStore.getState().activeFamous.filter((selection) => selection.person.id !== personId);
   appStore.setState({ activeFamous: active });
   rebuildPublicDatasets(appStore.getState());
 }
 
+export function toggleFamousPerson(person: FamousPerson): void {
+  if (isFamousActive(person.id)) removeFamousPerson(person.id);
+  else addFamousPerson(person);
+}
+
 // Flip one famous person between real calendar dates and "aligned to your age".
 export function setFamousAlignment(personId: string, aligned: boolean): void {
-  const state = appStore.getState();
-  const active = state.activeFamous.map((selection) =>
-    selection.personId === personId ? { ...selection, aligned } : selection,
+  const active = appStore.getState().activeFamous.map((selection) =>
+    selection.person.id === personId ? { ...selection, aligned } : selection,
   );
   appStore.setState({ activeFamous: active });
   rebuildPublicDatasets(appStore.getState());

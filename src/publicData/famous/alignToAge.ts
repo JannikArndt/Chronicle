@@ -20,6 +20,17 @@ export function famousKey(personId: string, aligned: boolean): string {
   return aligned ? `famous-${personId}-aligned` : `famous-${personId}`;
 }
 
+// Inverse of famousKey, for the rail: given a rendered group's namespaced id
+// (`pub:famous-<personId>[-aligned]:...`), recover the person and whether it's
+// currently shown aligned. Returns null for any non-famous group.
+export function parseFamousGroupId(groupId: string): { personId: string; aligned: boolean } | null {
+  const match = /^pub:famous-(.+):[^:]+$/.exec(groupId);
+  if (!match) return null;
+  const aligned = match[1].endsWith("-aligned");
+  const personId = aligned ? match[1].slice(0, -"-aligned".length) : match[1];
+  return { personId, aligned };
+}
+
 function shiftFuzzyDate(date: FuzzyDate, offsetMs: number): FuzzyDate {
   return { ...date, ms: date.ms + offsetMs };
 }
