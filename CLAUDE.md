@@ -168,3 +168,21 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 
 - Real-device iOS Safari gesture check (pinch vs page zoom) has never been done.
 - Public-data collapse state is in-memory only; private group collapse persists.
+
+## TODOs before final release (famous-people feature)
+
+Carried over from the famous-people spike (`plans/famous-people-spike.md`). These
+are intentionally shipped as-is for now but must be revisited before a real release:
+
+- **Remove or gate the 🐞 Wikidata debug panel** (`WikidataDebugPanel` in
+  `RowRail.tsx`, toggled from the picker header). It exposes raw SPARQL bindings
+  and kept/dropped candidates — a developer tool, not for end users. Put it behind
+  a dev flag or delete it.
+- **Cache Wikidata biographies** — every add re-runs the SPARQL query; no caching.
+- **Row-collapse state is in-memory** (`collapsedRowIds`) and resets on reload,
+  unlike overlay selections which persist. Decide whether to persist it.
+- **Stage 2 not built**: company lanes don't yet nest their positions
+  (Chairperson/CEO inside Tesla). The data is available (`P39` positions carry a
+  `P108` employer qualifier); see round 6 in the plan.
+- `src/publicData/famous/lives.ts` is now **test-fixture only** (Mozart/Einstein/
+  Frida), no longer shown in the UI — keep it out of the product surface.

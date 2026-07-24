@@ -22,7 +22,6 @@ import {
   removeFamousRow,
   removePublicGroup,
   setFamousAlignment,
-  toggleFamousPerson,
   toggleGroupCollapsed,
   toggleRowCollapsed,
   toggleRowHidden,
@@ -35,7 +34,6 @@ import { isPublicId, useAppState, userBirthMs } from "../state/store";
 import type { Category, Person } from "../model/types";
 import { triggerImportFlow } from "../storage/exportImport";
 import { loadPublicCatalog } from "../publicData/loader";
-import { famousCatalog } from "../publicData/famous/catalog";
 import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
 import { fetchWikidataBiography, searchWikidataCandidates } from "../publicData/famous/wikidata";
 import type { SparqlBinding, WikidataCandidate } from "../publicData/famous/wikidata";
@@ -953,53 +951,47 @@ function FamousPeoplePicker({ back }: { back: () => void }) {
           </button>
         )}
       </div>
-      <div className="popover-title">Famous people</div>
+      <div className="popover-title">Add a famous person</div>
 
       <input
         type="text"
         className="famous-search"
-        placeholder="Search Wikidata (e.g. Napoleon)…"
+        placeholder="Search anyone on Wikidata…"
         value={query}
+        autoFocus
         onChange={(e) => setQuery(e.target.value)}
       />
+
+      {query.trim().length < 2 && !searching && (
+        <div className="picker-hint">Scientists, artists, leaders, athletes — anyone with a Wikidata page.</div>
+      )}
       {searching && <div className="picker-hint">Searching…</div>}
       {error && <div className="picker-hint picker-error">{error}</div>}
       {!searching && query.trim().length >= 2 && people.length === 0 && (
-        <div className="picker-hint">No people matched — only people (Q5) are shown.</div>
+        <div className="picker-hint">No people found for “{query.trim()}”.</div>
       )}
-      {people.map((hit) => (
-        <button
-          key={hit.id}
-          type="button"
-          className="menu-item picker-row"
-          disabled={activeIds.has(hit.id) || loadingId !== null}
-          onClick={() => addFromWikidata(hit)}
-        >
-          <span>
-            {loadingId === hit.id ? "⏳" : activeIds.has(hit.id) ? "✓" : "＋"} {hit.label}
-            {hit.description && <small className="picker-blurb"> — {hit.description}</small>}
-          </span>
-        </button>
-      ))}
 
-      {candidates.length === 0 && !searching && (
-        <>
-          <div className="picker-subtitle">Suggestions</div>
-          {famousCatalog.map((person) => (
-            <label key={person.id} className="menu-item picker-row">
-              <input
-                type="checkbox"
-                checked={activeIds.has(person.id)}
-                onChange={() => toggleFamousPerson(person)}
-              />
-              <span>
-                {person.emoji} {person.name}
-                <small className="picker-blurb"> — {person.blurb}</small>
-              </span>
-            </label>
-          ))}
-        </>
-      )}
+      {people.map((hit) => {
+        const added = activeIds.has(hit.id);
+        const loading = loadingId === hit.id;
+        return (
+          <button
+            key={hit.id}
+            type="button"
+            className="menu-item wd-result"
+            disabled={added || loadingId !== null}
+            onClick={() => addFromWikidata(hit)}
+          >
+            <span className="wd-result-mark">{loading ? "⏳" : added ? "✓" : "＋"}</span>
+            <span className="wd-result-text">
+              <span className="wd-result-name">{hit.label}</span>
+              {hit.description && <span className="wd-result-desc">{hit.description}</span>}
+            </span>
+          </button>
+        );
+      })}
+
+      {people.length > 0 && <div className="picker-footer">Data from Wikidata</div>}
 
       {showDebug && debug && <WikidataDebugPanel debug={debug} onClose={() => setShowDebug(false)} />}
     </div>

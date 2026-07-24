@@ -1,10 +1,12 @@
-// Hand-authored biographies for the famous-people spike, used as the picker's
-// "Suggestions" and as offline examples of the multi-row shape the Wikidata
-// loader targets. Every entry has an explicit end date on purpose: an open end
-// renders as an ongoing arrow, which looks wrong for a finished historical life.
+// Hand-authored sample biographies. These are NOT shown in the app any more —
+// the picker is Wikidata-search only — they remain purely as offline TEST
+// FIXTURES for the alignment and store-wiring tests (a real FamousPerson with a
+// known shape, so those tests don't need a network call).
 //
-// Each person is split into the same three rows the Wikidata mapping produces —
-// Places lived, Education, Works — so aligned overlays read consistently.
+// Each person is split into Places lived, Education, Works, mirroring the
+// multi-row shape the Wikidata loader produces. Every entry has an explicit end
+// date on purpose: an open end renders as an ongoing arrow, wrong for a finished
+// historical life.
 
 import type { FamousBiography, FamousPerson } from "./types";
 

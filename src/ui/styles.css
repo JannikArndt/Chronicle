@@ -604,6 +604,46 @@ textarea {
   width: calc(100% - 16px);
 }
 
+/* Wikidata search results — name on top, description muted below. */
+.wd-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.wd-result-mark {
+  flex: none;
+  width: 14px;
+  color: var(--color-text-muted);
+}
+
+.wd-result-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wd-result-name {
+  color: var(--color-text);
+}
+
+.wd-result-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-footer {
+  padding: 6px 8px 2px;
+  font-size: 10px;
+  color: var(--color-text-faint);
+  text-align: right;
+}
+
 .picker-header {
   display: flex;
   align-items: center;
