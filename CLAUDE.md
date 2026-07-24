@@ -186,3 +186,9 @@ are intentionally shipped as-is for now but must be revisited before a real rele
   `P108` employer qualifier); see round 6 in the plan.
 - `src/publicData/famous/lives.ts` is now **test-fixture only** (Mozart/Einstein/
   Frida), no longer shown in the UI — keep it out of the product surface.
+- **Row-collapse state is lost when toggling 🎂 alignment**: `collapsedRowIds`
+  holds the namespaced row id, which flips between `pub:famous-x:` and
+  `pub:famous-x-aligned:`. Key collapse on the base row key instead.
+- **BCE dates dropped**: `Date.parse` can't read Wikidata's 4-digit negative
+  years (e.g. `-0044-…`), so pre-year-0 figures lose those dates. Add a
+  negative-year parse if we want ancient people to work.

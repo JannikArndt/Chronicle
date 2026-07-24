@@ -117,7 +117,9 @@ export function removeFamousPerson(personId: string): void {
 export function removeFamousRow(personId: string, rowKey: string): void {
   const selection = appStore.getState().activeFamous.find((s) => s.person.id === personId);
   if (!selection) return;
-  if (remainingRowKeys(selection.person, selection.removedRowKeys).filter((id) => id !== rowKey).length === 0) {
+  // Cascade-aware: removing a parent row also drops its sub-rows, so ask what
+  // would remain *after* this removal — not a naive filter that ignores children.
+  if (remainingRowKeys(selection.person, [...selection.removedRowKeys, rowKey]).length === 0) {
     removeFamousPerson(personId);
     return;
   }

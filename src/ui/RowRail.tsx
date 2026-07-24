@@ -633,7 +633,9 @@ function RailItem({
     const row = item.row;
     const category = categoryById.get(row.categoryId);
     const hidden = hiddenRowIds.includes(row.id);
-    const hasChildren = parentRowIds.has(row.id);
+    // Compact-collapse is an overlay (public) feature; keep the hide-checkbox for
+    // the user's own parent rows so private sub-timelines stay hideable.
+    const canCollapse = parentRowIds.has(row.id) && readOnly;
     const collapsed = collapsedRowIds.includes(row.id);
     // A category (top-level) row's buttons also show while hovering any of its
     // nested timelines; a sub-row's own buttons show only on its own direct hover.
@@ -649,7 +651,7 @@ function RailItem({
         onMouseEnter={() => onHoverEnter(key, categoryRowId)}
         onMouseLeave={onHoverLeave}
       >
-        {hasChildren ? (
+        {canCollapse ? (
           <button
             type="button"
             className="row-collapse-button"
