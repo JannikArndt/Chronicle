@@ -114,6 +114,29 @@ own `P569`/`P570`), and awards (`P166`, dated by `P585`).
   whole life to "at your age". **This resolves the last open risk — the WDQS
   SPARQL fetch works from the browser** (only Node's default User-Agent was blocked).
 
+## Update — round 6 (compact-collapse of an "area of life")
+
+Parent rows with sub-rows (Career, Children) are now collapsible — but unlike a
+group collapse, the sub-timelines **stay on the canvas** and compress into a
+dense band, giving an overview of that life area.
+
+- **Rail**: a ▸/▾ toggle on any parent row (replaces its checkbox). Collapsed, the
+  rail shows just "Career ▸" — the sub-row labels drop away.
+- **Canvas**: the sub-rows stay but render compact — `COMPACT_ROW_HEIGHT` (20 vs
+  40), tight `COMPACT_ROW_GAP`, 10px font — and each bar now carries **its row's
+  own label** (Tesla, SpaceX) since the rail no longer shows it.
+- Implemented as a `compact` flag on `LayoutItem`, inherited down from a collapsed
+  parent in `computeLayout` (new `collapsedRowIds` arg). The rail skips compact
+  items; the engine draws them shorter with the row label. State is in-memory
+  (`collapsedRowIds`) since public rows are read-only.
+- **Verified live**: collapsing Career compacts its 11 company lanes into a dense
+  labelled band; Children compacts its 14 kids; expand restores full lanes.
+
+Deferred (agreed): **Stage 2** — regroup Career so each company lane holds its
+*position* bars (Chairperson/CEO inside Tesla). The data is available — P39
+positions carry a `P108` employer qualifier — but positions overlap, so it needs
+a third nesting level. Next step, not in this change.
+
 ## Deliberate spike shortcuts (not production-ready)
 
 - Static biographies are hand-authored TS, kept out of `public-data/` on purpose

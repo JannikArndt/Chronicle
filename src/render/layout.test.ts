@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { GROUP_HEADER_HEIGHT, ROW_GAP, SUB_ROW_GAP, computeLayout } from "./layout";
+import { COMPACT_ROW_HEIGHT, GROUP_HEADER_HEIGHT, ROW_GAP, ROW_HEIGHT, SUB_ROW_GAP, computeLayout } from "./layout";
 import { emptyDataset } from "../model/dataset";
 import type { TimelineDataset } from "../model/types";
 
@@ -68,6 +68,23 @@ describe("computeLayout", () => {
     expect(r1s).toBeDefined();
     expect(r1s!.hidden).toBe(true);
     expect(items.find((i) => i.id === "r1")!.hidden).toBe(false);
+  });
+
+  test("collapsing a parent row keeps its sub-rows but renders them compact", () => {
+    const { items } = computeLayout(fixture(), new Set(), new Set(), new Set(["r1"]));
+    const r1 = items.find((i) => i.id === "r1")!;
+    const r1s = items.find((i) => i.id === "r1s")!;
+    // The parent stays full height (it's the header); the child is compacted.
+    expect(r1.compact).toBe(false);
+    expect(r1.height).toBe(ROW_HEIGHT);
+    expect(r1s.compact).toBe(true);
+    expect(r1s.height).toBe(COMPACT_ROW_HEIGHT);
+    expect(COMPACT_ROW_HEIGHT).toBeLessThan(ROW_HEIGHT);
+  });
+
+  test("an un-collapsed parent leaves sub-rows full height and non-compact", () => {
+    const { items } = computeLayout(fixture(), new Set());
+    expect(items.find((i) => i.id === "r1s")!.compact).toBe(false);
   });
 
   test("totalHeight covers the last item", () => {

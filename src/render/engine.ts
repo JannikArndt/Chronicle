@@ -531,8 +531,9 @@ export class TimelineEngine {
     selected: boolean,
   ): void {
     const { ctx } = this;
-    const top = item.y + 6;
-    const barHeight = item.height - 12;
+    const verticalPadding = item.compact ? 3 : 6;
+    const top = item.y + verticalPadding;
+    const barHeight = item.height - verticalPadding * 2;
     const x0 = geom.xVisualStart;
     const x1 = geom.xVisualEnd;
     const width = Math.max(x1 - x0, 2);
@@ -591,16 +592,25 @@ export class TimelineEngine {
     // Label anchored inside the near-opaque span so it stays legible (§5),
     // swapping to shortTitle when the full title overflows the bar, with a
     // favicon (if entry.website is set and its icon has loaded) in front.
-    ctx.font = "12px -apple-system, system-ui, sans-serif";
-    const iconUrl = entry.website ? faviconUrl(entry.website, FAVICON_SIZE_PX) : undefined;
-    const icon = iconUrl ? this.getFaviconImage(iconUrl) : undefined;
-    const iconSpace = icon ? FAVICON_SIZE_PX + FAVICON_GAP_PX : 0;
-
-    const titleWidth = ctx.measureText(entry.title).width;
-    const useShortTitle =
-      pickBarLabel(entry, geom, titleWidth + iconSpace) === "shortTitle" && !!entry.shortTitle;
-    const labelText = useShortTitle ? entry.shortTitle! : entry.title;
-    const textWidth = useShortTitle ? ctx.measureText(labelText).width : titleWidth;
+    // In a compact (collapsed-area) row the bar carries its ROW's label — the
+    // rail no longer shows it — in a smaller font, with no favicon.
+    let labelText: string;
+    let iconSpace = 0;
+    let icon: CanvasImageSource | undefined;
+    if (item.compact) {
+      ctx.font = "10px -apple-system, system-ui, sans-serif";
+      labelText = item.row?.label ?? entry.title;
+    } else {
+      ctx.font = "12px -apple-system, system-ui, sans-serif";
+      const iconUrl = entry.website ? faviconUrl(entry.website, FAVICON_SIZE_PX) : undefined;
+      icon = iconUrl ? this.getFaviconImage(iconUrl) : undefined;
+      iconSpace = icon ? FAVICON_SIZE_PX + FAVICON_GAP_PX : 0;
+      const titleWidth = ctx.measureText(entry.title).width;
+      const useShortTitle =
+        pickBarLabel(entry, geom, titleWidth + iconSpace) === "shortTitle" && !!entry.shortTitle;
+      labelText = useShortTitle ? entry.shortTitle! : entry.title;
+    }
+    const textWidth = ctx.measureText(labelText).width;
 
     const labelX = labelAnchorX(geom, textWidth + iconSpace, this.width);
     ctx.fillStyle = readableTextColor(colorToRgb(this.ctx, color), this.colors);

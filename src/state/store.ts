@@ -31,6 +31,9 @@ export interface AppState {
   pickingField?: "start" | "end";
   pickedDate?: { ms: number; precision: Precision; field: "start" | "end" };
   hiddenRowIds: string[];
+  // Parent rows collapsed into a compact canvas band (in-memory: public rows
+  // can't store this on their read-only dataset).
+  collapsedRowIds: string[];
   // Which optional public data the user has switched on. Nothing loads by
   // default — `publicDatasets` is rebuilt from these selections (see actions).
   // `activeFamous` holds the whole FamousPerson (not just an id) so a person
@@ -49,6 +52,7 @@ const initialState: AppState = {
   search: "",
   filters: { categoryIds: [], personIds: [] },
   hiddenRowIds: [],
+  collapsedRowIds: [],
   activeWorldKeys: [],
   activeFamous: [],
 };

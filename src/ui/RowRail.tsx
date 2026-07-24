@@ -24,6 +24,7 @@ import {
   setFamousAlignment,
   toggleFamousPerson,
   toggleGroupCollapsed,
+  toggleRowCollapsed,
   toggleRowHidden,
   toggleWorldEvents,
   updateCategory,
@@ -362,6 +363,12 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
     categoryRowIds.push(currentCategoryRowId);
   }
 
+  // Rows that have sub-rows get a collapse toggle (like a group). Derived from
+  // the layout so it reflects exactly what's rendered.
+  const parentRowIds = new Set(
+    layout.items.map((item) => item.row?.parentRowId).filter((id): id is string => !!id),
+  );
+
   return (
     <div className="rail" onPointerDown={(e) => e.stopPropagation()}>
       <div className="rail-scroll">
@@ -373,6 +380,7 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
               personById={personById}
               categoryById={categoryById}
               hiddenRowIds={hiddenRowIds}
+              parentRowIds={parentRowIds}
               selectedRowId={selectedRowId}
               openPopover={setPopover}
               engineRef={engineRef}
@@ -434,6 +442,7 @@ interface RailItemProps {
   personById: Map<string, Person>;
   categoryById: Map<string, Category>;
   hiddenRowIds: string[];
+  parentRowIds: Set<string>;
   selectedRowId?: string;
   openPopover: (p: PopoverState) => void;
   engineRef: MutableRefObject<TimelineEngine | null>;
@@ -450,6 +459,7 @@ function RailItem({
   personById,
   categoryById,
   hiddenRowIds,
+  parentRowIds,
   selectedRowId,
   openPopover,
   engineRef,
@@ -464,6 +474,11 @@ function RailItem({
   const readOnly = isPublicId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
+  const collapsedRowIds = useAppState((s) => s.collapsedRowIds);
+
+  // Compact sub-rows live only on the canvas (their parent is collapsed) — the
+  // rail drops them, so the bars carry their own labels instead.
+  if (item.compact) return null;
   const key = `${item.kind}:${item.id}`;
   const hoverReveal = (visible: boolean) => `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`;
 
@@ -620,6 +635,8 @@ function RailItem({
     const row = item.row;
     const category = categoryById.get(row.categoryId);
     const hidden = hiddenRowIds.includes(row.id);
+    const hasChildren = parentRowIds.has(row.id);
+    const collapsed = collapsedRowIds.includes(row.id);
     // A category (top-level) row's buttons also show while hovering any of its
     // nested timelines; a sub-row's own buttons show only on its own direct hover.
     const visible = item.isSubRow ? hoveredKey === key : hoveredKey === key || hoveredCategoryRowId === row.id;
@@ -634,15 +651,29 @@ function RailItem({
         onMouseEnter={() => onHoverEnter(key, categoryRowId)}
         onMouseLeave={onHoverLeave}
       >
-        <input
-          type="checkbox"
-          className="rail-row-checkbox"
-          checked={!hidden}
-          title="Show row"
-          style={{ accentColor: category?.color ?? "#888" }}
-          onClick={(e) => e.stopPropagation()}
-          onChange={() => toggleRowHidden(row.id)}
-        />
+        {hasChildren ? (
+          <button
+            type="button"
+            className="row-collapse-button"
+            title={collapsed ? "Expand timelines" : "Collapse into a compact band"}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleRowCollapsed(row.id);
+            }}
+          >
+            {collapsed ? "▸" : "▾"}
+          </button>
+        ) : (
+          <input
+            type="checkbox"
+            className="rail-row-checkbox"
+            checked={!hidden}
+            title="Show row"
+            style={{ accentColor: category?.color ?? "#888" }}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => toggleRowHidden(row.id)}
+          />
+        )}
         <span className="row-icon">{category?.icon}</span>
         <span className="rail-row-label" title={row.label}>
           <span className="label-full">{row.label}</span>

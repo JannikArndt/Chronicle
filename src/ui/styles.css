@@ -336,6 +336,17 @@ textarea {
   color: var(--color-text-muted);
 }
 
+/* Collapse toggle on a parent row (in place of the show/hide checkbox). */
+.row-collapse-button {
+  border: none;
+  background: none;
+  padding: 0;
+  width: 14px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  flex: none;
+}
+
 .rail-footer {
   display: flex;
   align-items: center;

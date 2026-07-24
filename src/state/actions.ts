@@ -548,6 +548,15 @@ export function toggleRowHidden(rowId: string): void {
   });
 }
 
+export function toggleRowCollapsed(rowId: string): void {
+  const { collapsedRowIds } = appStore.getState();
+  appStore.setState({
+    collapsedRowIds: collapsedRowIds.includes(rowId)
+      ? collapsedRowIds.filter((id) => id !== rowId)
+      : [...collapsedRowIds, rowId],
+  });
+}
+
 export function setSearch(search: string): void {
   appStore.setState({ search });
 }
