@@ -336,6 +336,17 @@ textarea {
   color: var(--color-text-muted);
 }
 
+/* Collapse toggle on a parent row (in place of the show/hide checkbox). */
+.row-collapse-button {
+  border: none;
+  background: none;
+  padding: 0;
+  width: 14px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  flex: none;
+}
+
 .rail-footer {
   display: flex;
   align-items: center;
@@ -546,6 +557,202 @@ textarea {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+/* World-events / famous-people pickers in the rail "+" menu. */
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.picker-row input {
+  width: auto;
+  flex: none;
+}
+
+.picker-subrow {
+  margin-left: 20px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.picker-blurb {
+  color: var(--color-text-muted);
+}
+
+.picker-subtitle,
+.picker-hint {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.picker-subtitle {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+
+.picker-error {
+  color: var(--color-danger);
+}
+
+.famous-search {
+  margin: 2px 8px 4px;
+  width: calc(100% - 16px);
+}
+
+/* Wikidata search results — name on top, description muted below. */
+.wd-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.wd-result-mark {
+  flex: none;
+  width: 14px;
+  color: var(--color-text-muted);
+}
+
+.wd-result-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wd-result-name {
+  color: var(--color-text);
+}
+
+.wd-result-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-footer {
+  padding: 6px 8px 2px;
+  font-size: 10px;
+  color: var(--color-text-faint);
+  text-align: right;
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Wikidata debug view — a wide, scrollable overlay above the narrow popover. */
+.wd-debug-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.wd-debug {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  width: min(860px, 92vw);
+  max-height: 84vh;
+  overflow: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+}
+
+.wd-debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.wd-debug-section {
+  margin-top: 12px;
+}
+
+.wd-debug-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.wd-debug-subtitle {
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.wd-debug-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .wd-debug-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wd-debug-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.wd-debug-table th,
+.wd-debug-table td {
+  border: 1px solid var(--color-border);
+  padding: 2px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.wd-debug-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.wd-dropped {
+  color: var(--color-text-faint);
+}
+
+.wd-debug-rowgroup ul {
+  margin: 2px 0 8px;
+  padding-left: 18px;
+}
+
+/* "Align to my age" toggle on a famous person's group header. */
+.align-toggle {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.align-toggle-on {
+  opacity: 1;
+  filter: none;
+}
+
+/* Remove-from-view "✕" on overlay (public) groups and famous rows.
+   Visibility is handled by .hover-reveal (like the other rail controls); this
+   only adds the danger tint on hover. */
+.remove-overlay:hover {
+  color: var(--color-danger);
 }
 
 .color-emoji-line input[type="color"] {

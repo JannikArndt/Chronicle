@@ -18,15 +18,26 @@ import {
   reorderGroup,
   replaceDataset,
   selectRow,
+  addFamousPerson,
+  removeFamousRow,
+  removePublicGroup,
+  setFamousAlignment,
   toggleGroupCollapsed,
+  toggleRowCollapsed,
   toggleRowHidden,
+  toggleWorldEvents,
   updateCategory,
   updatePerson,
   updateRow,
 } from "../state/actions";
-import { isPublicId, useAppState } from "../state/store";
+import { isPublicId, useAppState, userBirthMs } from "../state/store";
 import type { Category, Person } from "../model/types";
 import { triggerImportFlow } from "../storage/exportImport";
+import { loadPublicCatalog } from "../publicData/loader";
+import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
+import { fetchWikidataBiography, searchWikidataCandidates } from "../publicData/famous/wikidata";
+import type { SparqlBinding, WikidataCandidate } from "../publicData/famous/wikidata";
+import type { FamousPerson } from "../publicData/famous/types";
 
 const EMOJI_QUICK_PICKS = ["💼", "🏠", "❤️", "🎓", "✈️", "🎨", "⚽", "🐕"];
 
@@ -350,6 +361,12 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
     categoryRowIds.push(currentCategoryRowId);
   }
 
+  // Rows that have sub-rows get a collapse toggle (like a group). Derived from
+  // the layout so it reflects exactly what's rendered.
+  const parentRowIds = new Set(
+    layout.items.map((item) => item.row?.parentRowId).filter((id): id is string => !!id),
+  );
+
   return (
     <div className="rail" onPointerDown={(e) => e.stopPropagation()}>
       <div className="rail-scroll">
@@ -361,6 +378,7 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
               personById={personById}
               categoryById={categoryById}
               hiddenRowIds={hiddenRowIds}
+              parentRowIds={parentRowIds}
               selectedRowId={selectedRowId}
               openPopover={setPopover}
               engineRef={engineRef}
@@ -422,6 +440,7 @@ interface RailItemProps {
   personById: Map<string, Person>;
   categoryById: Map<string, Category>;
   hiddenRowIds: string[];
+  parentRowIds: Set<string>;
   selectedRowId?: string;
   openPopover: (p: PopoverState) => void;
   engineRef: MutableRefObject<TimelineEngine | null>;
@@ -438,6 +457,7 @@ function RailItem({
   personById,
   categoryById,
   hiddenRowIds,
+  parentRowIds,
   selectedRowId,
   openPopover,
   engineRef,
@@ -450,6 +470,13 @@ function RailItem({
 }: RailItemProps) {
   const style = { top: item.y, height: item.height };
   const readOnly = isPublicId(item.id);
+  // Whether the "align to my age" toggle can do anything (needs the user's birth date).
+  const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
+  const collapsedRowIds = useAppState((s) => s.collapsedRowIds);
+
+  // Compact sub-rows live only on the canvas (their parent is collapsed) — the
+  // rail drops them, so the bars carry their own labels instead.
+  if (item.compact) return null;
   const key = `${item.kind}:${item.id}`;
   const hoverReveal = (visible: boolean) => `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`;
 
@@ -458,6 +485,7 @@ function RailItem({
     const person = group.personId ? personById.get(group.personId) : undefined;
     const age = person ? computedAge(person) : null;
     const visible = hoveredKey === key;
+    const famous = parseFamousGroupId(group.id);
     return (
       <div
         className="rail-group"
@@ -475,6 +503,26 @@ function RailItem({
           {age !== null && <span className="age-badge">{age}</span>}
         </span>
         <span className="rail-actions">
+          {famous && canAlignFamous && (
+            <button
+              type="button"
+              className={`icon-button align-toggle ${famous.aligned ? "align-toggle-on" : ""}`}
+              title={famous.aligned ? "Show real dates" : "Align to my age"}
+              onClick={() => setFamousAlignment(famous.personId, !famous.aligned)}
+            >
+              🎂
+            </button>
+          )}
+          {readOnly && (
+            <button
+              type="button"
+              className={`${hoverReveal(visible)} remove-overlay`}
+              title="Remove from timeline"
+              onClick={() => removePublicGroup(group.id)}
+            >
+              ✕
+            </button>
+          )}
           {person && person.birthDate !== undefined && (
             <button
               type="button"
@@ -585,6 +633,10 @@ function RailItem({
     const row = item.row;
     const category = categoryById.get(row.categoryId);
     const hidden = hiddenRowIds.includes(row.id);
+    // Compact-collapse is an overlay (public) feature; keep the hide-checkbox for
+    // the user's own parent rows so private sub-timelines stay hideable.
+    const canCollapse = parentRowIds.has(row.id) && readOnly;
+    const collapsed = collapsedRowIds.includes(row.id);
     // A category (top-level) row's buttons also show while hovering any of its
     // nested timelines; a sub-row's own buttons show only on its own direct hover.
     const visible = item.isSubRow ? hoveredKey === key : hoveredKey === key || hoveredCategoryRowId === row.id;
@@ -599,15 +651,29 @@ function RailItem({
         onMouseEnter={() => onHoverEnter(key, categoryRowId)}
         onMouseLeave={onHoverLeave}
       >
-        <input
-          type="checkbox"
-          className="rail-row-checkbox"
-          checked={!hidden}
-          title="Show row"
-          style={{ accentColor: category?.color ?? "#888" }}
-          onClick={(e) => e.stopPropagation()}
-          onChange={() => toggleRowHidden(row.id)}
-        />
+        {canCollapse ? (
+          <button
+            type="button"
+            className="row-collapse-button"
+            title={collapsed ? "Expand timelines" : "Collapse into a compact band"}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleRowCollapsed(row.id);
+            }}
+          >
+            {collapsed ? "▸" : "▾"}
+          </button>
+        ) : (
+          <input
+            type="checkbox"
+            className="rail-row-checkbox"
+            checked={!hidden}
+            title="Show row"
+            style={{ accentColor: category?.color ?? "#888" }}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => toggleRowHidden(row.id)}
+          />
+        )}
         <span className="row-icon">{category?.icon}</span>
         <span className="rail-row-label" title={row.label}>
           <span className="label-full">{row.label}</span>
@@ -647,6 +713,24 @@ function RailItem({
             </button>
           </span>
         )}
+        {(() => {
+          const famousRow = parseFamousRowId(row.id);
+          return famousRow ? (
+            <span className="rail-actions">
+              <button
+                type="button"
+                className={`${hoverReveal(visible)} remove-overlay`}
+                title="Remove this timeline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeFamousRow(famousRow.personId, famousRow.rowKey);
+                }}
+              >
+                ✕
+              </button>
+            </span>
+          ) : null;
+        })()}
       </div>
     );
   }
@@ -718,6 +802,11 @@ function RailAddMenu({
     close();
   };
 
+  const [mode, setMode] = useState<"menu" | "world" | "famous">("menu");
+
+  if (mode === "world") return <WorldEventsPicker back={() => setMode("menu")} />;
+  if (mode === "famous") return <FamousPeoplePicker back={() => setMode("menu")} />;
+
   return (
     <div className="popover-form">
       <button type="button" className="menu-item" onClick={() => open({ kind: "add-group", top: 0 })}>
@@ -729,6 +818,12 @@ function RailAddMenu({
       <button type="button" className="menu-item" onClick={handleImport}>
         ＋ Import
       </button>
+      <button type="button" className="menu-item" onClick={() => setMode("world")}>
+        🌍 World events ▸
+      </button>
+      <button type="button" className="menu-item" onClick={() => setMode("famous")}>
+        🌟 Famous people ▸
+      </button>
       <button
         type="button"
         className="menu-item"
@@ -739,6 +834,272 @@ function RailAddMenu({
       >
         ✨ Replay setup assistant
       </button>
+    </div>
+  );
+}
+
+// Toggle any of the bundled world-events datasets on/off. Nothing shows until
+// picked here, so the catalog can grow without cluttering a fresh timeline.
+function WorldEventsPicker({ back }: { back: () => void }) {
+  const catalog = loadPublicCatalog();
+  const activeKeys = useAppState((s) => s.activeWorldKeys);
+
+  return (
+    <div className="popover-form">
+      <button type="button" className="menu-item" onClick={back}>
+        ◂ Back
+      </button>
+      <div className="popover-title">World events</div>
+      {catalog.map((item) => (
+        <label key={item.key} className="menu-item picker-row">
+          <input
+            type="checkbox"
+            checked={activeKeys.includes(item.key)}
+            onChange={() => toggleWorldEvents(item.key)}
+          />
+          <span>{item.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// Add a famous person's life to the timeline — a few curated suggestions plus a
+// live search of Wikidata. Once added, the "🎂 align to my age" toggle lives on
+// the person's group header in the rail (not here).
+interface WikidataDebug {
+  query: string;
+  candidates: WikidataCandidate[];
+  lastFetch: { name: string; bindings: SparqlBinding[]; person: FamousPerson } | null;
+}
+
+function FamousPeoplePicker({ back }: { back: () => void }) {
+  const activeFamous = useAppState((s) => s.activeFamous);
+  const activeIds = new Set(activeFamous.map((s) => s.person.id));
+
+  const [query, setQuery] = useState("");
+  const [candidates, setCandidates] = useState<WikidataCandidate[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<WikidataDebug | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
+
+  const people = candidates.filter((candidate) => candidate.isHuman);
+
+  // Debounced Wikidata search; the trailing request wins even if earlier ones
+  // resolve late (guarded by `cancelled`).
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setCandidates([]);
+      setSearching(false);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const hits = await searchWikidataCandidates(term);
+        if (cancelled) return;
+        setCandidates(hits);
+        setDebug((prev) => ({ query: term, candidates: hits, lastFetch: prev?.lastFetch ?? null }));
+      } catch {
+        if (!cancelled) setCandidates([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  const addFromWikidata = async (hit: WikidataCandidate) => {
+    setLoadingId(hit.id);
+    setError(null);
+    try {
+      const { person, bindings } = await fetchWikidataBiography(hit);
+      addFamousPerson(person);
+      setDebug((prev) => ({
+        query: prev?.query ?? query,
+        candidates: prev?.candidates ?? candidates,
+        lastFetch: { name: person.name, bindings, person },
+      }));
+      setQuery("");
+      setCandidates([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load from Wikidata.");
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  return (
+    <div className="popover-form">
+      <div className="picker-header">
+        <button type="button" className="menu-item" onClick={back}>
+          ◂ Back
+        </button>
+        {debug && (
+          <button
+            type="button"
+            className={`icon-button ${showDebug ? "align-toggle-on" : ""}`}
+            title="Show what Wikidata returned and how we read it"
+            onClick={() => setShowDebug((v) => !v)}
+          >
+            🐞
+          </button>
+        )}
+      </div>
+      <div className="popover-title">Add a famous person</div>
+
+      <input
+        type="text"
+        className="famous-search"
+        placeholder="Search anyone on Wikidata…"
+        value={query}
+        autoFocus
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
+      {query.trim().length < 2 && !searching && (
+        <div className="picker-hint">Scientists, artists, leaders, athletes — anyone with a Wikidata page.</div>
+      )}
+      {searching && <div className="picker-hint">Searching…</div>}
+      {error && <div className="picker-hint picker-error">{error}</div>}
+      {!searching && query.trim().length >= 2 && people.length === 0 && (
+        <div className="picker-hint">No people found for “{query.trim()}”.</div>
+      )}
+
+      {people.map((hit) => {
+        const added = activeIds.has(hit.id);
+        const loading = loadingId === hit.id;
+        return (
+          <button
+            key={hit.id}
+            type="button"
+            className="menu-item wd-result"
+            disabled={added || loadingId !== null}
+            onClick={() => addFromWikidata(hit)}
+          >
+            <span className="wd-result-mark">{loading ? "⏳" : added ? "✓" : "＋"}</span>
+            <span className="wd-result-text">
+              <span className="wd-result-name">{hit.label}</span>
+              {hit.description && <span className="wd-result-desc">{hit.description}</span>}
+            </span>
+          </button>
+        );
+      })}
+
+      {people.length > 0 && <div className="picker-footer">Data from Wikidata</div>}
+
+      {showDebug && debug && <WikidataDebugPanel debug={debug} onClose={() => setShowDebug(false)} />}
+    </div>
+  );
+}
+
+function yearOf(ms: number): number {
+  return new Date(ms).getUTCFullYear();
+}
+
+// A developer view: the raw search hits (with why each was kept/dropped) and,
+// for the last loaded person, the raw SPARQL rows next to how we mapped them.
+function WikidataDebugPanel({ debug, onClose }: { debug: WikidataDebug; onClose: () => void }) {
+  const fetched = debug.lastFetch;
+  return (
+    <div className="wd-debug-backdrop" onClick={onClose}>
+      <div className="wd-debug" onClick={(e) => e.stopPropagation()}>
+        <div className="wd-debug-head">
+          <strong>Wikidata debug</strong>
+          <button type="button" className="icon-button" onClick={onClose} title="Close">
+            ✕
+          </button>
+        </div>
+
+        <div className="wd-debug-section">
+          <div className="wd-debug-title">
+            Search “{debug.query}” — {debug.candidates.filter((c) => c.isHuman).length}/{debug.candidates.length} kept
+            as people
+          </div>
+          <table className="wd-debug-table">
+            <thead>
+              <tr>
+                <th>keep</th>
+                <th>id</th>
+                <th>label</th>
+                <th>P31 (instance of)</th>
+                <th>description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {debug.candidates.map((c) => (
+                <tr key={c.id} className={c.isHuman ? "" : "wd-dropped"}>
+                  <td>{c.isHuman ? "✓" : "✕"}</td>
+                  <td>{c.id}</td>
+                  <td>{c.label}</td>
+                  <td>{c.instanceOfIds.join(", ") || "—"}</td>
+                  <td>{c.description ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {fetched && (
+          <div className="wd-debug-section">
+            <div className="wd-debug-title">
+              Loaded “{fetched.name}” — birth {yearOf(fetched.person.birthMs)},{" "}
+              {fetched.person.biography.entries.length} entries in {fetched.person.biography.rows.length} rows
+            </div>
+            <div className="wd-debug-cols">
+              <div>
+                <div className="wd-debug-subtitle">How we interpreted it</div>
+                {fetched.person.biography.rows.map((row) => (
+                  <div key={row.id} className="wd-debug-rowgroup">
+                    <em>{row.label}</em>
+                    <ul>
+                      {fetched.person.biography.entries
+                        .filter((e) => e.rowId === row.id)
+                        .map((e) => (
+                          <li key={e.id}>
+                            {e.title} [{yearOf(e.start.ms)}–{e.end ? yearOf(e.end.ms) : "…"}]
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div className="wd-debug-subtitle">Raw SPARQL bindings ({fetched.bindings.length})</div>
+                <table className="wd-debug-table">
+                  <thead>
+                    <tr>
+                      <th>type</th>
+                      <th>label</th>
+                      <th>start</th>
+                      <th>end</th>
+                      <th>point</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fetched.bindings.map((b, i) => (
+                      <tr key={i}>
+                        <td>{b.type.value}</td>
+                        <td>{b.itemLabel?.value ?? ""}</td>
+                        <td>{b.startDate?.value.slice(0, 10) ?? ""}</td>
+                        <td>{b.endDate?.value.slice(0, 10) ?? ""}</td>
+                        <td>{b.pointDate?.value.slice(0, 10) ?? ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -4,9 +4,12 @@
 
 import { applyDelete, collectEntryCascade, collectGroupCascade, collectRowCascade } from "../model/cascade";
 import { emptyDataset, newId } from "../model/dataset";
-import { loadDataset, saveDataset } from "../storage/db";
-import { loadPublicDatasets } from "../publicData/loader";
-import { appStore } from "./store";
+import { loadDataset, loadOverlays, saveDataset, saveOverlays } from "../storage/db";
+import { loadPublicCatalog } from "../publicData/loader";
+import { buildFamousDataset, parseFamousGroupId, remainingRowKeys } from "../publicData/famous/alignToAge";
+import { appStore, userBirthMs } from "./store";
+import type { AppState } from "./store";
+import type { FamousPerson } from "../publicData/famous/types";
 import type {
   Category,
   Group,
@@ -26,6 +29,16 @@ function persistSoon(): void {
   }, 250);
 }
 
+let overlayPersistTimer: ReturnType<typeof setTimeout> | undefined;
+
+function persistOverlaysSoon(): void {
+  clearTimeout(overlayPersistTimer);
+  overlayPersistTimer = setTimeout(() => {
+    const { activeWorldKeys, activeFamous } = appStore.getState();
+    void saveOverlays({ activeWorldKeys, activeFamous });
+  }, 250);
+}
+
 function updateDataset(mutate: (dataset: TimelineDataset) => TimelineDataset): void {
   appStore.setState({ dataset: mutate(structuredClone(appStore.getState().dataset)) });
   persistSoon();
@@ -33,7 +46,116 @@ function updateDataset(mutate: (dataset: TimelineDataset) => TimelineDataset): v
 
 export async function initializeApp(): Promise<void> {
   const dataset = (await loadDataset()) ?? emptyDataset();
-  appStore.setState({ dataset, publicDatasets: loadPublicDatasets(), loaded: true });
+  // Public data is opt-in: nothing is merged until picked from the rail's "+"
+  // menu — but a previous session's picks are restored here so the overlay
+  // survives a reload.
+  const overlays = await loadOverlays();
+  appStore.setState({
+    dataset,
+    publicDatasets: [],
+    activeWorldKeys: overlays?.activeWorldKeys ?? [],
+    activeFamous: overlays?.activeFamous ?? [],
+    loaded: true,
+  });
+  rebuildPublicDatasets(appStore.getState());
+}
+
+// ---------- optional public data (world events + famous people) ----------
+
+// Loaded once per session; the files are bundled at build time and never change.
+let worldCatalogCache: ReturnType<typeof loadPublicCatalog> | null = null;
+function worldCatalog(): ReturnType<typeof loadPublicCatalog> {
+  worldCatalogCache ??= loadPublicCatalog();
+  return worldCatalogCache;
+}
+
+// Rebuild the merged-in `publicDatasets` from the user's current selections.
+// Famous people are (re)built here so an alignment toggle re-shifts the life
+// against the latest birth date without any stored copy going stale.
+function rebuildPublicDatasets(state: AppState): void {
+  const world = worldCatalog()
+    .filter((item) => state.activeWorldKeys.includes(item.key))
+    .map((item) => item.dataset);
+
+  const famous = state.activeFamous.map((selection) => {
+    const birth = selection.aligned ? userBirthMs(state) : undefined;
+    return buildFamousDataset(selection.person, birth, selection.removedRowKeys);
+  });
+
+  appStore.setState({ publicDatasets: [...world, ...famous] });
+  persistOverlaysSoon();
+}
+
+export function toggleWorldEvents(key: string): void {
+  const state = appStore.getState();
+  const active = state.activeWorldKeys.includes(key)
+    ? state.activeWorldKeys.filter((k) => k !== key)
+    : [...state.activeWorldKeys, key];
+  appStore.setState({ activeWorldKeys: active });
+  rebuildPublicDatasets(appStore.getState());
+}
+
+export function isFamousActive(personId: string): boolean {
+  return appStore.getState().activeFamous.some((selection) => selection.person.id === personId);
+}
+
+export function addFamousPerson(person: FamousPerson): void {
+  if (isFamousActive(person.id)) return;
+  const selection = { person, aligned: false, removedRowKeys: [] };
+  appStore.setState({ activeFamous: [...appStore.getState().activeFamous, selection] });
+  rebuildPublicDatasets(appStore.getState());
+}
+
+export function removeFamousPerson(personId: string): void {
+  const active = appStore.getState().activeFamous.filter((selection) => selection.person.id !== personId);
+  appStore.setState({ activeFamous: active });
+  rebuildPublicDatasets(appStore.getState());
+}
+
+// Remove a single timeline (row) from a famous person's overlay. If it was the
+// last remaining row, remove the whole person instead of leaving an empty group.
+export function removeFamousRow(personId: string, rowKey: string): void {
+  const selection = appStore.getState().activeFamous.find((s) => s.person.id === personId);
+  if (!selection) return;
+  // Cascade-aware: removing a parent row also drops its sub-rows, so ask what
+  // would remain *after* this removal — not a naive filter that ignores children.
+  if (remainingRowKeys(selection.person, [...selection.removedRowKeys, rowKey]).length === 0) {
+    removeFamousPerson(personId);
+    return;
+  }
+  const active = appStore.getState().activeFamous.map((s) =>
+    s.person.id === personId ? { ...s, removedRowKeys: [...s.removedRowKeys, rowKey] } : s,
+  );
+  appStore.setState({ activeFamous: active });
+  rebuildPublicDatasets(appStore.getState());
+}
+
+// Remove any optional public group from its header: a famous person, or a
+// world-events dataset (identified by the `pub:<key>:` namespace).
+export function removePublicGroup(groupId: string): void {
+  const famous = parseFamousGroupId(groupId);
+  if (famous) {
+    removeFamousPerson(famous.personId);
+    return;
+  }
+  const worldKey = /^pub:([^:]+):/.exec(groupId)?.[1];
+  if (worldKey && appStore.getState().activeWorldKeys.includes(worldKey)) {
+    toggleWorldEvents(worldKey);
+  }
+}
+
+export function toggleFamousPerson(person: FamousPerson): void {
+  if (isFamousActive(person.id)) removeFamousPerson(person.id);
+  else addFamousPerson(person);
+}
+
+// Flip one famous person between real calendar dates and "aligned to your age".
+export function setFamousAlignment(personId: string, aligned: boolean): void {
+  const active = appStore.getState().activeFamous.map((selection) =>
+    selection.person.id === personId ? { ...selection, aligned } : selection,
+  );
+  appStore.setState({ activeFamous: active });
+  rebuildPublicDatasets(appStore.getState());
 }
 
 // ---------- selection ----------
@@ -425,6 +547,15 @@ export function toggleRowHidden(rowId: string): void {
     hiddenRowIds: hiddenRowIds.includes(rowId)
       ? hiddenRowIds.filter((id) => id !== rowId)
       : [...hiddenRowIds, rowId],
+  });
+}
+
+export function toggleRowCollapsed(rowId: string): void {
+  const { collapsedRowIds } = appStore.getState();
+  appStore.setState({
+    collapsedRowIds: collapsedRowIds.includes(rowId)
+      ? collapsedRowIds.filter((id) => id !== rowId)
+      : [...collapsedRowIds, rowId],
   });
 }
 

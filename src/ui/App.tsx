@@ -34,9 +34,15 @@ export function App() {
   }, [loaded]);
 
   const layout = useMemo(
-    () => computeLayout(mergedDataset(state), new Set(), new Set(state.hiddenRowIds)),
+    () =>
+      computeLayout(
+        mergedDataset(state),
+        new Set(),
+        new Set(state.hiddenRowIds),
+        new Set(state.collapsedRowIds),
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.dataset, state.publicDatasets, state.hiddenRowIds],
+    [state.dataset, state.publicDatasets, state.hiddenRowIds, state.collapsedRowIds],
   );
 
   // Global keyboard handling (§6) — all ignored while typing in a field.

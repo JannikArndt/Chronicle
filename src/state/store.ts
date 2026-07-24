@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from "react";
 import { emptyDataset, mergeDatasets } from "../model/dataset";
 import type { TimelineDataset, TimelineEntry, Precision } from "../model/types";
+import type { FamousPerson } from "../publicData/famous/types";
 
 export interface TimeRangeFilter {
   startMs: number;
@@ -30,6 +31,18 @@ export interface AppState {
   pickingField?: "start" | "end";
   pickedDate?: { ms: number; precision: Precision; field: "start" | "end" };
   hiddenRowIds: string[];
+  // Parent rows collapsed into a compact canvas band (in-memory: public rows
+  // can't store this on their read-only dataset).
+  collapsedRowIds: string[];
+  // Which optional public data the user has switched on. Nothing loads by
+  // default — `publicDatasets` is rebuilt from these selections (see actions).
+  // `activeFamous` holds the whole FamousPerson (not just an id) so a person
+  // fetched from Wikidata at runtime survives a rebuild without a catalog.
+  activeWorldKeys: string[];
+  // `removedRowKeys` are base row ids (pre-namespacing) the user has removed
+  // from that person's overlay — a single timeline can be taken away without
+  // removing the whole person.
+  activeFamous: { person: FamousPerson; aligned: boolean; removedRowKeys: string[] }[];
 }
 
 const initialState: AppState = {
@@ -39,6 +52,9 @@ const initialState: AppState = {
   search: "",
   filters: { categoryIds: [], personIds: [] },
   hiddenRowIds: [],
+  collapsedRowIds: [],
+  activeWorldKeys: [],
+  activeFamous: [],
 };
 
 type Listener = () => void;
@@ -80,4 +96,12 @@ export function mergedDataset(state: AppState): TimelineDataset {
 
 export function isPublicId(id: string): boolean {
   return id.startsWith("pub:");
+}
+
+// The user's own birth instant, used to align a famous person's life "to your
+// age". Undefined until identity onboarding sets it — the picker hides the
+// alignment option in that case.
+export function userBirthMs(state: AppState): number | undefined {
+  const self = state.dataset.people.find((person) => person.id === state.dataset.selfPersonId);
+  return self?.birthDate;
 }

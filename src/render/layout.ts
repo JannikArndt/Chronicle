@@ -10,6 +10,10 @@ export const ROW_HEIGHT = 40;
 export const ROW_GAP = 10;
 export const SUB_ROW_GAP = 4; // sub-timelines hug their parent (§5)
 export const GROUP_GAP = 14;
+// A collapsed parent row squeezes its sub-rows into a dense band on the canvas
+// (the rail drops their labels) — a compacted overview of an "area of life".
+export const COMPACT_ROW_HEIGHT = 20;
+export const COMPACT_ROW_GAP = 2;
 
 export interface LayoutItem {
   kind: "group" | "person" | "row";
@@ -19,6 +23,9 @@ export interface LayoutItem {
   depth: number; // sub-row nesting depth (rows only)
   isSubRow: boolean;
   hidden: boolean; // row is unchecked in the rail (§2) — canvas skips its entries, rail keeps the row
+  // A sub-row inside a collapsed parent: drawn compact on the canvas and hidden
+  // in the rail. The bar carries its row's own label (there is no rail label).
+  compact: boolean;
   group?: Group;
   person?: Person;
   row?: TimelineRow;
@@ -33,27 +40,33 @@ export function computeLayout(
   dataset: TimelineDataset,
   collapsedGroupIds: Set<string>,
   hiddenRowIds: Set<string> = new Set(),
+  collapsedRowIds: Set<string> = new Set(),
 ): Layout {
   const items: LayoutItem[] = [];
   let y = 0;
 
   const personById = new Map(dataset.people.map((p) => [p.id, p]));
 
-  const pushRowTree = (row: TimelineRow, depth: number) => {
-    y += depth > 0 ? SUB_ROW_GAP : ROW_GAP;
+  // `compact` is inherited: once a collapsed row is crossed, everything below it
+  // renders compact. The collapsed row itself stays full height (it's the header).
+  const pushRowTree = (row: TimelineRow, depth: number, compact: boolean) => {
+    y += compact ? COMPACT_ROW_GAP : depth > 0 ? SUB_ROW_GAP : ROW_GAP;
+    const height = compact ? COMPACT_ROW_HEIGHT : ROW_HEIGHT;
     items.push({
       kind: "row",
       id: row.id,
       y,
-      height: ROW_HEIGHT,
+      height,
       depth,
       isSubRow: depth > 0,
       hidden: hiddenRowIds.has(row.id),
+      compact,
       row,
     });
-    y += ROW_HEIGHT;
+    y += height;
+    const childCompact = compact || collapsedRowIds.has(row.id);
     for (const child of dataset.rows.filter((r) => r.parentRowId === row.id)) {
-      pushRowTree(child, depth + 1);
+      pushRowTree(child, depth + 1, childCompact);
     }
   };
 
@@ -66,6 +79,7 @@ export function computeLayout(
       depth: 0,
       isSubRow: false,
       hidden: false,
+      compact: false,
       group,
     });
     y += GROUP_HEADER_HEIGHT;
@@ -74,10 +88,10 @@ export function computeLayout(
       const groupRows = dataset.rows.filter((r) => r.groupId === group.id && r.parentRowId === undefined);
       if (group.personId) {
         // The group IS this person (§2) — rows attach directly, no sub-header.
-        for (const row of groupRows) pushRowTree(row, 0);
+        for (const row of groupRows) pushRowTree(row, 0, false);
       } else {
         const directRows = groupRows.filter((r) => r.personId === undefined);
-        for (const row of directRows) pushRowTree(row, 0);
+        for (const row of directRows) pushRowTree(row, 0, false);
         const personIdsInOrder = [...new Set(groupRows.map((r) => r.personId).filter((id): id is string => !!id))];
         for (const personId of personIdsInOrder) {
           const person = personById.get(personId);
@@ -90,11 +104,12 @@ export function computeLayout(
             depth: 0,
             isSubRow: false,
             hidden: false,
+            compact: false,
             person,
             group,
           });
           y += PERSON_HEADER_HEIGHT;
-          for (const row of groupRows.filter((r) => r.personId === personId)) pushRowTree(row, 0);
+          for (const row of groupRows.filter((r) => r.personId === personId)) pushRowTree(row, 0, false);
         }
       }
     }
