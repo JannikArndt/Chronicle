@@ -28,8 +28,6 @@ interface RowSheetProps {
   onClose: () => void;
   onPositionChange: (position: number) => void;
   sheetHandleRef: Ref<BottomSheetHandle>;
-  // Called when a row's entry is tapped, so the shell can open the inspector.
-  onOpenEntry: (entryId: string) => void;
   // Navigating into a sub-pane pulls a peeking sheet up, so the pane isn't read
   // through a 96px slot.
   raiseSheet: () => void;
@@ -42,7 +40,6 @@ export function RowSheet({
   onClose,
   onPositionChange,
   sheetHandleRef,
-  onOpenEntry,
   raiseSheet,
 }: RowSheetProps) {
   const state = useAppState((s) => s);
@@ -80,11 +77,7 @@ export function RowSheet({
       {settingsRowId === null ? (
         <TimelineList layout={layout} onOpenRow={openRowSettings} />
       ) : (
-        <RowSettingsPane
-          rowId={settingsRowId}
-          onBack={() => setSettingsRowId(null)}
-          onOpenEntry={onOpenEntry}
-        />
+        <RowSettingsPane rowId={settingsRowId} onBack={() => setSettingsRowId(null)} />
       )}
     </BottomSheet>
   );
@@ -136,15 +129,9 @@ function TimelineList({ layout, onOpenRow }: { layout: Layout; onOpenRow: (rowId
   );
 }
 
-function RowSettingsPane({
-  rowId,
-  onBack,
-  onOpenEntry,
-}: {
-  rowId: string;
-  onBack: () => void;
-  onOpenEntry: (entryId: string) => void;
-}) {
+// Selecting an entry here opens the inspector sheet, because that sheet is
+// driven by the same `selectedEntryId` the canvas writes — no extra plumbing.
+function RowSettingsPane({ rowId, onBack }: { rowId: string; onBack: () => void }) {
   const state = useAppState((s) => s);
   const merged = mergedDataset(state);
   const row = merged.rows.find((candidate) => candidate.id === rowId);
@@ -187,10 +174,7 @@ function RowSettingsPane({
           key={entry.id}
           type="button"
           className="sheet-row"
-          onClick={() => {
-            selectEntry(entry.id);
-            onOpenEntry(entry.id);
-          }}
+          onClick={() => selectEntry(entry.id)}
         >
           <span className="sheet-row-label">{entry.title}</span>
           <span className="sheet-row-count">
