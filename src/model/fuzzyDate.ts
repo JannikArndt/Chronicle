@@ -81,23 +81,55 @@ export function formatFuzzyDate(date: FuzzyDate): string {
   }
 }
 
-// Manual text entry: "2020-05-14" → day, "2020-05" → month, "2020" → year.
-// Coarser inputs anchor mid-period so the fuzz band brackets the whole period.
-export function parseDateInput(text: string): { ms: number; precision: Precision } | null {
-  const trimmed = text.trim().replace(/^ca\.?\s*/i, "");
-  let match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(trimmed);
-  if (match) {
-    const ms = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    return Number.isNaN(ms) ? null : { ms, precision: "day" };
+// Dragging a date handle must land on whole units of whatever precision the
+// field is set to — otherwise a "year" date silently acquires a day and month
+// the user never chose. Anchors match parseDateInput's: mid-period.
+export function snapMsToPrecision(ms: number, precision: Precision): number {
+  const d = new Date(ms);
+  switch (precision) {
+    case "exact":
+    case "day":
+      return utcDayStart(ms);
+    case "month":
+      return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 15);
+    case "year":
+    case "circa":
+      return Date.UTC(d.getUTCFullYear(), 6, 1);
   }
-  match = /^(\d{4})-(\d{1,2})$/.exec(trimmed);
-  if (match) {
-    const ms = Date.UTC(Number(match[1]), Number(match[2]) - 1, 15);
-    return Number.isNaN(ms) ? null : { ms, precision: "month" };
+}
+
+const SHORT_MONTH_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+// The format IS the feedback: how a date is written says how precisely it is
+// known, so "exactly / around / sometime" stops being an invisible property of
+// the field. Unlike formatFuzzyDate (which is a round-trippable edit format),
+// this is for reading.
+export function formatByPrecision(date: FuzzyDate): string {
+  const d = new Date(date.ms);
+  const year = d.getUTCFullYear();
+  const month = SHORT_MONTH_NAMES[d.getUTCMonth()];
+  switch (date.precision) {
+    case "exact":
+    case "day":
+      return `${d.getUTCDate()} ${month} ${year}`;
+    case "month":
+      return `${month} ${year}`;
+    case "year":
+      return `${year}`;
+    case "circa":
+      return `~${year}`;
   }
-  match = /^(\d{4})$/.exec(trimmed);
-  if (match) {
-    return { ms: Date.UTC(Number(match[1]), 6, 1), precision: "year" };
-  }
-  return null;
 }

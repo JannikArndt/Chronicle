@@ -3,7 +3,8 @@
 // it. Picking commits date AND precision together from the snapped unit.
 
 import { useEffect, useState } from "react";
-import { formatFuzzyDate, parseDateInput } from "../model/fuzzyDate";
+import { formatFuzzyDate } from "../model/fuzzyDate";
+import { parseDateInput } from "../model/parseDateInput";
 import type { FuzzyDate, Precision } from "../model/types";
 import { armDatePicking, cancelDatePicking } from "../state/actions";
 import { useAppState } from "../state/store";
@@ -42,8 +43,10 @@ export function DateField({ label, field, value, onChange, allowOngoing, disable
       return;
     }
     const parsed = parseDateInput(text);
-    if (parsed) {
+    if (parsed.kind === "date") {
       onChange({ ms: parsed.ms, precision: parsed.precision, fuzzDays: value?.fuzzDays });
+    } else if (parsed.kind === "ongoing" && allowOngoing) {
+      onChange(undefined);
     } else {
       setText(value ? formatFuzzyDate(value) : "");
     }

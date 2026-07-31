@@ -1104,6 +1104,19 @@ textarea {
   gap: 8px;
 }
 
+/* The inspector stacks instead: its subtitle is a line of its own, long enough
+   that sitting it beside the title would squeeze both. */
+.sheet-title-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sheet-title-stack .sheet-title {
+  font-size: 18px;
+}
+
 .sheet-title {
   font-size: 16px;
   font-weight: 800;
@@ -1300,6 +1313,177 @@ textarea {
 
 .editable-input:focus {
   outline: none;
+}
+
+/* ---------- mobile date editor (handles) ---------- */
+
+.date-editor {
+  padding: 2px 8px 4px;
+}
+
+/* Start on the left, End on the right — each sits above the handle it
+   controls, which is what makes the lane below it readable without labels. */
+.date-editor-blocks {
+  display: flex;
+  gap: 10px;
+}
+
+.date-block {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.date-editor-blocks > .date-block:last-child {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.date-block-caption {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.date-block-value {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.date-block-input {
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  border-bottom: 1.5px solid var(--color-accent);
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  /* Under 16px, focusing this zooms all of iOS Safari. */
+  font-size: max(16px, 1em);
+}
+
+.date-block-input:focus {
+  outline: none;
+}
+
+.date-block-error {
+  font-size: 11.5px;
+  color: var(--color-danger);
+}
+
+.date-ongoing-toggle {
+  padding: 4px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.date-ongoing-toggle-on {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.date-granularity {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.date-granularity-pick {
+  padding: 5px 10px;
+  border: none;
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.date-granularity-pick + .date-granularity-pick {
+  border-left: 1px solid var(--color-border);
+}
+
+.date-granularity-pick-on {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+/* The lane is a touch surface, so the browser must not try to scroll or zoom
+   the page while a handle is being dragged. */
+.date-lane {
+  position: relative;
+  height: 46px;
+  margin: 14px 0 6px;
+  border-radius: 10px;
+  background: var(--color-bg-subtle);
+  touch-action: none;
+}
+
+.date-lane-bar {
+  position: absolute;
+  top: 15px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--color-accent);
+  opacity: 0.55;
+}
+
+.date-lane-now {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--color-text-faint);
+}
+
+/* 32px of hit target around a 14px dot: the dot is what you see, the padding is
+   what you actually hit. */
+.date-handle {
+  position: absolute;
+  top: 50%;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  border-radius: 50%;
+}
+
+.date-handle::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* An ongoing end is not a date the user set, so its handle reads as a marker
+   rather than a grab point. */
+.date-handle-ongoing::after {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
 }
 
 .entry-chips {

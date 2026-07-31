@@ -32,7 +32,7 @@ import {
   updateOnboardingPlaceEntry,
 } from "../state/actions";
 import type { OnboardingPlaceAnswer } from "../state/actions";
-import { parseDateInput } from "../model/fuzzyDate";
+import { parseDateInput } from "../model/parseDateInput";
 import { appStore } from "../state/store";
 
 export interface PlaceAnswer {
@@ -154,12 +154,12 @@ export function PlacesTable({ placesRowId, birthDateMs, firstRow, onFinished }: 
     if (startMs === undefined) return currentRows;
 
     const yearText = row.yearText.trim();
-    const endParsed = yearText === "" ? null : parseDateInput(yearText);
+    const endParsed = yearText === "" ? undefined : parseDateInput(yearText);
     const place = row.placeAnswer && formatPlaceAnswerText(row.placeAnswer) === trimmedPlace ? row.placeAnswer : null;
     const answer: OnboardingPlaceAnswer = {
       label: place?.title ?? trimmedPlace,
       startMs,
-      endMs: endParsed?.ms,
+      endMs: endParsed?.kind === "date" ? endParsed.ms : undefined,
       subtitle: place?.subtitle,
       fullName: place?.fullName ?? trimmedPlace,
       coordinates: place?.coordinates,

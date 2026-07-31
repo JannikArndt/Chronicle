@@ -6,13 +6,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { Ref } from "react";
 import { collectEntryCascade, describeCascade } from "../model/cascade";
-import { formatFuzzyDate } from "../model/fuzzyDate";
+import { formatByPrecision } from "../model/fuzzyDate";
 import type { TimelineEntry } from "../model/types";
 import { deleteEntryWithCascade, updateEntry } from "../state/actions";
 import { isPublicId, mergedDataset, useAppState } from "../state/store";
 import { BottomSheet } from "./BottomSheet";
 import type { BottomSheetHandle } from "./BottomSheet";
-import { DateField } from "./DateField";
+import { DateRangeEditor } from "./DateRangeEditor";
 
 interface EntrySheetProps {
   anchors: number[];
@@ -25,8 +25,8 @@ interface EntrySheetProps {
 // An entry's own dates, as one line — the stand-in subtitle for entries that
 // have none, so the peek state never shows an empty second line.
 function dateRangeText(entry: TimelineEntry): string {
-  const start = formatFuzzyDate(entry.start);
-  return entry.end ? `${start} – ${formatFuzzyDate(entry.end)}` : `${start} – ongoing`;
+  const start = formatByPrecision(entry.start);
+  return entry.end ? `${start} – ${formatByPrecision(entry.end)}` : `${start} – ongoing`;
 }
 
 export function EntrySheet({ anchors, open, onClose, onPositionChange, sheetHandleRef }: EntrySheetProps) {
@@ -58,7 +58,7 @@ export function EntrySheet({ anchors, open, onClose, onPositionChange, sheetHand
       onClose={onClose}
       onPositionChange={onPositionChange}
       header={
-        <div className="sheet-title-row">
+        <div className="sheet-title-stack">
           <EditableLine
             className="sheet-title"
             value={shown.title}
@@ -78,21 +78,7 @@ export function EntrySheet({ anchors, open, onClose, onPositionChange, sheetHand
       }
     >
       <div className="sheet-section">When</div>
-      <DateField
-        label="Start"
-        field="start"
-        value={shown.start}
-        disabled={readOnly}
-        onChange={(value) => value && change({ start: value })}
-      />
-      <DateField
-        label={shown.end ? "End" : "End — ongoing"}
-        field="end"
-        value={shown.end}
-        allowOngoing
-        disabled={readOnly}
-        onChange={(value) => change({ end: value })}
-      />
+      <DateRangeEditor start={shown.start} end={shown.end} disabled={readOnly} onChange={change} />
 
       <div className="sheet-section">Connected</div>
       <div className="entry-chips">
