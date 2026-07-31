@@ -3,9 +3,9 @@ import {
   DAY_MS,
   DEFAULT_FUZZ_DAYS,
   addDays,
+  formatByPrecision,
   formatFuzzyDate,
   fuzzMs,
-  parseDateInput,
   rampBounds,
   utcDayStart,
 } from "./fuzzyDate";
@@ -89,28 +89,7 @@ describe("rampBounds", () => {
   });
 });
 
-describe("parse and format", () => {
-  test("full date parses as day precision at UTC midnight", () => {
-    expect(parseDateInput("2020-05-14")).toEqual({ ms: T0, precision: "day" });
-  });
-
-  test("year-month parses as month precision anchored mid-month", () => {
-    const parsed = parseDateInput("2020-05");
-    expect(parsed?.precision).toBe("month");
-    expect(new Date(parsed!.ms).toISOString().slice(0, 7)).toBe("2020-05");
-  });
-
-  test("bare year parses as year precision anchored mid-year", () => {
-    const parsed = parseDateInput("1987");
-    expect(parsed?.precision).toBe("year");
-    expect(new Date(parsed!.ms).getUTCFullYear()).toBe(1987);
-  });
-
-  test("garbage is rejected", () => {
-    expect(parseDateInput("not a date")).toBeNull();
-    expect(parseDateInput("")).toBeNull();
-  });
-
+describe("format", () => {
   test("format follows precision, not stored resolution", () => {
     expect(formatFuzzyDate({ ms: T0, precision: "day" })).toBe("2020-05-14");
     expect(formatFuzzyDate({ ms: T0, precision: "exact" })).toBe("2020-05-14");
@@ -119,9 +98,15 @@ describe("parse and format", () => {
     expect(formatFuzzyDate({ ms: T0, precision: "circa" })).toBe("ca. 2020");
   });
 
-  test("parse/format round-trips for day precision", () => {
-    const parsed = parseDateInput("1999-12-31")!;
-    expect(formatFuzzyDate({ ...parsed })).toBe("1999-12-31");
+  // The reading format is where precision becomes visible: the same instant
+  // must look different at each precision, or "around 2020" is indistinguishable
+  // from "14 May 2020".
+  test("formatByPrecision changes shape with precision", () => {
+    expect(formatByPrecision({ ms: T0, precision: "day" })).toBe("14 May 2020");
+    expect(formatByPrecision({ ms: T0, precision: "exact" })).toBe("14 May 2020");
+    expect(formatByPrecision({ ms: T0, precision: "month" })).toBe("May 2020");
+    expect(formatByPrecision({ ms: T0, precision: "year" })).toBe("2020");
+    expect(formatByPrecision({ ms: T0, precision: "circa" })).toBe("~2020");
   });
 });
 

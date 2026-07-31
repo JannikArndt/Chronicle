@@ -15,7 +15,7 @@ import type { PlaceAnswer } from "./PlacesTable";
 import { formatSuggestionText } from "./nominatim";
 import { useAssistantFlow } from "./useAssistantFlow";
 import { addOnboardingPlaceEntry, completeIdentityStep, updateGroup, updatePerson } from "../state/actions";
-import { parseDateInput } from "../model/fuzzyDate";
+import { parseDateInput } from "../model/parseDateInput";
 import { appStore } from "../state/store";
 
 // Manually re-opening the assistant (e.g. from the rail's "+" menu, for
@@ -111,14 +111,14 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
 
   const commitUntil = () => {
     const trimmed = untilText.trim();
-    const endParsed = trimmed === "" ? null : parseDateInput(trimmed);
-    if (trimmed !== "" && !endParsed) return;
+    const endParsed = trimmed === "" ? undefined : parseDateInput(trimmed);
+    if (endParsed !== undefined && endParsed.kind !== "date") return;
     if (!setup || birthDateMs === undefined || firstPlaceAnswer === null) return;
 
     const entryId = addOnboardingPlaceEntry(setup.placesRowId, {
       label: firstPlaceAnswer.title,
       startMs: birthDateMs,
-      endMs: endParsed?.ms,
+      endMs: endParsed?.kind === "date" ? endParsed.ms : undefined,
       subtitle: firstPlaceAnswer.subtitle,
       fullName: firstPlaceAnswer.fullName,
       coordinates: firstPlaceAnswer.coordinates,

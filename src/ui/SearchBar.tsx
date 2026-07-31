@@ -2,7 +2,7 @@
 // disappears. Outright hiding stays with the rail's checkboxes.
 
 import { useState } from "react";
-import { parseDateInput } from "../model/fuzzyDate";
+import { parseDateInput } from "../model/parseDateInput";
 import { setFilters, setSearch } from "../state/actions";
 import { useAppState } from "../state/store";
 
@@ -67,7 +67,10 @@ function TimeRangeFilterInputs() {
     const end = parseDateInput(toText);
     setFilters({
       ...filters,
-      timeRange: start && end ? { startMs: start.ms, endMs: end.ms } : undefined,
+      timeRange:
+        start.kind === "date" && end.kind === "date"
+          ? { startMs: start.ms, endMs: end.ms }
+          : undefined,
     });
   };
 
