@@ -7,19 +7,12 @@
       "collapsed": false
     }
   ],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "Firsts",
-      "color": "#4a6fa5",
-      "icon": "💡"
-    }
-  ],
   "rows": [
     {
       "id": "row-1",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#4a6fa5",
+      "icon": "💡",
       "label": "Computing, Internet & AI"
     }
   ],

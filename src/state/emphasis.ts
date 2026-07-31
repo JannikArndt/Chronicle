@@ -7,7 +7,6 @@ import type { Filters } from "./store";
 export function hasActiveFilters(search: string, filters: Filters): boolean {
   return (
     search.trim() !== "" ||
-    filters.categoryIds.length > 0 ||
     filters.personIds.length > 0 ||
     filters.timeRange !== undefined
   );
@@ -34,9 +33,6 @@ export function computeEmphasis(
       if (!inTitle && !inDescription && !inSubtitle && !inPlace) return false;
     }
     const row = rowById.get(entry.rowId);
-    if (filters.categoryIds.length > 0 && (!row || !filters.categoryIds.includes(row.categoryId))) {
-      return false;
-    }
     if (filters.personIds.length > 0) {
       const personId = row?.personId ?? (row ? groupById.get(row.groupId)?.personId : undefined);
       if (!personId || !filters.personIds.includes(personId)) return false;

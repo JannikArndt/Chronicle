@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from "react";
-import { categoryDeleteBlockers, collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
+import { collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
 import {
@@ -26,12 +26,11 @@ import {
   toggleRowCollapsed,
   toggleRowHidden,
   toggleWorldEvents,
-  updateCategory,
   updatePerson,
   updateRow,
 } from "../state/actions";
 import { isPublicId, useAppState, userBirthMs } from "../state/store";
-import type { Category, Person } from "../model/types";
+import type { Person } from "../model/types";
 import { triggerImportFlow } from "../storage/exportImport";
 import { loadPublicCatalog } from "../publicData/loader";
 import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
@@ -44,7 +43,7 @@ const EMOJI_QUICK_PICKS = ["💼", "🏠", "❤️", "🎓", "✈️", "🎨", "
 type PopoverState =
   | { kind: "add-menu"; groupId: string; personId?: string; top: number }
   | { kind: "person-edit"; personId: string; groupId?: string; top: number }
-  | { kind: "category-edit"; rowId: string; top: number }
+  | { kind: "row-edit"; rowId: string; top: number }
   | { kind: "add-sub-row"; rowId: string; top: number }
   | { kind: "add-group"; top: number }
   | { kind: "add-person"; top: number }
@@ -337,28 +336,26 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
   // Which rail item's action buttons are shown (§ hover-reveal). Tracked in JS
   // rather than pure CSS :hover: Safari can leave :hover "stuck" after a fast
   // mouse-exit from these absolutely-positioned, transitioned rows, but real
-  // mouseenter/mouseleave events don't have that failure mode. hoveredCategoryRowId
-  // is the top-level row a hovered sub-row belongs to, so a category's own
+  // mouseenter/mouseleave events don't have that failure mode. hoveredTopRowId
+  // is the top-level row a hovered sub-row belongs to, so a top-level row's own
   // buttons also light up while hovering any of its nested timelines.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const [hoveredCategoryRowId, setHoveredCategoryRowId] = useState<string | null>(null);
+  const [hoveredTopRowId, setHoveredTopRowId] = useState<string | null>(null);
   const dragController = useRailDragController(railContentRef);
 
   const allPeople = [...dataset.people, ...publicDatasets.flatMap((d) => d.people)];
-  const allCategories = [...dataset.categories, ...publicDatasets.flatMap((d) => d.categories)];
   const personById = new Map(allPeople.map((p) => [p.id, p]));
-  const categoryById = new Map(allCategories.map((c) => [c.id, c]));
 
   const closePopover = () => setPopover(null);
 
   // pushRowTree (layout.ts) emits each top-level row immediately followed by
   // all its descendants before the next one, so a single running variable is
-  // enough to know which category row each item belongs to.
-  const categoryRowIds: (string | null)[] = [];
-  let currentCategoryRowId: string | null = null;
+  // enough to know which top-level row each item belongs to.
+  const topRowIds: (string | null)[] = [];
+  let currentTopRowId: string | null = null;
   for (const item of layout.items) {
-    if (item.kind === "row" && item.row && !item.isSubRow) currentCategoryRowId = item.row.id;
-    categoryRowIds.push(currentCategoryRowId);
+    if (item.kind === "row" && item.row && !item.isSubRow) currentTopRowId = item.row.id;
+    topRowIds.push(currentTopRowId);
   }
 
   // Rows that have sub-rows get a collapse toggle (like a group). Derived from
@@ -376,22 +373,21 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
               key={`${item.kind}:${item.id}`}
               item={item}
               personById={personById}
-              categoryById={categoryById}
               hiddenRowIds={hiddenRowIds}
               parentRowIds={parentRowIds}
               selectedRowId={selectedRowId}
               openPopover={setPopover}
               engineRef={engineRef}
-              categoryRowId={categoryRowIds[index]}
+              topRowId={topRowIds[index]}
               hoveredKey={hoveredKey}
-              hoveredCategoryRowId={hoveredCategoryRowId}
-              onHoverEnter={(key, categoryRowId) => {
+              hoveredTopRowId={hoveredTopRowId}
+              onHoverEnter={(key, topRowId) => {
                 setHoveredKey(key);
-                setHoveredCategoryRowId(categoryRowId);
+                setHoveredTopRowId(topRowId);
               }}
               onHoverLeave={() => {
                 setHoveredKey(null);
-                setHoveredCategoryRowId(null);
+                setHoveredTopRowId(null);
               }}
               dragController={dragController}
             />
@@ -438,16 +434,15 @@ function lifeSpanRange(birthDate: number): { startMs: number; endMs: number } {
 interface RailItemProps {
   item: LayoutItem;
   personById: Map<string, Person>;
-  categoryById: Map<string, Category>;
   hiddenRowIds: string[];
   parentRowIds: Set<string>;
   selectedRowId?: string;
   openPopover: (p: PopoverState) => void;
   engineRef: MutableRefObject<TimelineEngine | null>;
-  categoryRowId: string | null;
+  topRowId: string | null;
   hoveredKey: string | null;
-  hoveredCategoryRowId: string | null;
-  onHoverEnter: (key: string, categoryRowId: string | null) => void;
+  hoveredTopRowId: string | null;
+  onHoverEnter: (key: string, topRowId: string | null) => void;
   onHoverLeave: () => void;
   dragController: RailDragController;
 }
@@ -455,15 +450,14 @@ interface RailItemProps {
 function RailItem({
   item,
   personById,
-  categoryById,
   hiddenRowIds,
   parentRowIds,
   selectedRowId,
   openPopover,
   engineRef,
-  categoryRowId,
+  topRowId,
   hoveredKey,
-  hoveredCategoryRowId,
+  hoveredTopRowId,
   onHoverEnter,
   onHoverLeave,
   dragController,
@@ -631,15 +625,14 @@ function RailItem({
 
   if (item.kind === "row" && item.row) {
     const row = item.row;
-    const category = categoryById.get(row.categoryId);
     const hidden = hiddenRowIds.includes(row.id);
     // Compact-collapse is an overlay (public) feature; keep the hide-checkbox for
     // the user's own parent rows so private sub-timelines stay hideable.
     const canCollapse = parentRowIds.has(row.id) && readOnly;
     const collapsed = collapsedRowIds.includes(row.id);
-    // A category (top-level) row's buttons also show while hovering any of its
-    // nested timelines; a sub-row's own buttons show only on its own direct hover.
-    const visible = item.isSubRow ? hoveredKey === key : hoveredKey === key || hoveredCategoryRowId === row.id;
+    // A top-level row's buttons also show while hovering any of its nested
+    // timelines; a sub-row's own buttons show only on its own direct hover.
+    const visible = item.isSubRow ? hoveredKey === key : hoveredKey === key || hoveredTopRowId === row.id;
     return (
       <div
         className={`rail-row ${item.isSubRow ? "rail-row-sub" : ""} ${row.id === selectedRowId ? "rail-row-selected" : ""}`}
@@ -648,7 +641,7 @@ function RailItem({
         data-rail-id={row.id}
         data-rail-sub-row={item.isSubRow ? "true" : undefined}
         onClick={() => selectRow(row.id)}
-        onMouseEnter={() => onHoverEnter(key, categoryRowId)}
+        onMouseEnter={() => onHoverEnter(key, topRowId)}
         onMouseLeave={onHoverLeave}
       >
         {canCollapse ? (
@@ -669,12 +662,12 @@ function RailItem({
             className="rail-row-checkbox"
             checked={!hidden}
             title="Show row"
-            style={{ accentColor: category?.color ?? "#888" }}
+            style={{ accentColor: row.color ?? "#888" }}
             onClick={(e) => e.stopPropagation()}
             onChange={() => toggleRowHidden(row.id)}
           />
         )}
-        <span className="row-icon">{category?.icon}</span>
+        <span className="row-icon">{row.icon}</span>
         <span className="rail-row-label" title={row.label}>
           <span className="label-full">{row.label}</span>
           <span className="label-initial">{row.label.slice(0, 1)}</span>
@@ -703,10 +696,10 @@ function RailItem({
             <button
               type="button"
               className={hoverReveal(visible)}
-              title="Edit row & category"
+              title="Edit row"
               onClick={(e) => {
                 e.stopPropagation();
-                openPopover({ kind: "category-edit", rowId: row.id, top: topOf(e) });
+                openPopover({ kind: "row-edit", rowId: row.id, top: topOf(e) });
               }}
             >
               ⚙
@@ -772,7 +765,7 @@ function Popover({
         {popover.kind === "person-edit" && (
           <PersonEditor personId={popover.personId} groupId={popover.groupId} close={close} />
         )}
-        {popover.kind === "category-edit" && <CategoryEditor rowId={popover.rowId} close={close} />}
+        {popover.kind === "row-edit" && <RowEditor rowId={popover.rowId} close={close} />}
         {popover.kind === "add-sub-row" && <SubRowForm rowId={popover.rowId} close={close} />}
       </div>
     </>
@@ -1190,7 +1183,7 @@ function AddMenu({ groupId, personId, close }: { groupId: string; personId?: str
           </button>
         )}
         <button type="button" className="menu-item" onClick={() => setMode("row")}>
-          🏷️ Category (timeline row)
+          🏷️ Timeline row
         </button>
         <button
           type="button"
@@ -1287,54 +1280,46 @@ function PersonEditor({
   );
 }
 
-function CategoryEditor({ rowId, close }: { rowId: string; close: () => void }) {
+function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
   const dataset = useAppState((s) => s.dataset);
   const row = dataset.rows.find((r) => r.id === rowId);
-  const category = dataset.categories.find((c) => c.id === row?.categoryId);
-  if (!row || !category) return null;
-  const blockers = categoryDeleteBlockers(dataset, category.id);
+  if (!row) return null;
 
   return (
     <div className="popover-form">
       <div className="popover-title">Row</div>
-      <input type="text" value={row.label} onChange={(e) => updateRow(rowId, { label: e.target.value })} />
-
-      <div className="popover-title">Category “{category.label}”</div>
-      <input
-        type="text"
-        value={category.label}
-        onChange={(e) => updateCategory(category.id, { label: e.target.value })}
-      />
-      <div className="color-emoji-line">
+      <div className="row-edit-line">
         <input
           type="color"
-          value={toHexColor(category.color)}
-          onChange={(e) => updateCategory(category.id, { color: e.target.value })}
+          value={toHexColor(row.color ?? "#888888")}
+          onChange={(e) => updateRow(rowId, { color: e.target.value })}
         />
         <input
           type="text"
           className="emoji-input"
-          value={category.icon}
+          value={row.icon ?? ""}
           maxLength={4}
-          onChange={(e) => updateCategory(category.id, { icon: e.target.value })}
+          onChange={(e) => updateRow(rowId, { icon: e.target.value || undefined })}
         />
-        <span className="emoji-picks">
-          {EMOJI_QUICK_PICKS.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              className="icon-button"
-              onClick={() => updateCategory(category.id, { icon: emoji })}
-            >
-              {emoji}
-            </button>
-          ))}
-        </span>
+        <input
+          type="text"
+          className="row-edit-name"
+          value={row.label}
+          onChange={(e) => updateRow(rowId, { label: e.target.value })}
+        />
       </div>
-      <div className="hint">
-        Category in use by {blockers.length} row{blockers.length === 1 ? "" : "s"} (
-        {blockers.map((b) => b.label).join(", ")}) — it can only be deleted once no row uses it.
-      </div>
+      <span className="emoji-picks">
+        {EMOJI_QUICK_PICKS.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            className="icon-button"
+            onClick={() => updateRow(rowId, { icon: emoji })}
+          >
+            {emoji}
+          </button>
+        ))}
+      </span>
       <button
         type="button"
         className="danger-button"

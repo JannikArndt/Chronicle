@@ -30,17 +30,8 @@ The JSON must conform exactly to this structure (no extra fields anywhere):
 {
   "schemaVersion": 1,
   "groups": [{ "id": "g-1", "label": "<topic name>", "collapsed": false }],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "<category name>",
-      "color": "<any CSS color, pick something fitting the topic>",
-      "icon": "<one fitting emoji>",
-      "defaultVisibility": "shareable"
-    }
-  ],
   "rows": [
-    { "id": "row-1", "groupId": "g-1", "categoryId": "cat-1", "label": "<row label>" }
+    { "id": "row-1", "groupId": "g-1", "color": "<any CSS color, pick something fitting the topic>", "icon": "<one fitting emoji>", "label": "<row label>" }
   ],
   "entries": [
     {

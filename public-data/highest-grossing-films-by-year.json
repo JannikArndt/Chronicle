@@ -7,19 +7,12 @@
       "collapsed": false
     }
   ],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "Box Office",
-      "color": "#c8102e",
-      "icon": "🎬"
-    }
-  ],
   "rows": [
     {
       "id": "row-1",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#c8102e",
+      "icon": "🎬",
       "label": "Highest-grossing film of the year (worldwide)"
     }
   ],

@@ -7,19 +7,12 @@
       "collapsed": false
     }
   ],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "Best Picture",
-      "color": "#c9a227",
-      "icon": "🏆"
-    }
-  ],
   "rows": [
     {
       "id": "row-1",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#c9a227",
+      "icon": "🏆",
       "label": "Academy Award for Best Picture"
     }
   ],

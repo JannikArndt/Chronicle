@@ -11,13 +11,14 @@ export function serializeDataset(dataset: TimelineDataset): string {
 
 export type ImportResult = { ok: true; dataset: TimelineDataset } | { ok: false; error: string };
 
-const ARRAY_FIELDS = ["people", "groups", "categories", "rows", "entries"] as const;
+const ARRAY_FIELDS = ["people", "groups", "rows", "entries"] as const;
 
-// Oldest export shape this importer still reads. v1/v2/v3 files are
+// Oldest export shape this importer still reads. v1/v2/v3/v4 files are
 // structurally valid as-is: v2 only added the optional selfPersonId, v3
 // dropped the (now-ignored) `entities`/`linkedEntityIds` fields, and v4
-// dropped `visibility`/`defaultVisibility` — no migration needed, those
-// fields just go unread on an older file.
+// dropped `visibility`/`defaultVisibility`. v5 removed the Category concept
+// and moved each row's color and icon onto the row itself — the only migration
+// with an actual data step (folding category.color/icon onto the row, below).
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
 
 export function validateImport(raw: unknown): ImportResult {
@@ -44,15 +45,34 @@ export function validateImport(raw: unknown): ImportResult {
       return { ok: false, error: "Malformed entry found (needs id, rowId, start). Import aborted." };
     }
   }
-  // No field migration needed beyond the version bump: v1→v2's diff (selfPersonId)
-  // is optional and stays undefined; v3 and v4 only remove fields the app no
-  // longer reads (`entities`/`linkedEntityIds`, then `visibility`/
-  // `defaultVisibility`), so any leftover copies in an older file are simply
-  // ignored rather than migrated.
+  // v1→v4 need no data migration: their diffs are either an optional new field
+  // (selfPersonId) or removed fields the app no longer reads
+  // (`entities`/`linkedEntityIds`, `visibility`/`defaultVisibility`), so
+  // leftover copies are simply ignored. v5 is the exception — it folds each
+  // row's category color onto the row so the removed `categories` array doesn't
+  // take the row's color with it.
   if (schemaVersion < SCHEMA_VERSION) {
+    if (Array.isArray(candidate.categories)) foldCategoryColorsIntoRows(candidate);
     candidate.schemaVersion = SCHEMA_VERSION;
   }
   return { ok: true, dataset: candidate as unknown as TimelineDataset };
+}
+
+// v5 migration: rows used to get their color and icon from a shared Category
+// (via `categoryId`); now both live on the row. Copy each row's category color
+// and icon onto the row and strip the now-removed `categoryId`/`categories`.
+function foldCategoryColorsIntoRows(candidate: Record<string, unknown>): void {
+  const categories = candidate.categories as Array<Record<string, unknown>>;
+  const categoryById = new Map(categories.map((category) => [category.id as string, category]));
+  for (const row of candidate.rows as Array<Record<string, unknown>>) {
+    const category = categoryById.get(row.categoryId as string);
+    if (category) {
+      if (row.color === undefined) row.color = category.color;
+      if (row.icon === undefined) row.icon = category.icon;
+    }
+    delete row.categoryId;
+  }
+  delete candidate.categories;
 }
 
 export function parseImportFile(text: string): ImportResult {

@@ -71,12 +71,11 @@ describe("buildFamousDataset — removing rows cascades to sub-rows", () => {
     blurb: "test",
     biography: {
       groups: [{ id: "g", label: "X", collapsed: false }],
-      categories: [{ id: "c", label: "Career", color: "#000", icon: "💼" }],
       rows: [
-        { id: "r-career", groupId: "g", categoryId: "c", label: "Career" },
-        { id: "r-career-0", groupId: "g", categoryId: "c", label: "Job A", parentRowId: "r-career" },
-        { id: "r-career-1", groupId: "g", categoryId: "c", label: "Job B", parentRowId: "r-career" },
-        { id: "r-places", groupId: "g", categoryId: "c", label: "Places lived" },
+        { id: "r-career", groupId: "g", color: "#000", icon: "💼", label: "Career" },
+        { id: "r-career-0", groupId: "g", color: "#000", icon: "💼", label: "Job A", parentRowId: "r-career" },
+        { id: "r-career-1", groupId: "g", color: "#000", icon: "💼", label: "Job B", parentRowId: "r-career" },
+        { id: "r-places", groupId: "g", color: "#000", icon: "💼", label: "Places lived" },
       ],
       entries: [
         { id: "a", rowId: "r-career-0", title: "Job A", start: { ms: Date.UTC(1990, 0, 1), precision: "year" }, end: { ms: Date.UTC(2000, 0, 1), precision: "year" } },

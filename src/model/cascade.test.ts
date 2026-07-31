@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
   applyDelete,
-  categoryDeleteBlockers,
   collectEntryCascade,
   collectGroupCascade,
   collectRowCascade,
@@ -21,7 +20,7 @@ function makeEntry(id: string, rowId: string, parentEntryId?: string): TimelineE
 }
 
 function makeRow(id: string, groupId: string, parentRowId?: string, personId?: string): TimelineRow {
-  return { id, groupId, categoryId: "cat-1", label: id, parentRowId, personId };
+  return { id, groupId, color: "#333", label: id, parentRowId, personId };
 }
 
 // g1 (plain group) contains person p1's row r1, r1 has sub-row r2, r2 has sub-sub-row r3.
@@ -37,10 +36,6 @@ function fixture(): TimelineDataset {
     { id: "g1", label: "Family", collapsed: false },
     { id: "g2", label: "Me", personId: "p2", collapsed: false },
     { id: "g3", label: "Friends", collapsed: false },
-  ];
-  ds.categories = [
-    { id: "cat-1", label: "Job", color: "#333", icon: "💼" },
-    { id: "cat-2", label: "Unused", color: "#666", icon: "🎈" },
   ];
   ds.rows = [
     makeRow("r1", "g1", undefined, "p1"),
@@ -100,19 +95,6 @@ describe("describeCascade", () => {
       "This deletes 3 entries and 2 sub-rows.",
     );
     expect(describeCascade(collectEntryCascade(fixture(), "e3"))).toBe("This deletes 1 entry.");
-  });
-});
-
-describe("categoryDeleteBlockers", () => {
-  test("lists rows still using the category", () => {
-    expect(categoryDeleteBlockers(fixture(), "cat-1").map((r) => r.id).sort()).toEqual([
-      "r1",
-      "r2",
-      "r3",
-      "r4",
-      "r5",
-    ]);
-    expect(categoryDeleteBlockers(fixture(), "cat-2")).toEqual([]);
   });
 });
 

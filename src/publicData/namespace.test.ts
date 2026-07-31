@@ -6,12 +6,9 @@ import type { TimelineDataset } from "../model/types";
 function fixture(): TimelineDataset {
   const ds = emptyDataset();
   ds.groups = [{ id: "g-1", label: "Apple", collapsed: false }];
-  ds.categories = [
-    { id: "cat-1", label: "Releases", color: "#888", icon: "📱" },
-  ];
   ds.rows = [
-    { id: "row-1", groupId: "g-1", categoryId: "cat-1", label: "iPhone" },
-    { id: "row-2", groupId: "g-1", categoryId: "cat-1", label: "Details", parentRowId: "row-1" },
+    { id: "row-1", groupId: "g-1", color: "#888", label: "iPhone" },
+    { id: "row-2", groupId: "g-1", color: "#888", label: "Details", parentRowId: "row-1" },
   ];
   ds.entries = [
     {
@@ -39,8 +36,7 @@ describe("namespaceDataset", () => {
     expect(ds.rows[1].parentRowId).toBe("pub:iphone-releases:row-1");
     expect(ds.entries[0].rowId).toBe("pub:iphone-releases:row-1");
     expect(ds.entries[1].parentEntryId).toBe("pub:iphone-releases:e-1");
-    expect(ds.categories[0].id).toBe("pub:iphone-releases:cat-1");
-    expect(ds.rows[0].categoryId).toBe("pub:iphone-releases:cat-1");
+    expect(ds.rows[0].color).toBe("#888");
   });
 
   test("leaves absent optional references undefined", () => {

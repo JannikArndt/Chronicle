@@ -7,19 +7,12 @@
       "collapsed": false
     }
   ],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "Firsts",
-      "color": "#e63946",
-      "icon": "🚀"
-    }
-  ],
   "rows": [
     {
       "id": "row-1",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#e63946",
+      "icon": "🚀",
       "label": "Space & Transportation"
     }
   ],

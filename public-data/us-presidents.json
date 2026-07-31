@@ -7,19 +7,12 @@
       "collapsed": false
     }
   ],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "Presidents",
-      "color": "#3c3b6e",
-      "icon": "🇺🇸"
-    }
-  ],
   "rows": [
     {
       "id": "row-1",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#3c3b6e",
+      "icon": "🇺🇸",
       "label": "President of the United States"
     }
   ],

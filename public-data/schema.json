@@ -5,7 +5,7 @@
   "description": "A TimelineDataset restricted to what public data needs: no people/personId (public data is ownerless). Ids only need to be unique within this file — the app namespaces them on load.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "groups", "categories", "rows", "entries"],
+  "required": ["schemaVersion", "groups", "rows", "entries"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "groups": {
@@ -21,30 +21,17 @@
         }
       }
     },
-    "categories": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "label", "color", "icon"],
-        "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "label": { "type": "string", "minLength": 1 },
-          "color": { "type": "string", "minLength": 1 },
-          "icon": { "type": "string", "minLength": 1 }
-        }
-      }
-    },
     "rows": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "groupId", "categoryId", "label"],
+        "required": ["id", "groupId", "label"],
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "groupId": { "type": "string", "minLength": 1 },
-          "categoryId": { "type": "string", "minLength": 1 },
+          "color": { "type": "string", "minLength": 1, "description": "Any CSS color for this row's bars; omit for a neutral default." },
+          "icon": { "type": "string", "minLength": 1, "description": "One emoji shown before the row label; optional." },
           "label": { "type": "string", "minLength": 1 },
           "parentRowId": { "type": "string", "minLength": 1 }
         }

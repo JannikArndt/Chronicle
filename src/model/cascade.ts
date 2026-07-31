@@ -1,9 +1,7 @@
 // Delete cascades (ENGINEERING_PROMPT.md §9): deletes flow down the
 // row/entry parent tree and are always confirmed with a summary first.
-// Categories are a shared flat resource — deleting one is blocked while
-// any row references it, never cascaded.
 
-import type { TimelineDataset, TimelineRow } from "./types";
+import type { TimelineDataset } from "./types";
 
 export interface Cascade {
   rowIds: string[];
@@ -81,10 +79,6 @@ export function describeCascade(cascade: Cascade): string {
   if (cascade.personIds.length > 0) parts.push(count(cascade.personIds.length, "person", "persons"));
   if (parts.length === 1) return `This deletes ${parts[0]}.`;
   return `This deletes ${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}.`;
-}
-
-export function categoryDeleteBlockers(dataset: TimelineDataset, categoryId: string): TimelineRow[] {
-  return dataset.rows.filter((row) => row.categoryId === categoryId);
 }
 
 export function applyDelete(dataset: TimelineDataset, cascade: Cascade, groupId?: string): TimelineDataset {

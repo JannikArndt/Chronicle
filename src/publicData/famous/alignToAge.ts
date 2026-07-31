@@ -69,7 +69,6 @@ export function buildFamousDataset(
       ...group,
       label: aligned ? `${group.label}${ALIGNED_LABEL_SUFFIX}` : group.label,
     })),
-    categories: person.biography.categories,
     rows: person.biography.rows.filter((row) => keptRowIds.has(row.id)),
     entries: person.biography.entries
       .filter((entry) => keptRowIds.has(entry.rowId))

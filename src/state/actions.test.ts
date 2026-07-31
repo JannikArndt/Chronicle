@@ -20,9 +20,8 @@ const T0 = Date.UTC(2020, 0, 1);
 
 function fixture(): TimelineDataset {
   const ds = emptyDataset();
-  ds.categories = [{ id: "cat-1", label: "Job", color: "#333", icon: "💼" }];
   ds.groups = [{ id: "g1", label: "Me", collapsed: false }];
-  ds.rows = [{ id: "r1", groupId: "g1", categoryId: "cat-1", label: "Job" }];
+  ds.rows = [{ id: "r1", groupId: "g1", color: "#333", label: "Job" }];
   ds.entries = [
     {
       id: "e1",
@@ -79,7 +78,6 @@ describe("selection", () => {
 // g2, g3 empty. Array order is display order — that's what these actions move.
 function dragFixture(): TimelineDataset {
   const ds = emptyDataset();
-  ds.categories = [{ id: "cat-1", label: "Job", color: "#333", icon: "💼" }];
   ds.people = [{ id: "p1", label: "Alex" }];
   ds.groups = [
     { id: "g1", label: "Me", collapsed: false },
@@ -87,9 +85,9 @@ function dragFixture(): TimelineDataset {
     { id: "g3", label: "Empty", collapsed: false },
   ];
   ds.rows = [
-    { id: "r1", groupId: "g1", categoryId: "cat-1", label: "Job" },
-    { id: "r2", groupId: "g1", categoryId: "cat-1", label: "Home" },
-    { id: "r3", groupId: "g2", personId: "p1", categoryId: "cat-1", label: "School" },
+    { id: "r1", groupId: "g1", color: "#333", label: "Job" },
+    { id: "r2", groupId: "g1", color: "#333", label: "Home" },
+    { id: "r3", groupId: "g2", personId: "p1", color: "#333", label: "School" },
   ];
   return ds;
 }
@@ -207,7 +205,7 @@ describe("rail drag-and-drop: moveRow", () => {
 
   test("a sub-row cannot be moved", () => {
     const ds = dragFixture();
-    ds.rows.push({ id: "r1-sub", groupId: "g1", categoryId: "cat-1", label: "Sub", parentRowId: "r1" });
+    ds.rows.push({ id: "r1-sub", groupId: "g1", color: "#333", label: "Sub", parentRowId: "r1" });
     replaceDataset(ds);
     moveRow("r1-sub", "g2", null);
     expect(rowById("r1-sub")?.groupId).toBe("g1");

@@ -7,25 +7,19 @@
       "collapsed": false
     }
   ],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "Games",
-      "color": "#0f6ab4",
-      "icon": "🏅"
-    }
-  ],
   "rows": [
     {
       "id": "row-summer",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#0f6ab4",
+      "icon": "🏅",
       "label": "Summer Games"
     },
     {
       "id": "row-winter",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#0f6ab4",
+      "icon": "🏅",
       "label": "Winter Games"
     }
   ],

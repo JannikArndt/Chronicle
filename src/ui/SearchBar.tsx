@@ -13,7 +13,6 @@ export function SearchBar() {
   const publicDatasets = useAppState((s) => s.publicDatasets);
   const [expanded, setExpanded] = useState(false);
 
-  const categories = [...dataset.categories, ...publicDatasets.flatMap((d) => d.categories)];
   const people = [...dataset.people, ...publicDatasets.flatMap((d) => d.people)];
 
   const toggle = (list: string[], id: string): string[] =>
@@ -34,23 +33,6 @@ export function SearchBar() {
       </div>
       {expanded && (
         <div className="filter-panel">
-          {categories.length > 0 && (
-            <div className="filter-group">
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  type="button"
-                  className={`pill ${filters.categoryIds.includes(category.id) ? "pill-active" : ""}`}
-                  onClick={() =>
-                    setFilters({ ...filters, categoryIds: toggle(filters.categoryIds, category.id) })
-                  }
-                >
-                  <span className="pill-icon">{category.icon}</span>
-                  <span className="pill-label">{category.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
           {people.length > 0 && (
             <div className="filter-group">
               {people.map((person) => (

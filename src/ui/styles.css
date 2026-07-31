@@ -552,11 +552,15 @@ textarea {
   width: auto;
 }
 
-.color-emoji-line {
+.row-edit-line {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+}
+
+.row-edit-name {
+  flex: 1;
+  min-width: 0;
 }
 
 /* World-events / famous-people pickers in the rail "+" menu. */
@@ -755,15 +759,17 @@ textarea {
   color: var(--color-danger);
 }
 
-.color-emoji-line input[type="color"] {
+.row-edit-line input[type="color"] {
   width: 40px;
   height: 30px;
   padding: 2px;
+  flex: none;
 }
 
 .emoji-input {
   width: 52px;
   text-align: center;
+  flex: none;
 }
 
 .emoji-picks {

@@ -7,19 +7,12 @@
       "collapsed": false
     }
   ],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "Releases",
-      "color": "#5e8d9c",
-      "icon": "📱"
-    }
-  ],
   "rows": [
     {
       "id": "row-1",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#5e8d9c",
+      "icon": "📱",
       "label": "Flagship generations"
     }
   ],

@@ -7,19 +7,12 @@
       "collapsed": false
     }
   ],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "Tournaments",
-      "color": "#1a7a3c",
-      "icon": "⚽"
-    }
-  ],
   "rows": [
     {
       "id": "row-1",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#1a7a3c",
+      "icon": "⚽",
       "label": "Men's World Cup"
     }
   ],

@@ -50,8 +50,7 @@ function buildBiography(name: string, rows: LifeRows): FamousBiography {
   }
   return {
     groups: [{ id: "g", label: name, collapsed: false }],
-    categories: ROW_DEFINITIONS.map((d) => ({ id: `c-${d.key}`, label: d.label, color: d.color, icon: d.icon })),
-    rows: ROW_DEFINITIONS.map((d) => ({ id: `r-${d.key}`, groupId: "g", categoryId: `c-${d.key}`, label: d.label })),
+    rows: ROW_DEFINITIONS.map((d) => ({ id: `r-${d.key}`, groupId: "g", color: d.color, icon: d.icon, label: d.label })),
     entries,
   };
 }

@@ -6,7 +6,6 @@ export function emptyDataset(): TimelineDataset {
     schemaVersion: SCHEMA_VERSION,
     people: [],
     groups: [],
-    categories: [],
     rows: [],
     entries: [],
   };
@@ -26,7 +25,6 @@ export function mergeDatasets(base: TimelineDataset, ...extra: TimelineDataset[]
   for (const dataset of extra) {
     merged.people.push(...dataset.people);
     merged.groups.push(...dataset.groups);
-    merged.categories.push(...dataset.categories);
     merged.rows.push(...dataset.rows);
     merged.entries.push(...dataset.entries);
   }

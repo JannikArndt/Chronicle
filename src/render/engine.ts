@@ -159,7 +159,6 @@ export class TimelineEngine {
       schemaVersion: 1,
       people: [],
       groups: [],
-      categories: [],
       rows: [],
       entries: [],
     };
@@ -467,10 +466,6 @@ export class TimelineEngine {
     if (this.input.draft) this.drawDraft(this.input.draft, visible, nowMs);
   }
 
-  private categoryOf(row: TimelineRow) {
-    return this.input.dataset.categories.find((c) => c.id === row.categoryId);
-  }
-
   private personOf(row: TimelineRow) {
     const group = this.input.dataset.groups.find((g) => g.id === row.groupId);
     const personId = row.personId ?? group?.personId;
@@ -485,8 +480,7 @@ export class TimelineEngine {
   ): void {
     const { ctx } = this;
     const row = item.row!;
-    const category = this.categoryOf(row);
-    const color = category?.color ?? "#888";
+    const color = row.color ?? "#888";
 
     if (row.id === this.input.selectedRowId) {
       ctx.fillStyle = this.colors.rowSelected;
@@ -797,7 +791,7 @@ export class TimelineEngine {
     const { ctx } = this;
     ctx.save();
     ctx.setLineDash([6, 4]);
-    ctx.strokeStyle = this.categoryOf(item.row)?.color ?? "#888";
+    ctx.strokeStyle = item.row.color ?? "#888";
     ctx.lineWidth = 2;
     const width = Math.max(geom.xVisualEnd - geom.xVisualStart, 24);
     roundRectPath(ctx, geom.xVisualStart, item.y + 6, width, item.height - 12, 5);

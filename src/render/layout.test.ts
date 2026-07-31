@@ -15,13 +15,10 @@ function fixture(): TimelineDataset {
     { id: "g-me", label: "Me", personId: "p-me", collapsed: false },
     { id: "g-family", label: "Family", collapsed: false },
   ];
-  ds.categories = [
-    { id: "c1", label: "Job", color: "#333", icon: "💼" },
-  ];
   ds.rows = [
-    { id: "r1", groupId: "g-me", categoryId: "c1", label: "Job" },
-    { id: "r1s", groupId: "g-me", categoryId: "c1", label: "Projects", parentRowId: "r1" },
-    { id: "r2", groupId: "g-family", personId: "p-finn", categoryId: "c1", label: "School" },
+    { id: "r1", groupId: "g-me", color: "#333", label: "Job" },
+    { id: "r1s", groupId: "g-me", color: "#333", label: "Projects", parentRowId: "r1" },
+    { id: "r2", groupId: "g-family", personId: "p-finn", color: "#333", label: "School" },
   ];
   return ds;
 }

@@ -18,13 +18,11 @@ export function namespaceDataset(dataset: TimelineDataset, fileStem: string): Ti
       id: ns(group.id),
       personId: nsOptional(group.personId),
     })),
-    categories: dataset.categories.map((category) => ({ ...category, id: ns(category.id) })),
     rows: dataset.rows.map((row) => ({
       ...row,
       id: ns(row.id),
       groupId: ns(row.groupId),
       personId: nsOptional(row.personId),
-      categoryId: ns(row.categoryId),
       parentRowId: nsOptional(row.parentRowId),
     })),
     entries: dataset.entries.map((entry) => ({

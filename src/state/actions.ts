@@ -11,7 +11,6 @@ import { appStore, userBirthMs } from "./store";
 import type { AppState } from "./store";
 import type { FamousPerson } from "../publicData/famous/types";
 import type {
-  Category,
   Group,
   Person,
   Precision,
@@ -234,7 +233,7 @@ export function deleteEntryWithCascade(entryId: string): void {
   clearSelection();
 }
 
-// ---------- rows / groups / persons / categories ----------
+// ---------- rows / groups / persons ----------
 
 export interface IdentitySetupResult {
   personId: string;
@@ -252,8 +251,7 @@ export function completeIdentityStep(name: string): IdentitySetupResult {
     const group: Group = { id: newId("group"), label: name, personId: person.id, collapsed: false };
     dataset.groups.push(group);
     dataset.selfPersonId = person.id;
-    const category = ensureCategory(dataset, "Places lived", "#8ba66f", "🏠");
-    const row: TimelineRow = { id: newId("row"), groupId: group.id, categoryId: category.id, label: "Places lived" };
+    const row: TimelineRow = { id: newId("row"), groupId: group.id, color: "#8ba66f", icon: "🏠", label: "Places lived" };
     dataset.rows.push(row);
     result = { personId: person.id, groupId: group.id, placesRowId: row.id };
     return dataset;
@@ -350,35 +348,21 @@ export function addPersonToGroup(groupId: string, label: string): void {
     const person: Person = { id: newId("person"), label };
     dataset.people.push(person);
     // A person needs at least one row to be visible; start with a generic one.
-    const category = ensureCategory(dataset, "General", "#7a8ba6", "📌");
     dataset.rows.push({
       id: newId("row"),
       groupId,
       personId: person.id,
-      categoryId: category.id,
+      color: "#7a8ba6",
+      icon: "📌",
       label: "General",
     });
     return dataset;
   });
 }
 
-function ensureCategory(dataset: TimelineDataset, label: string, color: string, icon: string): Category {
-  const existing = dataset.categories.find((c) => c.label === label);
-  if (existing) return existing;
-  const category: Category = {
-    id: newId("cat"),
-    label,
-    color,
-    icon,
-  };
-  dataset.categories.push(category);
-  return category;
-}
-
 export function addRow(groupId: string, label: string, personId?: string): void {
   updateDataset((dataset) => {
-    const category = ensureCategory(dataset, label, randomPastelColor(), "🏷️");
-    dataset.rows.push({ id: newId("row"), groupId, personId, categoryId: category.id, label });
+    dataset.rows.push({ id: newId("row"), groupId, personId, color: randomPastelColor(), icon: "🏷️", label });
     return dataset;
   });
 }
@@ -387,12 +371,12 @@ export function addSubRow(parentRowId: string, label: string): void {
   updateDataset((dataset) => {
     const parent = dataset.rows.find((r) => r.id === parentRowId);
     if (!parent) return dataset;
-    const category = ensureCategory(dataset, label, randomPastelColor(), "🏷️");
     dataset.rows.push({
       id: newId("row"),
       groupId: parent.groupId,
       personId: parent.personId,
-      categoryId: category.id,
+      color: randomPastelColor(),
+      icon: "🏷️",
       label,
       parentRowId,
     });
@@ -509,14 +493,6 @@ export function updatePerson(personId: string, patch: Partial<Person>): void {
   updateDataset((dataset) => {
     const person = dataset.people.find((p) => p.id === personId);
     if (person) Object.assign(person, patch);
-    return dataset;
-  });
-}
-
-export function updateCategory(categoryId: string, patch: Partial<Category>): void {
-  updateDataset((dataset) => {
-    const category = dataset.categories.find((c) => c.id === categoryId);
-    if (category) Object.assign(category, patch);
     return dataset;
   });
 }

@@ -34,6 +34,25 @@ describe("import validation", () => {
     if (result.ok) expect(result.dataset.schemaVersion).toBe(SCHEMA_VERSION);
   });
 
+  test("folds a pre-v5 category color and icon onto each row and drops the categories array", () => {
+    const legacy = {
+      schemaVersion: 4,
+      people: [],
+      groups: [{ id: "g1", label: "Me", collapsed: false }],
+      categories: [{ id: "cat-1", label: "Job", color: "#abcdef", icon: "💼" }],
+      rows: [{ id: "r1", groupId: "g1", categoryId: "cat-1", label: "Job" }],
+      entries: [],
+    };
+    const result = validateImport(legacy);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.dataset.rows[0].color).toBe("#abcdef");
+      expect(result.dataset.rows[0].icon).toBe("💼");
+      expect("categoryId" in result.dataset.rows[0]).toBe(false);
+      expect("categories" in result.dataset).toBe(false);
+    }
+  });
+
   test("rejects structurally broken files", () => {
     expect(validateImport({ schemaVersion: 1 }).ok).toBe(false);
     expect(validateImport(null).ok).toBe(false);

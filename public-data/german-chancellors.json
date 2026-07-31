@@ -7,19 +7,12 @@
       "collapsed": false
     }
   ],
-  "categories": [
-    {
-      "id": "cat-1",
-      "label": "Chancellors",
-      "color": "#dd0000",
-      "icon": "🇩🇪"
-    }
-  ],
   "rows": [
     {
       "id": "row-1",
       "groupId": "g-1",
-      "categoryId": "cat-1",
+      "color": "#dd0000",
+      "icon": "🇩🇪",
       "label": "Chancellor of Germany"
     }
   ],

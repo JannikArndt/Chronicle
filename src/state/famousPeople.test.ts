@@ -104,11 +104,10 @@ describe("removing famous overlays", () => {
       blurb: "t",
       biography: {
         groups: [{ id: "g", label: "X", collapsed: false }],
-        categories: [{ id: "c", label: "C", color: "#000", icon: "💼" }],
         rows: [
-          { id: "r-flat", groupId: "g", categoryId: "c", label: "Places" },
-          { id: "r-parent", groupId: "g", categoryId: "c", label: "Career" },
-          { id: "r-parent-0", groupId: "g", categoryId: "c", label: "Job", parentRowId: "r-parent" },
+          { id: "r-flat", groupId: "g", color: "#000", icon: "💼", label: "Places" },
+          { id: "r-parent", groupId: "g", color: "#000", icon: "💼", label: "Career" },
+          { id: "r-parent-0", groupId: "g", color: "#000", icon: "💼", label: "Job", parentRowId: "r-parent" },
         ],
         entries: [
           { id: "e0", rowId: "r-flat", title: "Home", start: { ms: 0, precision: "year" as const }, end: { ms: 1, precision: "year" as const } },

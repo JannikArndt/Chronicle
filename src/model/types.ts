@@ -5,7 +5,7 @@
 // A date like "2020-05-14" always means 2020-05-14T00:00:00Z regardless of the
 // viewer's local timezone, so a dataset renders identically on every device.
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export type Precision = "exact" | "day" | "month" | "year" | "circa";
 
@@ -13,13 +13,6 @@ export interface FuzzyDate {
   ms: number; // reference instant (UTC)
   precision: Precision;
   fuzzDays?: number; // optional explicit override of the default fuzziness for this precision
-}
-
-export interface Category {
-  id: string;
-  label: string;
-  color: string; // any CSS color — a native color picker, not a fixed palette
-  icon: string; // any emoji — free-text input, plus a few quick-picks for convenience
 }
 
 export interface Person {
@@ -49,7 +42,8 @@ export interface TimelineRow {
   // (e.g. Finn's "Residence" row inside "Family"). Unset when the row belongs
   // directly to a personId group (that group's personId applies).
   personId?: string;
-  categoryId: string;
+  color?: string; // any CSS color for this row's bars — a native color picker, not a fixed palette
+  icon?: string; // any emoji, shown before the row label in the rail and inspector — free-text input
   label: string;
   parentRowId?: string; // set for a sub-timeline (e.g. "Projects at Kestrel" under "Job")
 }
@@ -82,7 +76,6 @@ export interface TimelineDataset {
   schemaVersion: number;
   people: Person[];
   groups: Group[];
-  categories: Category[];
   rows: TimelineRow[];
   entries: TimelineEntry[];
   // The Person who is "you" — set once the identity onboarding step completes.

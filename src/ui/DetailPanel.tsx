@@ -6,10 +6,9 @@ import { collectEntryCascade, describeCascade } from "../model/cascade";
 import { faviconUrl } from "../model/favicon";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import type { Place, TimelineEntry } from "../model/types";
-import { clearSelection, deleteEntryWithCascade, updateEntry, updateRow } from "../state/actions";
+import { clearSelection, deleteEntryWithCascade, updateEntry } from "../state/actions";
 import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { DateField } from "./DateField";
-import { PillSelector } from "./PillSelector";
 import { PlaceAutocompleteInput } from "../onboarding/PlaceAutocompleteInput";
 import { formatSuggestionText } from "../onboarding/nominatim";
 import type { PlaceSuggestion } from "../onboarding/nominatim";
@@ -36,15 +35,13 @@ export function DetailPanel() {
   const isDraft = state.draft?.id === entry.id;
   const readOnly = isPublicId(entry.id);
   const row = merged.rows.find((r) => r.id === entry.rowId);
-  const category = merged.categories.find((c) => c.id === row?.categoryId);
-  const privateCategories = state.dataset.categories;
   const change = (patch: Partial<TimelineEntry>) => updateEntry(entry.id, patch);
 
   return (
     <aside className="detail-panel">
       <div className="detail-header">
         <span className="detail-category">
-          {category?.icon} {row?.label}
+          {row?.icon} {row?.label}
         </span>
         <button type="button" className="icon-button" title="Close" onClick={clearSelection}>
           ✕
@@ -154,17 +151,6 @@ export function DetailPanel() {
           />
         </div>
       </div>
-
-      {!readOnly && row && privateCategories.length > 0 && (
-        <div className="field">
-          <label className="field-label">Category (of this row)</label>
-          <PillSelector
-            options={privateCategories.map((c) => ({ value: c.id, icon: c.icon, label: c.label }))}
-            value={row.categoryId}
-            onChange={(categoryId) => updateRow(row.id, { categoryId })}
-          />
-        </div>
-      )}
 
       {!readOnly && !isDraft && (
         <button

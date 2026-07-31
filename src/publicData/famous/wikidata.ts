@@ -250,21 +250,21 @@ export function bindingsToPerson(
     throw new Error(`No timeline data found on Wikidata for ${name}.`);
   }
 
-  const categories: FamousBiography["categories"] = [];
   const rows: FamousBiography["rows"] = [];
   const entries: FamousBiography["entries"] = [];
 
   for (const spec of usedSpecs) {
     const items = byType.get(spec.key)!.sort((a, b) => a.start.ms - b.start.ms);
-    const categoryId = `c-${spec.key}`;
     const parentRowId = `r-${spec.key}`;
-    categories.push({ id: categoryId, label: spec.label, color: spec.color, icon: spec.icon });
-    rows.push({ id: parentRowId, groupId: "g", categoryId, label: spec.label });
+    // Every row in a life-area shares the spec's color and icon (what the
+    // category used to carry); lane sub-rows inherit them so parallel lanes
+    // read as one colored area.
+    rows.push({ id: parentRowId, groupId: "g", color: spec.color, icon: spec.icon, label: spec.label });
 
     if (spec.layout === "lanes") {
       items.slice(0, MAX_LANES_PER_ROW).forEach((item, index) => {
         const rowId = `${parentRowId}-${index}`;
-        rows.push({ id: rowId, groupId: "g", categoryId, label: item.title, parentRowId });
+        rows.push({ id: rowId, groupId: "g", color: spec.color, icon: spec.icon, label: item.title, parentRowId });
         entries.push({ id: `${spec.key}-${index}`, rowId, title: item.title, start: item.start, end: item.end });
       });
     } else {
@@ -276,7 +276,6 @@ export function bindingsToPerson(
 
   const biography: FamousBiography = {
     groups: [{ id: "g", label: name, collapsed: false }],
-    categories,
     rows,
     entries,
   };
