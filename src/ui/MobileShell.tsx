@@ -5,13 +5,13 @@
 // architecture genuinely differs: on mobile a timeline row navigates into its
 // own settings pane, on desktop it toggles in place.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import type { TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import { xToMs } from "../render/timeScale";
 import { startDraft } from "../state/actions";
-import { appStore, isPublicId } from "../state/store";
+import { appStore, isPublicId, useAppState } from "../state/store";
 import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
 import { replaceDataset } from "../state/actions";
 import { CanvasHost } from "./CanvasHost";
@@ -35,6 +35,9 @@ const FAB_FADE_OUT_FRACTION = 0.4;
 
 // Index into `anchors` above — the half-screen one.
 const HALF_ANCHOR_INDEX = 1;
+
+// Breathing room between the lowest floating control and the axis beneath it.
+const AXIS_CLEARANCE_PX = 8;
 
 interface MobileShellProps {
   layout: Layout;
@@ -63,9 +66,37 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
+  // The FAB is the "add something" affordance for the canvas. While an entry
+  // surface is open it is neither reachable nor meaningful, and it would sit on
+  // top of that surface.
+  const entrySurfaceOpen = useAppState((s) => s.draft !== undefined || s.selectedEntryId !== undefined);
+
+  // The floating chips (and the search panel below them) would otherwise cover
+  // the year labels, so the canvas is told to start its axis underneath them.
+  const chipsRef = useRef<HTMLDivElement>(null);
+  const searchPanelRef = useRef<HTMLDivElement>(null);
+  const [axisTop, setAxisTop] = useState(0);
+  useLayoutEffect(() => {
+    // The search panel grows when its filters expand, so measure continuously
+    // rather than only when it is opened.
+    const lowestOverlay = searchPanelRef.current ?? chipsRef.current;
+    if (!lowestOverlay) return;
+    const measure = () =>
+      setAxisTop(Math.round(lowestOverlay.getBoundingClientRect().bottom) + AXIS_CLEARANCE_PX);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(lowestOverlay);
+    return () => observer.disconnect();
+  }, [searchOpen, viewportHeight]);
+
+  // Remembered so the FAB can be put back where it belongs after it unmounts
+  // and returns — its position is style, not React state.
+  const sheetPositionRef = useRef(PEEK_ANCHOR_PX);
+
   // Written straight onto the element rather than through state: this runs on
   // every frame of a sheet drag.
   const moveFabWithSheet = (sheetPosition: number, animate: boolean) => {
+    sheetPositionRef.current = sheetPosition;
     const fab = fabRef.current;
     if (!fab) return;
     fab.classList.toggle("fab-snapping", animate);
@@ -81,6 +112,13 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
     if (!rowSheetOpen) moveFabWithSheet(FAB_RESTING_OFFSET_PX, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowSheetOpen]);
+
+  // Coming back from an entry surface, the FAB is a fresh element with no
+  // transform on it yet.
+  useEffect(() => {
+    if (!entrySurfaceOpen) moveFabWithSheet(sheetPositionRef.current, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entrySurfaceOpen]);
 
   const startEntryAtViewCentre = () => {
     const engine = engineRef.current;
@@ -99,9 +137,9 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
 
   return (
     <div className="mobile-shell">
-      <CanvasHost layout={layout} railContentRef={railContentRef} engineRef={engineRef} />
+      <CanvasHost layout={layout} railContentRef={railContentRef} engineRef={engineRef} axisTop={axisTop} />
 
-      <div className="mobile-chips">
+      <div className="mobile-chips" ref={chipsRef}>
         <button type="button" className="chip-pill" onClick={() => setSearchOpen(!searchOpen)}>
           🔍 Search
         </button>
@@ -111,16 +149,24 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
       </div>
 
       {searchOpen && (
-        <div className="mobile-search-panel">
+        <div className="mobile-search-panel" ref={searchPanelRef}>
           <SearchBar />
         </div>
       )}
 
       {menuOpen && <MobileMenu close={() => setMenuOpen(false)} onStartOnboarding={onStartOnboarding} />}
 
-      <button ref={fabRef} type="button" className="mobile-fab" aria-label="Add entry" onClick={startEntryAtViewCentre}>
-        ＋
-      </button>
+      {!entrySurfaceOpen && (
+        <button
+          ref={fabRef}
+          type="button"
+          className="mobile-fab"
+          aria-label="Add entry"
+          onClick={startEntryAtViewCentre}
+        >
+          ＋
+        </button>
+      )}
 
       {!rowSheetOpen && (
         <button type="button" className="chip-pill mobile-reopen" onClick={() => setRowSheetOpen(true)}>

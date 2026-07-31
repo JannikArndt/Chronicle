@@ -92,6 +92,10 @@ export interface EngineInput {
   // Entry ids that should stand out; null when no search/filter is active.
   emphasizedEntryIds: Set<string> | null;
   picking: boolean;
+  // Pixels of canvas left empty above the axis header. The mobile shell floats
+  // its chips over the canvas, and the axis has to start below them or the
+  // years are unreadable. Desktop leaves this at 0.
+  axisTop?: number;
 }
 
 interface EntryHit {
@@ -224,8 +228,14 @@ export class TimelineEngine {
 
   // ---------- internals ----------
 
+  // The y where rows begin: everything above it belongs to the axis header and
+  // to whatever the host floats above it.
+  private contentTop(): number {
+    return (this.input.axisTop ?? 0) + AXIS_HEIGHT;
+  }
+
   private setScrollY(value: number): void {
-    const maxScroll = Math.max(0, this.input.layout.totalHeight - (this.height - AXIS_HEIGHT) + 40);
+    const maxScroll = Math.max(0, this.input.layout.totalHeight - (this.height - this.contentTop()) + 40);
     this.scrollY = Math.min(maxScroll, Math.max(0, value));
     this.callbacks.onScrollSync(this.scrollY);
   }
@@ -371,7 +381,7 @@ export class TimelineEngine {
         return;
       }
     }
-    const contentY = y - AXIS_HEIGHT + this.scrollY;
+    const contentY = y - this.contentTop() + this.scrollY;
     const rowItem = this.input.layout.items.find(
       (item) => item.kind === "row" && contentY >= item.y && contentY <= item.y + item.height,
     );
@@ -400,9 +410,9 @@ export class TimelineEngine {
     // Content area (clipped below the axis header).
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, AXIS_HEIGHT, this.width, this.height - AXIS_HEIGHT);
+    ctx.rect(0, this.contentTop(), this.width, this.height - this.contentTop());
     ctx.clip();
-    ctx.translate(0, AXIS_HEIGHT - this.scrollY);
+    ctx.translate(0, this.contentTop() - this.scrollY);
     this.drawGridlines(ticks);
     this.drawContent();
     ctx.restore();
@@ -418,7 +428,7 @@ export class TimelineEngine {
   private drawGridlines(ticks: { fine: { ms: number }[]; coarse: { ms: number }[] }): void {
     const { ctx } = this;
     const y0 = this.scrollY;
-    const y1 = this.scrollY + this.height - AXIS_HEIGHT;
+    const y1 = this.scrollY + this.height - this.contentTop();
     for (const [tickList, color] of [
       [ticks.fine, this.colors.gridline],
       [ticks.coarse, this.colors.gridlineCoarse],
@@ -438,7 +448,7 @@ export class TimelineEngine {
 
   private visibleRowItems(): LayoutItem[] {
     const top = this.scrollY - ROW_HEIGHT;
-    const bottom = this.scrollY + this.height - AXIS_HEIGHT + ROW_HEIGHT;
+    const bottom = this.scrollY + this.height - this.contentTop() + ROW_HEIGHT;
     return this.input.layout.items.filter((item) => item.y + item.height >= top && item.y <= bottom);
   }
 
@@ -618,8 +628,8 @@ export class TimelineEngine {
     this.entryHits.push({
       x0: Math.min(x0, labelX),
       x1: Math.max(x1, labelX + iconSpace + textWidth),
-      y0: item.y + 6 - this.scrollY + AXIS_HEIGHT,
-      y1: item.y + item.height - 6 - this.scrollY + AXIS_HEIGHT,
+      y0: item.y + 6 - this.scrollY + this.contentTop(),
+      y1: item.y + item.height - 6 - this.scrollY + this.contentTop(),
       entry,
     });
   }
@@ -736,7 +746,7 @@ export class TimelineEngine {
       ctx.restore();
       this.plusHits.push({
         x: spot.x,
-        y: y - this.scrollY + AXIS_HEIGHT,
+        y: y - this.scrollY + this.contentTop(),
         rowId: row.id,
         startMs: spot.startMs,
       });
@@ -801,14 +811,16 @@ export class TimelineEngine {
 
   private drawAxisHeader(ticks: ReturnType<typeof computeTicks>): void {
     const { ctx } = this;
+    const top = this.input.axisTop ?? 0;
+    const bottom = this.contentTop();
     // 1. Background and border FIRST.
     ctx.fillStyle = this.colors.axisBackground;
-    ctx.fillRect(0, 0, this.width, AXIS_HEIGHT);
+    ctx.fillRect(0, top, this.width, AXIS_HEIGHT);
     ctx.strokeStyle = this.colors.axisBorder;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(0, AXIS_HEIGHT - 0.5);
-    ctx.lineTo(this.width, AXIS_HEIGHT - 0.5);
+    ctx.moveTo(0, bottom - 0.5);
+    ctx.lineTo(this.width, bottom - 0.5);
     ctx.stroke();
 
     // 2. Tick marks and text ON TOP — never repaint the background after this.
@@ -818,14 +830,14 @@ export class TimelineEngine {
     for (const tick of ticks.coarse) {
       const x = msToX(this.scale, tick.ms);
       if (x < -60 || x > this.width) continue;
-      ctx.fillText(tick.label, Math.max(x + 4, 4), 14);
+      ctx.fillText(tick.label, Math.max(x + 4, 4), top + 14);
     }
     ctx.font = "11px -apple-system, system-ui, sans-serif";
     ctx.fillStyle = this.colors.axisFineText;
     for (const tick of ticks.fine) {
       const x = msToX(this.scale, tick.ms);
       if (x < -60 || x > this.width) continue;
-      ctx.fillText(tick.label, x + 4, 32);
+      ctx.fillText(tick.label, x + 4, top + 32);
     }
   }
 

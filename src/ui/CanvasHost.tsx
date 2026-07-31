@@ -5,6 +5,7 @@
 import { useEffect, useRef } from "react";
 import type { MutableRefObject, RefObject } from "react";
 import { TimelineEngine } from "../render/engine";
+import type { EngineInput } from "../render/engine";
 import type { Layout } from "../render/layout";
 import {
   clearSelection,
@@ -20,12 +21,32 @@ interface CanvasHostProps {
   layout: Layout;
   railContentRef: RefObject<HTMLDivElement>;
   engineRef: MutableRefObject<TimelineEngine | null>;
+  // Pixels to leave empty above the axis — the mobile shell floats controls there.
+  axisTop?: number;
 }
 
-export function CanvasHost({ layout, railContentRef, engineRef }: CanvasHostProps) {
+// The engine takes its whole input in one call, and two different effects below
+// have to produce it, so it is built in one place.
+function engineInputFor(layout: Layout, axisTop: number): EngineInput {
+  const state = appStore.getState();
+  return {
+    dataset: mergedDataset(state),
+    layout,
+    selectedEntryId: state.selectedEntryId ?? state.draft?.id,
+    selectedRowId: state.selectedRowId,
+    draft: state.draft,
+    emphasizedEntryIds: computeEmphasis(mergedDataset(state), state.search, state.filters),
+    picking: state.pickingField !== undefined,
+    axisTop,
+  };
+}
+
+export function CanvasHost({ layout, railContentRef, engineRef, axisTop = 0 }: CanvasHostProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
+  const axisTopRef = useRef(axisTop);
+  axisTopRef.current = axisTop;
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -46,16 +67,7 @@ export function CanvasHost({ layout, railContentRef, engineRef }: CanvasHostProp
     testHooks.__chronicleStore = appStore;
 
     const feedEngine = () => {
-      const state = appStore.getState();
-      engine.setInput({
-        dataset: mergedDataset(state),
-        layout: layoutRef.current,
-        selectedEntryId: state.selectedEntryId ?? state.draft?.id,
-        selectedRowId: state.selectedRowId,
-        draft: state.draft,
-        emphasizedEntryIds: computeEmphasis(mergedDataset(state), state.search, state.filters),
-        picking: state.pickingField !== undefined,
-      });
+      engine.setInput(engineInputFor(layoutRef.current, axisTopRef.current));
     };
     feedEngine();
     const unsubscribe = appStore.subscribe(feedEngine);
@@ -74,22 +86,11 @@ export function CanvasHost({ layout, railContentRef, engineRef }: CanvasHostProp
     };
   }, [engineRef, railContentRef]);
 
-  // Layout changes (rows added, groups collapsed) re-feed the engine even
-  // though the store subscription fired before this prop updated.
+  // Layout and axis-offset changes re-feed the engine even though the store
+  // subscription fired before these props updated.
   useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    const state = appStore.getState();
-    engine.setInput({
-      dataset: mergedDataset(state),
-      layout,
-      selectedEntryId: state.selectedEntryId ?? state.draft?.id,
-      selectedRowId: state.selectedRowId,
-      draft: state.draft,
-      emphasizedEntryIds: computeEmphasis(mergedDataset(state), state.search, state.filters),
-      picking: state.pickingField !== undefined,
-    });
-  }, [layout, engineRef]);
+    engineRef.current?.setInput(engineInputFor(layout, axisTop));
+  }, [layout, axisTop, engineRef]);
 
   return <canvas ref={canvasRef} className="timeline-canvas" />;
 }
