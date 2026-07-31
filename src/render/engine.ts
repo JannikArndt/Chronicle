@@ -43,12 +43,13 @@ const FALLBACK_COLORS = {
   bracket: "rgba(80, 76, 70, 0.55)",
 };
 
-type ColorTable = typeof FALLBACK_COLORS;
+export type ColorTable = typeof FALLBACK_COLORS;
 
 // The canvas is painted by JS, not CSS, so it can't pick up the OS dark-mode
 // media query on its own — read the same custom properties the DOM UI uses
-// (defined in src/ui/styles.css) so the two never mismatch.
-function readThemeColors(): ColorTable {
+// (defined in src/ui/styles.css) so the two never mismatch. Exported because
+// the minimap is a second canvas and must not grow a colour table of its own.
+export function readThemeColors(): ColorTable {
   if (typeof document === "undefined") return FALLBACK_COLORS;
   const style = getComputedStyle(document.documentElement);
   const read = (name: string, fallback: string) => {
@@ -81,6 +82,9 @@ export interface EngineCallbacks {
   onRequestDraft: (rowId: string, startMs: number) => void;
   onPickDate: (ms: number, precision: Precision) => void;
   onScrollSync: (scrollY: number) => void;
+  // Fired whenever the visible time span changes, so an overview (the mobile
+  // minimap) can track pan and pinch frame by frame.
+  onViewChange?: (startMs: number, endMs: number) => void;
 }
 
 export interface EngineInput {
@@ -133,6 +137,7 @@ export class TimelineEngine {
   private activePointers = new Map<number, { x: number; y: number }>();
   private pinchStart?: { distance: number; midX: number; scale: TimeScale };
   private hoverX: number | null = null;
+  private lastEmittedView: { startMs: number; endMs: number } | null = null;
   private hatchPattern: CanvasPattern | null = null;
   // Resolved once at construction and re-resolved on OS theme change (see
   // attachEvents) — never a second hardcoded color table that could drift
@@ -213,6 +218,13 @@ export class TimelineEngine {
 
   zoomToRange(startMs: number, endMs: number): void {
     this.scale = scaleForRange(startMs, endMs, this.width);
+    this.requestDraw();
+  }
+
+  // Re-centres on an instant at the current zoom — dragging the minimap moves
+  // the view without changing how far in the user was.
+  centerOnMs(ms: number): void {
+    this.scale = clampScale({ ...this.scale, startMs: ms - (this.width / 2) * this.scale.msPerPx });
     this.requestDraw();
   }
 
@@ -423,6 +435,18 @@ export class TimelineEngine {
     this.drawAxisHeader(ticks);
 
     if (this.input.picking && this.hoverX !== null) this.drawPickGuide(this.hoverX);
+
+    this.emitViewChangeIfMoved();
+  }
+
+  // Announced from the draw loop rather than from each pan/zoom entry point:
+  // every one of them ends in a repaint, so this catches all of them once.
+  private emitViewChangeIfMoved(): void {
+    const startMs = this.scale.startMs;
+    const endMs = xToMs(this.scale, this.width);
+    if (this.lastEmittedView?.startMs === startMs && this.lastEmittedView.endMs === endMs) return;
+    this.lastEmittedView = { startMs, endMs };
+    this.callbacks.onViewChange?.(startMs, endMs);
   }
 
   private drawGridlines(ticks: { fine: { ms: number }[]; coarse: { ms: number }[] }): void {

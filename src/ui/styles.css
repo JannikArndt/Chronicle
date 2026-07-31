@@ -928,12 +928,28 @@ textarea {
   inset: 0;
 }
 
-.mobile-chips {
+/* Everything docked at the top stacks in normal flow inside one container, so
+   nothing overlaps and MobileShell can measure a single bottom edge to hand the
+   canvas as its `axisTop`. */
+.mobile-top-stack {
   position: absolute;
   z-index: 60;
-  top: calc(8px + env(safe-area-inset-top));
-  left: 10px;
-  right: 10px;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: calc(8px + env(safe-area-inset-top)) 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Gaps between the controls stay draggable canvas. */
+  pointer-events: none;
+}
+
+.mobile-top-stack > * {
+  pointer-events: auto;
+}
+
+.mobile-chips {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -942,6 +958,17 @@ textarea {
 
 .mobile-chips > * {
   pointer-events: auto;
+}
+
+.mobile-strip {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  /* The strip handles its own drag; the browser must not pan or zoom the page
+     out from under it. */
+  touch-action: none;
 }
 
 .chip-pill {
@@ -977,11 +1004,6 @@ textarea {
 }
 
 .mobile-search-panel {
-  position: absolute;
-  z-index: 59;
-  top: calc(52px + env(safe-area-inset-top));
-  left: 10px;
-  right: 10px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 14px;
