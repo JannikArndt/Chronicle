@@ -22,6 +22,13 @@ export const AXIS_HEIGHT = 46;
 const PLUS_RADIUS = 11;
 const MIN_GAP_FOR_PLUS_PX = 48;
 
+// What separates a tap from the end of a pan. A finger never holds perfectly
+// still, so movement alone is not enough — a slow, short drag is still a drag.
+const TAP_MAX_MOVEMENT_PX = 9;
+const TAP_MAX_DURATION_MS = 350;
+// Fingers are wider than bars: a tap this close to a bar still counts as on it.
+const TAP_SLOP_PX = 4;
+
 // Fallback palette used if CSS custom properties aren't resolvable (e.g. no
 // document, as in unit tests) — mirrors the light theme in src/ui/styles.css.
 const FALLBACK_COLORS = {
@@ -103,10 +110,14 @@ export interface EngineInput {
 }
 
 interface EntryHit {
+  // The hit box, which extends past the bar to cover a label drawn outside it.
   x0: number;
   x1: number;
   y0: number;
   y1: number;
+  // The bar's own width. Overlapping entries are resolved in favour of the
+  // narrowest, and a long label must not make its entry look narrow.
+  barWidth: number;
   entry: TimelineEntry;
 }
 
@@ -133,7 +144,17 @@ export class TimelineEngine {
 
   private entryHits: EntryHit[] = [];
   private plusHits: PlusHit[] = [];
-  private pointerDown?: { x: number; y: number; scale: TimeScale; scrollY: number; moved: boolean };
+  private pointerDown?: {
+    x: number;
+    y: number;
+    time: number;
+    scale: TimeScale;
+    scrollY: number;
+    moved: boolean;
+    // Peak distance from the press point, so a gesture that wanders and comes
+    // back is not mistaken for a tap.
+    maxMovement: number;
+  };
   private activePointers = new Map<number, { x: number; y: number }>();
   private pinchStart?: { distance: number; midX: number; scale: TimeScale };
   private hoverX: number | null = null;
@@ -300,9 +321,11 @@ export class TimelineEngine {
         this.pointerDown = {
           x: event.offsetX,
           y: event.offsetY,
+          time: event.timeStamp,
           scale: this.scale,
           scrollY: this.scrollY,
           moved: false,
+          maxMovement: 0,
         };
       }
     }, { signal: this.eventAbort.signal });
@@ -328,6 +351,7 @@ export class TimelineEngine {
       if (!this.pointerDown) return;
       const dx = event.offsetX - this.pointerDown.x;
       const dy = event.offsetY - this.pointerDown.y;
+      this.pointerDown.maxMovement = Math.max(this.pointerDown.maxMovement, Math.hypot(dx, dy));
       if (!this.pointerDown.moved && Math.hypot(dx, dy) < 4) return;
       this.pointerDown.moved = true;
       // Drag pans BOTH axes at once — horizontal-only panning was explicitly
@@ -339,7 +363,15 @@ export class TimelineEngine {
     }, { signal: this.eventAbort.signal });
 
     const endPointer = (event: PointerEvent) => {
-      const wasTap = this.pointerDown && !this.pointerDown.moved;
+      // A tap, not merely "a press that didn't pan": panning starts after 4px,
+      // but a finger that drifts a little and lifts straight away still meant
+      // to tap, and one that creeps 8px over two seconds did not. The time
+      // limit is for fingers only — a mouse can rest on a button all day and
+      // still be clicking it.
+      const press = this.pointerDown;
+      const heldTooLong =
+        event.pointerType !== "mouse" && event.timeStamp - (press?.time ?? 0) >= TAP_MAX_DURATION_MS;
+      const wasTap = press !== undefined && press.maxMovement < TAP_MAX_MOVEMENT_PX && !heldTooLong;
       this.activePointers.delete(event.pointerId);
       if (this.activePointers.size < 2) this.pinchStart = undefined;
       if (wasTap) this.handleClick(event.offsetX, event.offsetY);
@@ -387,11 +419,20 @@ export class TimelineEngine {
         return;
       }
     }
-    for (const hit of this.entryHits) {
-      if (x >= hit.x0 && x <= hit.x1 && y >= hit.y0 && y <= hit.y1) {
-        this.callbacks.onSelectEntry(hit.entry.id);
-        return;
-      }
+    // Every row is concurrent, so a tap can land on several overlapping bars.
+    // The narrowest wins: a short entry drawn on top of a long one is otherwise
+    // impossible to select, while the long one stays reachable everywhere else.
+    const touchedEntries = this.entryHits.filter(
+      (hit) =>
+        x >= hit.x0 - TAP_SLOP_PX &&
+        x <= hit.x1 + TAP_SLOP_PX &&
+        y >= hit.y0 - TAP_SLOP_PX &&
+        y <= hit.y1 + TAP_SLOP_PX,
+    );
+    if (touchedEntries.length > 0) {
+      const narrowest = touchedEntries.reduce((best, hit) => (hit.barWidth < best.barWidth ? hit : best));
+      this.callbacks.onSelectEntry(narrowest.entry.id);
+      return;
     }
     const contentY = y - this.contentTop() + this.scrollY;
     const rowItem = this.input.layout.items.find(
@@ -611,9 +652,11 @@ export class TimelineEngine {
       ctx.restore();
     }
 
+    // Accent, not text colour: at mobile bar heights a dark outline reads as
+    // part of the bar rather than as "this one is selected".
     if (selected) {
-      ctx.strokeStyle = this.colors.barText;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = this.colors.guide;
+      ctx.lineWidth = 2.5;
       ctx.stroke();
     }
 
@@ -654,6 +697,7 @@ export class TimelineEngine {
       x1: Math.max(x1, labelX + iconSpace + textWidth),
       y0: item.y + 6 - this.scrollY + this.contentTop(),
       y1: item.y + item.height - 6 - this.scrollY + this.contentTop(),
+      barWidth: width,
       entry,
     });
   }

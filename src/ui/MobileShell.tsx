@@ -10,12 +10,12 @@ import type { MutableRefObject } from "react";
 import type { TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import { xToMs } from "../render/timeScale";
-import { startDraft } from "../state/actions";
+import { clearSelection, startDraft } from "../state/actions";
 import { appStore, isPublicId, useAppState } from "../state/store";
 import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
 import { replaceDataset } from "../state/actions";
 import { CanvasHost } from "./CanvasHost";
-import { DetailPanel } from "./DetailPanel";
+import { EntrySheet } from "./EntrySheet";
 import { MiniMap } from "./MiniMap";
 import { RowSheet } from "./RowSheet";
 import { SearchBar } from "./SearchBar";
@@ -27,6 +27,11 @@ import type { BottomSheetHandle } from "./BottomSheet";
 const PEEK_ANCHOR_PX = 96;
 const HALF_ANCHOR_FRACTION = 0.45;
 const FULL_ANCHOR_FRACTION = 0.84;
+
+// The entry inspector's peek anchor is taller: it has to hold a title and a
+// subtitle, which is the whole point of the peek state.
+const ENTRY_PEEK_ANCHOR_PX = 142;
+const ENTRY_HALF_ANCHOR_FRACTION = 0.46;
 
 // The FAB floats just above the sheet's top edge, and fades out once the sheet
 // covers enough of the screen that "add" is no longer the obvious next action.
@@ -52,6 +57,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   const railContentRef = useRef<HTMLDivElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
   const sheetHandleRef = useRef<BottomSheetHandle>(null);
+  const entrySheetHandleRef = useRef<BottomSheetHandle>(null);
 
   const viewportHeight = useViewportHeight();
   const anchors = useMemo(
@@ -62,15 +68,23 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
     ],
     [viewportHeight],
   );
+  const entryAnchors = useMemo(
+    () => [
+      ENTRY_PEEK_ANCHOR_PX,
+      Math.round(viewportHeight * ENTRY_HALF_ANCHOR_FRACTION),
+      Math.round(viewportHeight * FULL_ANCHOR_FRACTION),
+    ],
+    [viewportHeight],
+  );
 
   const [rowSheetOpen, setRowSheetOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // The FAB is the "add something" affordance for the canvas. While an entry
-  // surface is open it is neither reachable nor meaningful, and it would sit on
-  // top of that surface.
-  const entrySurfaceOpen = useAppState((s) => s.draft !== undefined || s.selectedEntryId !== undefined);
+  // The inspector's visibility is derived from the store, not held here: the
+  // canvas, the timeline sheet and the FAB all select entries through the same
+  // actions, and any of them opening this sheet must look identical.
+  const entrySheetOpen = useAppState((s) => s.draft !== undefined || s.selectedEntryId !== undefined);
 
   // Everything docked at the top — chips, search panel, life strip — stacks in
   // one container, and the canvas is told to start its axis below it. Measured
@@ -119,9 +133,9 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   // Coming back from an entry surface, the FAB is a fresh element with no
   // transform on it yet.
   useEffect(() => {
-    if (!entrySurfaceOpen) moveFabWithSheet(sheetPositionRef.current, false);
+    if (!entrySheetOpen) moveFabWithSheet(sheetPositionRef.current, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entrySurfaceOpen]);
+  }, [entrySheetOpen]);
 
   const startEntryAtViewCentre = () => {
     const engine = engineRef.current;
@@ -169,7 +183,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
 
       {menuOpen && <MobileMenu close={() => setMenuOpen(false)} onStartOnboarding={onStartOnboarding} />}
 
-      {!entrySurfaceOpen && (
+      {!entrySheetOpen && (
         <button
           ref={fabRef}
           type="button"
@@ -181,7 +195,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
         </button>
       )}
 
-      {!rowSheetOpen && (
+      {!rowSheetOpen && !entrySheetOpen && (
         <button type="button" className="chip-pill mobile-reopen" onClick={() => setRowSheetOpen(true)}>
           🗂 Timelines
         </button>
@@ -190,17 +204,20 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
       <RowSheet
         layout={layout}
         anchors={anchors}
-        open={rowSheetOpen}
+        open={rowSheetOpen && !entrySheetOpen}
         onClose={() => setRowSheetOpen(false)}
         onPositionChange={(position) => moveFabWithSheet(position, false)}
         sheetHandleRef={sheetHandleRef}
         raiseSheet={() => sheetHandleRef.current?.raiseToAtLeastAnchor(HALF_ANCHOR_INDEX)}
-        onOpenEntry={() => {}}
       />
 
-      {/* Temporary: the desktop detail panel is the mobile entry surface until
-          the inspector sheet replaces it. */}
-      <DetailPanel />
+      <EntrySheet
+        anchors={entryAnchors}
+        open={entrySheetOpen}
+        onClose={clearSelection}
+        onPositionChange={() => {}}
+        sheetHandleRef={entrySheetHandleRef}
+      />
     </div>
   );
 }
