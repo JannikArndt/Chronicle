@@ -14,6 +14,7 @@ import { isPublicId, mergedDataset, useAppState } from "../state/store";
 import type { Layout } from "../render/layout";
 import { BottomSheet } from "./BottomSheet";
 import type { BottomSheetHandle } from "./BottomSheet";
+import { EditableLine } from "./EditableLine";
 
 // Six row colours that read clearly against both themes at bar height. Row
 // colours are data (any CSS colour is valid), so these are quick picks, not a
@@ -151,7 +152,13 @@ function RowSettingsPane({ rowId, onBack }: { rowId: string; onBack: () => void 
       </button>
       <div className="row-settings-head">
         <span className="row-settings-emoji">{row.icon ?? "🏷️"}</span>
-        <span className="row-settings-name">{row.label}</span>
+        <EditableLine
+          className="row-settings-name"
+          value={row.label}
+          placeholder="Untitled timeline"
+          readOnly={readOnly}
+          onCommit={(label) => updateRow(row.id, { label })}
+        />
       </div>
 
       <div className="sheet-section">Group</div>

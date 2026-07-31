@@ -3,7 +3,7 @@
 // different shape: at its peek anchor it shows only the title and subtitle, so
 // tapping a bar answers "what is this?" and everything else is one pull away.
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import type { Ref } from "react";
 import { collectEntryCascade, describeCascade } from "../model/cascade";
 import { formatByPrecision } from "../model/fuzzyDate";
@@ -13,6 +13,7 @@ import { isPublicId, mergedDataset, useAppState } from "../state/store";
 import { BottomSheet } from "./BottomSheet";
 import type { BottomSheetHandle } from "./BottomSheet";
 import { DateRangeEditor } from "./DateRangeEditor";
+import { EditableLine } from "./EditableLine";
 
 interface EntrySheetProps {
   anchors: number[];
@@ -120,61 +121,3 @@ export function EntrySheet({ anchors, open, onClose, onPositionChange, sheetHand
   );
 }
 
-// Tap the text and it becomes an input; blur or Enter commits. No Save button
-// anywhere in this app. The pencil is deliberately large enough to notice — a
-// smaller, fainter one tested as invisible.
-function EditableLine({
-  className,
-  value,
-  placeholder,
-  readOnly,
-  autoFocus,
-  onCommit,
-}: {
-  className: string;
-  value: string;
-  placeholder: string;
-  readOnly: boolean;
-  autoFocus?: boolean;
-  onCommit: (value: string) => void;
-}) {
-  const [editing, setEditing] = useState(autoFocus === true);
-  const [text, setText] = useState(value);
-
-  // A different entry can be selected while this line is mounted; its own
-  // in-flight edit must not leak onto the new one.
-  useEffect(() => {
-    if (!editing) setText(value);
-  }, [value, editing]);
-
-  if (readOnly) return <span className={className}>{value || placeholder}</span>;
-
-  if (editing) {
-    return (
-      <input
-        className={`editable-input ${className}`}
-        type="text"
-        value={text}
-        placeholder={placeholder}
-        autoFocus
-        onChange={(event) => {
-          setText(event.target.value);
-          onCommit(event.target.value);
-        }}
-        onBlur={() => setEditing(false)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") (event.target as HTMLInputElement).blur();
-        }}
-      />
-    );
-  }
-
-  return (
-    <button type="button" className={`editable-line ${className}`} onClick={() => setEditing(true)}>
-      <span className={value ? "" : "editable-placeholder"}>{value || placeholder}</span>
-      <span className="editable-pencil" aria-hidden="true">
-        ✎
-      </span>
-    </button>
-  );
-}
