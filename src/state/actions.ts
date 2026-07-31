@@ -212,6 +212,19 @@ function commitDraft(draft: TimelineEntry): void {
   appStore.setState({ draft: undefined, selectedEntryId: draft.id });
 }
 
+// A complete entry, written in one go. The draft mechanism above exists for
+// direct manipulation, where a bar appears before it has a title; an assistant
+// asks every question first and commits once, which is also what keeps its
+// Back button from ever crossing a commit boundary.
+export function addEntry(entry: Omit<TimelineEntry, "id">): string {
+  const id = newId("entry");
+  updateDataset((dataset) => {
+    dataset.entries.push({ ...entry, id });
+    return dataset;
+  });
+  return id;
+}
+
 // ---------- entry editing (autosave per field) ----------
 
 export function updateEntry(entryId: string, patch: Partial<TimelineEntry>): void {
@@ -360,11 +373,15 @@ export function addPersonToGroup(groupId: string, label: string): void {
   });
 }
 
-export function addRow(groupId: string, label: string, personId?: string): void {
+// Returns the new row's id so a caller that has to put something on it right
+// away (the add-entry assistant) doesn't have to search for it afterwards.
+export function addRow(groupId: string, label: string, personId?: string, icon = "🏷️"): string {
+  const id = newId("row");
   updateDataset((dataset) => {
-    dataset.rows.push({ id: newId("row"), groupId, personId, color: randomPastelColor(), icon: "🏷️", label });
+    dataset.rows.push({ id, groupId, personId, color: randomPastelColor(), icon, label });
     return dataset;
   });
+  return id;
 }
 
 export function addSubRow(parentRowId: string, label: string): void {

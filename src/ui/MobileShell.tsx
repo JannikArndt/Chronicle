@@ -9,8 +9,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import type { TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
-import { xToMs } from "../render/timeScale";
-import { clearSelection, startDraft } from "../state/actions";
+import { AddEntryAssistant } from "../onboarding/AddEntryAssistant";
+import { clearSelection } from "../state/actions";
 import { appStore, isPublicId, useAppState } from "../state/store";
 import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
 import { replaceDataset } from "../state/actions";
@@ -80,6 +80,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   const [rowSheetOpen, setRowSheetOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [addEntryOpen, setAddEntryOpen] = useState(false);
 
   // The inspector's visibility is derived from the store, not held here: the
   // canvas, the timeline sheet and the FAB all select entries through the same
@@ -137,19 +138,13 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entrySheetOpen]);
 
-  const startEntryAtViewCentre = () => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    const state = appStore.getState();
-    const ownRow = layout.items.find((item) => item.kind === "row" && !isPublicId(item.id));
-    const rowId = state.selectedRowId ?? ownRow?.id;
-    if (!rowId) {
-      // Nothing to add to yet — the setup assistant is the honest next step.
-      onStartOnboarding();
-      return;
-    }
-    // The canvas is full-bleed, so the window's midpoint is the view's midpoint.
-    startDraft(rowId, xToMs(engine.scale, window.innerWidth / 2));
+  // The FAB opens the add-entry assistant — but that assistant needs somewhere
+  // to put a new timeline, and a dataset with no group of your own has no such
+  // place. Setup is the honest next step there.
+  const startAddingEntry = () => {
+    const hasSomewhereToPutIt = appStore.getState().dataset.groups.some((group) => !isPublicId(group.id));
+    if (hasSomewhereToPutIt) setAddEntryOpen(true);
+    else onStartOnboarding();
   };
 
   return (
@@ -189,7 +184,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
           type="button"
           className="mobile-fab"
           aria-label="Add entry"
-          onClick={startEntryAtViewCentre}
+          onClick={startAddingEntry}
         >
           ＋
         </button>
@@ -218,6 +213,12 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
         onPositionChange={() => {}}
         sheetHandleRef={entrySheetHandleRef}
       />
+
+      {addEntryOpen && (
+        <div className="assistant-overlay">
+          <AddEntryAssistant onFinished={() => setAddEntryOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }
