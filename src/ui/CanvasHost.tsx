@@ -23,6 +23,8 @@ interface CanvasHostProps {
   engineRef: MutableRefObject<TimelineEngine | null>;
   // Pixels to leave empty above the axis — the mobile shell floats controls there.
   axisTop?: number;
+  // Called on every change to the visible time span (the minimap follows it).
+  onViewChange?: (startMs: number, endMs: number) => void;
 }
 
 // The engine takes its whole input in one call, and two different effects below
@@ -41,12 +43,21 @@ function engineInputFor(layout: Layout, axisTop: number): EngineInput {
   };
 }
 
-export function CanvasHost({ layout, railContentRef, engineRef, axisTop = 0 }: CanvasHostProps) {
+export function CanvasHost({
+  layout,
+  railContentRef,
+  engineRef,
+  axisTop = 0,
+  onViewChange,
+}: CanvasHostProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   const axisTopRef = useRef(axisTop);
   axisTopRef.current = axisTop;
+  // Read through a ref: the engine's callbacks are bound once, at construction.
+  const onViewChangeRef = useRef(onViewChange);
+  onViewChangeRef.current = onViewChange;
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -55,6 +66,7 @@ export function CanvasHost({ layout, railContentRef, engineRef, axisTop = 0 }: C
       onSelectRow: (rowId) => (rowId ? selectRow(rowId) : clearSelection()),
       onRequestDraft: startDraft,
       onPickDate: commitPickedDate,
+      onViewChange: (startMs, endMs) => onViewChangeRef.current?.(startMs, endMs),
       onScrollSync: (scrollY) => {
         const rail = railContentRef.current;
         if (rail) rail.style.transform = `translateY(${-scrollY}px)`;

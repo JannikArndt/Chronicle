@@ -16,6 +16,7 @@ import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
 import { replaceDataset } from "../state/actions";
 import { CanvasHost } from "./CanvasHost";
 import { DetailPanel } from "./DetailPanel";
+import { MiniMap } from "./MiniMap";
 import { RowSheet } from "./RowSheet";
 import { SearchBar } from "./SearchBar";
 import { useViewportHeight } from "./useIsMobile";
@@ -71,23 +72,25 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   // top of that surface.
   const entrySurfaceOpen = useAppState((s) => s.draft !== undefined || s.selectedEntryId !== undefined);
 
-  // The floating chips (and the search panel below them) would otherwise cover
-  // the year labels, so the canvas is told to start its axis underneath them.
-  const chipsRef = useRef<HTMLDivElement>(null);
-  const searchPanelRef = useRef<HTMLDivElement>(null);
+  // Everything docked at the top — chips, search panel, life strip — stacks in
+  // one container, and the canvas is told to start its axis below it. Measured
+  // rather than computed: the strip's height changes with the timeline count
+  // and the search panel grows when its filters expand.
+  const topStackRef = useRef<HTMLDivElement>(null);
   const [axisTop, setAxisTop] = useState(0);
   useLayoutEffect(() => {
-    // The search panel grows when its filters expand, so measure continuously
-    // rather than only when it is opened.
-    const lowestOverlay = searchPanelRef.current ?? chipsRef.current;
-    if (!lowestOverlay) return;
+    const topStack = topStackRef.current;
+    if (!topStack) return;
     const measure = () =>
-      setAxisTop(Math.round(lowestOverlay.getBoundingClientRect().bottom) + AXIS_CLEARANCE_PX);
+      setAxisTop(Math.round(topStack.getBoundingClientRect().bottom) + AXIS_CLEARANCE_PX);
     measure();
     const observer = new ResizeObserver(measure);
-    observer.observe(lowestOverlay);
+    observer.observe(topStack);
     return () => observer.disconnect();
-  }, [searchOpen, viewportHeight]);
+  }, []);
+
+  // The strip's viewport window follows the canvas frame by frame.
+  const [view, setView] = useState<{ startMs: number; endMs: number } | null>(null);
 
   // Remembered so the FAB can be put back where it belongs after it unmounts
   // and returns — its position is style, not React state.
@@ -137,22 +140,32 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
 
   return (
     <div className="mobile-shell">
-      <CanvasHost layout={layout} railContentRef={railContentRef} engineRef={engineRef} axisTop={axisTop} />
+      <CanvasHost
+        layout={layout}
+        railContentRef={railContentRef}
+        engineRef={engineRef}
+        axisTop={axisTop}
+        onViewChange={(startMs, endMs) => setView({ startMs, endMs })}
+      />
 
-      <div className="mobile-chips" ref={chipsRef}>
-        <button type="button" className="chip-pill" onClick={() => setSearchOpen(!searchOpen)}>
-          🔍 Search
-        </button>
-        <button type="button" className="chip-round" aria-label="More" onClick={() => setMenuOpen(true)}>
-          ⋯
-        </button>
-      </div>
-
-      {searchOpen && (
-        <div className="mobile-search-panel" ref={searchPanelRef}>
-          <SearchBar />
+      <div className="mobile-top-stack" ref={topStackRef}>
+        <div className="mobile-chips">
+          <button type="button" className="chip-pill" onClick={() => setSearchOpen(!searchOpen)}>
+            🔍 Search
+          </button>
+          <button type="button" className="chip-round" aria-label="More" onClick={() => setMenuOpen(true)}>
+            ⋯
+          </button>
         </div>
-      )}
+
+        {searchOpen && (
+          <div className="mobile-search-panel">
+            <SearchBar />
+          </div>
+        )}
+
+        <MiniMap layout={layout} engineRef={engineRef} view={view} />
+      </div>
 
       {menuOpen && <MobileMenu close={() => setMenuOpen(false)} onStartOnboarding={onStartOnboarding} />}
 
