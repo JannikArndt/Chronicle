@@ -46,6 +46,10 @@ interface BottomSheetProps {
   className?: string;
 }
 
+// How far the finger must travel down the content before an overscroll counts
+// as "drag the sheet" rather than "the list just bounced".
+const CONTENT_DRAG_THRESHOLD_PX = 4;
+
 interface DragState {
   pointerId: number;
   startClientX: number;
@@ -54,6 +58,10 @@ interface DragState {
   startPosition: number;
   target: HTMLElement;
   samples: { time: number; position: number }[];
+  // A gesture that began on the scrollable content, before it is known whether
+  // the user is scrolling the list or pulling the sheet. Pending gestures move
+  // nothing and never capture the pointer, so a plain scroll is untouched.
+  pending: boolean;
 }
 
 function prefersReducedMotion(): boolean {
@@ -76,6 +84,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   handleRef,
 ) {
   const sheetRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef(anchors[initialAnchorIndex]);
   const dragRef = useRef<DragState | null>(null);
 
@@ -90,6 +99,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
 
   const topAnchor = () => anchorsRef.current[anchorsRef.current.length - 1];
 
+  // Below its highest anchor the sheet's content does not scroll at all —
+  // dragging anywhere on it moves the sheet, the way iOS sheets behave.
+  const isFullyRaised = () => positionRef.current >= topAnchor() - 1;
+
   const applyPosition = (animate: boolean) => {
     const sheet = sheetRef.current;
     if (!sheet) return;
@@ -98,6 +111,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     sheet.style.height = `${topAnchor()}px`;
     sheet.classList.toggle("sheet-snapping", animate && !prefersReducedMotion());
     sheet.style.transform = `translateY(${topAnchor() - positionRef.current}px)`;
+    listRef.current?.classList.toggle("sheet-list-locked", !isFullyRaised());
     onPositionChangeRef.current?.(positionRef.current);
   };
 
@@ -153,12 +167,12 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), []);
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const beginGesture = (event: ReactPointerEvent<HTMLDivElement>, pending: boolean) => {
     const target = event.target as HTMLElement;
-    // A text field in the header (in-place title editing) has to behave like a
-    // text field, including its own caret placement and selection drag.
+    // A text field (in-place title editing) has to behave like a text field,
+    // including its own caret placement and selection drag.
     if (target.closest("input, textarea")) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (!pending) event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       pointerId: event.pointerId,
       startClientX: event.clientX,
@@ -167,13 +181,46 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
       startPosition: positionRef.current,
       target,
       samples: [{ time: event.timeStamp, position: positionRef.current }],
+      pending,
     };
     sheetRef.current?.classList.remove("sheet-snapping");
+  };
+
+  // The header is always a sheet handle.
+  const handleHeaderPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => beginGesture(event, false);
+
+  // The content is a handle too, but only once it is clear the list itself
+  // cannot absorb the gesture — otherwise the sheet would hijack scrolling.
+  const handleContentPointerDown = (event: ReactPointerEvent<HTMLDivElement>) =>
+    beginGesture(event, isFullyRaised());
+
+  // A pending gesture becomes a sheet drag the moment the finger pulls down
+  // while the list is already at its top; any other movement abandons it and
+  // leaves the list to scroll natively.
+  const promoteOrAbandonPendingDrag = (drag: DragState, event: ReactPointerEvent<HTMLDivElement>) => {
+    const movedDown = event.clientY - drag.startClientY;
+    if (Math.abs(movedDown) < CONTENT_DRAG_THRESHOLD_PX) return;
+    const listAtTop = (listRef.current?.scrollTop ?? 0) <= 0;
+    if (movedDown <= 0 || !listAtTop) {
+      dragRef.current = null;
+      return;
+    }
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.pending = false;
+    // Re-anchor to here, so the sheet doesn't jump by the threshold distance.
+    drag.startClientY = event.clientY;
+    drag.startTime = event.timeStamp;
+    drag.startPosition = positionRef.current;
+    drag.samples = [{ time: event.timeStamp, position: positionRef.current }];
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.pending) {
+      promoteOrAbandonPendingDrag(drag, event);
+      if (dragRef.current?.pending !== false) return;
+    }
     const dragged = drag.startPosition + (drag.startClientY - event.clientY);
     positionRef.current = rubberBandPosition(dragged, anchorsRef.current, closable);
     applyPosition(false);
@@ -187,6 +234,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
+    // Never promoted: nothing moved, and the pointer was never captured, so the
+    // native click on whatever was pressed goes through untouched.
+    if (drag.pending) return;
 
     const first = drag.samples[0];
     const last = drag.samples[drag.samples.length - 1];
@@ -220,7 +270,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     >
       <div
         className="sheet-head"
-        onPointerDown={handlePointerDown}
+        onPointerDown={handleHeaderPointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
@@ -228,7 +278,16 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
         <div className="sheet-grab" />
         {header}
       </div>
-      <div className="sheet-list">{children}</div>
+      <div
+        ref={listRef}
+        className="sheet-list"
+        onPointerDown={handleContentPointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        {children}
+      </div>
     </div>
   );
 });
