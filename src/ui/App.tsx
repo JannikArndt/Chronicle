@@ -10,14 +10,17 @@ import { appStore, mergedDataset, useAppState } from "../state/store";
 import { CanvasHost } from "./CanvasHost";
 import { DataMenu } from "./DataMenu";
 import { DetailPanel } from "./DetailPanel";
+import { MobileShell } from "./MobileShell";
 import { RowRail } from "./RowRail";
 import { SearchBar } from "./SearchBar";
+import { useIsMobile } from "./useIsMobile";
 import { IdentityBirthPlacesAssistant } from "../onboarding/IdentityBirthPlacesAssistant";
 import { shouldShowOnboarding } from "../onboarding/shouldShowOnboarding";
 
 export function App() {
   const loaded = useAppState((s) => s.loaded);
   const state = useAppState((s) => s);
+  const isMobile = useIsMobile();
   const railContentRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<TimelineEngine | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
@@ -107,32 +110,42 @@ export function App() {
   const isEmpty = state.dataset.groups.length === 0;
 
   return (
-    <div className="app">
-      <header className="top-bar">
-        <span className="app-title">Chronicle</span>
-        <SearchBar />
-        <DataMenu />
-      </header>
-      <div className="main-area">
-        <RowRail
+    <>
+      {isMobile ? (
+        <MobileShell
           layout={layout}
-          railContentRef={railContentRef}
-          onStartOnboarding={() => setOnboardingOpen(true)}
           engineRef={engineRef}
+          onStartOnboarding={() => setOnboardingOpen(true)}
         />
-        <CanvasHost layout={layout} railContentRef={railContentRef} engineRef={engineRef} />
-        {isEmpty && (
-          <div className="empty-hint">
-            Start with “＋ Group” in the bottom-left — e.g. a group called “Me” that is a person.
+      ) : (
+        <div className="app">
+          <header className="top-bar">
+            <span className="app-title">Chronicle</span>
+            <SearchBar />
+            <DataMenu />
+          </header>
+          <div className="main-area">
+            <RowRail
+              layout={layout}
+              railContentRef={railContentRef}
+              onStartOnboarding={() => setOnboardingOpen(true)}
+              engineRef={engineRef}
+            />
+            <CanvasHost layout={layout} railContentRef={railContentRef} engineRef={engineRef} />
+            {isEmpty && (
+              <div className="empty-hint">
+                Start with “＋ Group” in the bottom-left — e.g. a group called “Me” that is a person.
+              </div>
+            )}
+            <DetailPanel />
           </div>
-        )}
-        <DetailPanel />
-      </div>
+        </div>
+      )}
       {onboardingOpen && (
         <div className="assistant-overlay">
           <IdentityBirthPlacesAssistant onFinished={() => setOnboardingOpen(false)} />
         </div>
       )}
-    </div>
+    </>
   );
 }

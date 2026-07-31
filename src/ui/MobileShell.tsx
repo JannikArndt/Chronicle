@@ -1,0 +1,197 @@
+// The mobile shell: a full-bleed canvas with everything else floating over it.
+//
+// This is a different shell, not a restyled desktop one — App.tsx branches here
+// once, and no media query tries to reconcile the two. The information
+// architecture genuinely differs: on mobile a timeline row navigates into its
+// own settings pane, on desktop it toggles in place.
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { MutableRefObject } from "react";
+import type { TimelineEngine } from "../render/engine";
+import type { Layout } from "../render/layout";
+import { xToMs } from "../render/timeScale";
+import { startDraft } from "../state/actions";
+import { appStore, isPublicId } from "../state/store";
+import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
+import { replaceDataset } from "../state/actions";
+import { CanvasHost } from "./CanvasHost";
+import { DetailPanel } from "./DetailPanel";
+import { RowSheet } from "./RowSheet";
+import { SearchBar } from "./SearchBar";
+import { useViewportHeight } from "./useIsMobile";
+import type { BottomSheetHandle } from "./BottomSheet";
+
+// Peek / half / full. The peek anchor shows the sheet's header and the first
+// row or two — enough to say "your timelines live here".
+const PEEK_ANCHOR_PX = 96;
+const HALF_ANCHOR_FRACTION = 0.45;
+const FULL_ANCHOR_FRACTION = 0.84;
+
+// The FAB floats just above the sheet's top edge, and fades out once the sheet
+// covers enough of the screen that "add" is no longer the obvious next action.
+const FAB_GAP_ABOVE_SHEET_PX = 16;
+const FAB_RESTING_OFFSET_PX = 12;
+const FAB_FADE_OUT_FRACTION = 0.4;
+
+// Index into `anchors` above — the half-screen one.
+const HALF_ANCHOR_INDEX = 1;
+
+interface MobileShellProps {
+  layout: Layout;
+  engineRef: MutableRefObject<TimelineEngine | null>;
+  onStartOnboarding: () => void;
+}
+
+export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShellProps) {
+  // The canvas engine syncs the DOM rail's scroll through this ref; there is no
+  // rail on mobile, so it stays null and the sync is a no-op.
+  const railContentRef = useRef<HTMLDivElement>(null);
+  const fabRef = useRef<HTMLButtonElement>(null);
+  const sheetHandleRef = useRef<BottomSheetHandle>(null);
+
+  const viewportHeight = useViewportHeight();
+  const anchors = useMemo(
+    () => [
+      PEEK_ANCHOR_PX,
+      Math.round(viewportHeight * HALF_ANCHOR_FRACTION),
+      Math.round(viewportHeight * FULL_ANCHOR_FRACTION),
+    ],
+    [viewportHeight],
+  );
+
+  const [rowSheetOpen, setRowSheetOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Written straight onto the element rather than through state: this runs on
+  // every frame of a sheet drag.
+  const moveFabWithSheet = (sheetPosition: number, animate: boolean) => {
+    const fab = fabRef.current;
+    if (!fab) return;
+    fab.classList.toggle("fab-snapping", animate);
+    fab.style.transform = `translateY(${-(sheetPosition + FAB_GAP_ABOVE_SHEET_PX)}px)`;
+    const faded = sheetPosition > viewportHeight * FAB_FADE_OUT_FRACTION;
+    fab.style.opacity = faded ? "0" : "1";
+    fab.style.pointerEvents = faded ? "none" : "auto";
+  };
+
+  // With the sheet thrown away there is no edge to ride, so the FAB drops to
+  // its own resting position above the safe area.
+  useEffect(() => {
+    if (!rowSheetOpen) moveFabWithSheet(FAB_RESTING_OFFSET_PX, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowSheetOpen]);
+
+  const startEntryAtViewCentre = () => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const state = appStore.getState();
+    const ownRow = layout.items.find((item) => item.kind === "row" && !isPublicId(item.id));
+    const rowId = state.selectedRowId ?? ownRow?.id;
+    if (!rowId) {
+      // Nothing to add to yet — the setup assistant is the honest next step.
+      onStartOnboarding();
+      return;
+    }
+    // The canvas is full-bleed, so the window's midpoint is the view's midpoint.
+    startDraft(rowId, xToMs(engine.scale, window.innerWidth / 2));
+  };
+
+  return (
+    <div className="mobile-shell">
+      <CanvasHost layout={layout} railContentRef={railContentRef} engineRef={engineRef} />
+
+      <div className="mobile-chips">
+        <button type="button" className="chip-pill" onClick={() => setSearchOpen(!searchOpen)}>
+          🔍 Search
+        </button>
+        <button type="button" className="chip-round" aria-label="More" onClick={() => setMenuOpen(true)}>
+          ⋯
+        </button>
+      </div>
+
+      {searchOpen && (
+        <div className="mobile-search-panel">
+          <SearchBar />
+        </div>
+      )}
+
+      {menuOpen && <MobileMenu close={() => setMenuOpen(false)} onStartOnboarding={onStartOnboarding} />}
+
+      <button ref={fabRef} type="button" className="mobile-fab" aria-label="Add entry" onClick={startEntryAtViewCentre}>
+        ＋
+      </button>
+
+      {!rowSheetOpen && (
+        <button type="button" className="chip-pill mobile-reopen" onClick={() => setRowSheetOpen(true)}>
+          🗂 Timelines
+        </button>
+      )}
+
+      <RowSheet
+        layout={layout}
+        anchors={anchors}
+        open={rowSheetOpen}
+        onClose={() => setRowSheetOpen(false)}
+        onPositionChange={(position) => moveFabWithSheet(position, false)}
+        sheetHandleRef={sheetHandleRef}
+        raiseSheet={() => sheetHandleRef.current?.raiseToAtLeastAnchor(HALF_ANCHOR_INDEX)}
+        onOpenEntry={() => {}}
+      />
+
+      {/* Temporary: the desktop detail panel is the mobile entry surface until
+          the inspector sheet replaces it. */}
+      <DetailPanel />
+    </div>
+  );
+}
+
+function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOnboarding: () => void }) {
+  const handleImport = () => {
+    triggerImportFlow((result) => {
+      if (!result.ok) {
+        window.alert(result.error);
+        return;
+      }
+      const counts = `${result.dataset.entries.length} entries in ${result.dataset.rows.length} rows`;
+      if (window.confirm(`Replace your current data with this import (${counts})? This cannot be undone.`)) {
+        replaceDataset(result.dataset);
+      }
+    });
+    close();
+  };
+
+  return (
+    <>
+      <div className="popover-backdrop" onClick={close} />
+      <div className="mobile-menu">
+        <button
+          type="button"
+          className="menu-item"
+          onClick={() => {
+            triggerDownload(appStore.getState().dataset);
+            close();
+          }}
+        >
+          ⬇️ Export JSON
+        </button>
+        <button type="button" className="menu-item" onClick={handleImport}>
+          ⬆️ Import JSON…
+        </button>
+        <button
+          type="button"
+          className="menu-item"
+          onClick={() => {
+            close();
+            onStartOnboarding();
+          }}
+        >
+          ✨ Replay setup assistant
+        </button>
+        <div className="hint">
+          Your data lives only in this browser — export regularly to back it up or move devices.
+        </div>
+      </div>
+    </>
+  );
+}

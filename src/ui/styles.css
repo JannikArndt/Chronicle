@@ -17,6 +17,7 @@
   --color-border-strong: #d8d6d0;
 
   --color-accent: #c2410c;
+  --color-accent-soft: rgba(194, 65, 12, 0.12);
 
   --color-danger: #b91c1c;
   --color-danger-border: #e8b4b4;
@@ -68,6 +69,7 @@
     --color-border-strong: #48423a;
 
     --color-accent: #e8621f;
+    --color-accent-soft: rgba(232, 98, 31, 0.18);
 
     --color-danger: #f87171;
     --color-danger-border: #7f2b2b;
@@ -897,29 +899,409 @@ textarea {
   top: 52px;
 }
 
-/* ---------- mobile (§5): narrow translucent rail, first-letter labels ---------- */
+/* ---------- mobile ---------- */
 
+/* The mobile shell is its own component tree (MobileShell.tsx), not a restyled
+   desktop one — these rules are only ever reached below the same breakpoint
+   useIsMobile.ts watches. What is left in the media query below are the desktop
+   components mobile still borrows. */
+
+.mobile-shell {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.mobile-shell .timeline-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.mobile-chips {
+  position: absolute;
+  z-index: 60;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.mobile-chips > * {
+  pointer-events: auto;
+}
+
+.chip-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface-translucent);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(8px);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.chip-round {
+  margin-left: auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-surface-translucent);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(8px);
+  color: var(--color-text-muted);
+  font-size: 15px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.mobile-search-panel {
+  position: absolute;
+  z-index: 59;
+  top: calc(52px + env(safe-area-inset-top));
+  left: 10px;
+  right: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.14);
+}
+
+.mobile-menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(50px + env(safe-area-inset-top));
+  right: 10px;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.14);
+}
+
+.mobile-fab {
+  position: absolute;
+  z-index: 55;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom));
+  width: 54px;
+  height: 54px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #ffffff;
+  font-size: 24px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  transition: opacity 0.2s;
+  will-change: transform;
+}
+
+.mobile-fab.fab-snapping {
+  transition:
+    transform 0.34s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.2s;
+}
+
+.mobile-reopen {
+  position: absolute;
+  z-index: 52;
+  left: 12px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+}
+
+/* ---------- bottom sheet ---------- */
+
+.sheet {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-translucent);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--color-border);
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.16);
+  will-change: transform;
+}
+
+/* Apple's sheet curve — the snap only animates on release, never during a drag. */
+.sheet.sheet-snapping {
+  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.sheet-head {
+  flex: none;
+  padding: 8px 16px 6px;
+  touch-action: none;
+  cursor: grab;
+}
+
+.sheet-grab {
+  width: 38px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--color-border-strong);
+  margin: 0 auto 8px;
+}
+
+.sheet-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sheet-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.sheet-sub {
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+/* overflow-x hidden: the date editor's handles and the bar's fuzzy edges
+   deliberately overhang their container, and would otherwise make the whole
+   sheet scroll sideways. */
+.sheet-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 2px 10px calc(16px + env(safe-area-inset-bottom));
+}
+
+.sheet-section {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 12px 8px 6px;
+}
+
+.sheet-subsection {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  padding: 6px 8px 2px;
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 8px;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.sheet-row:active {
+  background: var(--color-bg-hover);
+}
+
+.sheet-row-hidden {
+  opacity: 0.45;
+}
+
+.sheet-row-static {
+  color: var(--color-text-secondary);
+}
+
+.sheet-row-emoji {
+  flex: none;
+  width: 26px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.sheet-row-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.sheet-row-count {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--color-text-faint);
+}
+
+.sheet-chevron {
+  flex: none;
+  padding: 0 4px;
+  font-size: 17px;
+  color: var(--color-text-faint);
+}
+
+.sheet-soon-tag {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.sheet-back {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+  padding: 4px 8px 10px;
+}
+
+.sheet-empty {
+  font-size: 13px;
+  color: var(--color-text-faint);
+  padding: 2px 8px 6px;
+}
+
+.sheet-danger-button {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 16px 8px 8px;
+  padding: 10px;
+  border: 1px solid var(--color-danger);
+  border-radius: 10px;
+  background: none;
+  color: var(--color-danger);
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+}
+
+.row-settings-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 4px;
+}
+
+.row-settings-emoji {
+  font-size: 20px;
+}
+
+.row-settings-name {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.pick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 2px 8px;
+}
+
+.color-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+}
+
+.color-dot-selected {
+  border-color: var(--color-text);
+}
+
+.icon-pick {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 17px;
+}
+
+.icon-pick-selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* A switch, not a checkbox: this is the only place row visibility lives on
+   mobile, and it has to read as a setting rather than a list marker. */
+.switch {
+  flex: none;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  border-radius: 13px;
+  background: var(--color-border-strong);
+  transition: background 0.18s;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s;
+}
+
+.switch-on {
+  background: var(--color-accent);
+}
+
+.switch-on::after {
+  transform: translateX(16px);
+}
+
+/* iOS Safari zooms the whole page when a focused field is under 16px. Every
+   input on a mobile surface must clear that — including ones created
+   dynamically for in-place editing. Never fix this with maximum-scale=1: that
+   takes pinch-zoom away from everyone who needs it. */
 @media (max-width: 640px) {
-  .rail {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 120px;
-    background: var(--color-rail-translucent);
-    backdrop-filter: blur(6px);
-  }
-
-  .label-full {
-    display: none;
-  }
-
-  .label-initial {
-    display: inline;
-  }
-
-  .rail-row .rail-actions {
-    display: none;
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
   }
 
   .detail-panel {
