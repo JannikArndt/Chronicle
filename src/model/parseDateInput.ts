@@ -31,7 +31,8 @@ const MONTH_NAMES = [
 
 // Shown verbatim when nothing matches — the user must never be left guessing
 // what this field will accept.
-export const ACCEPTED_DATE_FORMATS_HINT = "Try 2016, Aug 2016, 2016-08, 6.8.2016 — or “now”.";
+export const ACCEPTED_DATE_FORMATS_HINT =
+  "Try 2016, Aug 2016, 2016-08, 6.8.2016 — or “still ongoing”.";
 
 export type ParsedDateInput =
   | { kind: "date"; ms: number; precision: Precision }
@@ -57,7 +58,9 @@ export function parseDateInput(text: string): ParsedDateInput {
   const trimmed = text.trim();
   if (trimmed === "") return { kind: "error", message: ACCEPTED_DATE_FORMATS_HINT };
 
-  if (/^(now|ongoing|present)$/i.test(trimmed)) return { kind: "ongoing" };
+  // "still ongoing" is the wording the end field itself shows, so typing back
+  // what you can read there has to work.
+  if (/^(?:still\s+)?(?:now|ongoing|present)$/i.test(trimmed)) return { kind: "ongoing" };
 
   // "~2016" and "ca. 2016" say the year is approximate — which is exactly what
   // circa precision means, so the prefix sets it rather than being discarded.

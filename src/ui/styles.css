@@ -1459,20 +1459,22 @@ textarea {
   color: var(--color-danger);
 }
 
-.date-ongoing-toggle {
+/* "still ongoing" as a value reads as a state, not a date — so it is set in the
+   accent colour rather than the plain text one. */
+.date-block-value-ongoing {
+  color: var(--color-accent);
+}
+
+/* The shortcut that fills the end field with "still ongoing". Only visible
+   while that field is being edited. */
+.date-ongoing-fill {
   padding: 4px 9px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-accent);
   border-radius: 999px;
-  background: none;
+  background: var(--color-accent-soft);
   font: inherit;
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-.date-ongoing-toggle-on {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
   color: var(--color-accent);
 }
 
@@ -1561,6 +1563,7 @@ textarea {
   border-color: var(--color-accent);
 }
 
+.entry-short-title,
 .entry-note {
   display: block;
   width: calc(100% - 16px);
