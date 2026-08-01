@@ -4,28 +4,16 @@
 // solution for non-technical users, and that problem is still open.
 
 import { useState } from "react";
-import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
-import { replaceDataset } from "../state/actions";
+import { triggerDownload } from "../storage/exportImport";
 import { useAppState } from "../state/store";
+import { importDatasetWithConfirmation } from "./importFlow";
 
 export function DataMenu() {
   const dataset = useAppState((s) => s.dataset);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const handleImport = () => {
-    triggerImportFlow((result) => {
-      if (!result.ok) {
-        setMessage(result.error);
-        return;
-      }
-      const counts = `${result.dataset.entries.length} entries in ${result.dataset.rows.length} rows`;
-      if (window.confirm(`Replace your current data with this import (${counts})? This cannot be undone.`)) {
-        replaceDataset(result.dataset);
-        setMessage("Imported.");
-      }
-    });
-  };
+  const handleImport = () => importDatasetWithConfirmation(setMessage);
 
   return (
     <div className="data-menu">
