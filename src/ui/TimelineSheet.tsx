@@ -11,7 +11,7 @@
 // routes have to land in the same place — and they do, because none of them
 // touches this component.
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { MutableRefObject } from "react";
 import { collectEntryCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import { formatByPrecision } from "../model/fuzzyDate";
@@ -102,12 +102,21 @@ export function TimelineSheet({
       merged.groups.find((group) => group.id === row.groupId)?.label)
     : undefined;
 
-  // Which way the panes slide. Compared against the previous render rather than
-  // stored as history: there is only ever one way in and one way out of a pane.
-  const previousDepth = useRef(PANE_DEPTH[pane]);
+  // Which way the panes slide. Derived by comparing against the last pane shown
+  // rather than by keeping a history: there is only ever one way in and one way
+  // out of a pane. Held in state and updated during render (the supported
+  // "derived from props" pattern) rather than in a ref — a ref mutated during
+  // render gets the wrong answer under StrictMode's double invocation, which
+  // would silently make every Back animate forwards in dev.
   const depth = PANE_DEPTH[pane];
-  const direction = depth >= previousDepth.current ? "forward" : "back";
-  previousDepth.current = depth;
+  const [slide, setSlide] = useState({ depth, direction: "forward" });
+  if (slide.depth !== depth) {
+    setSlide({ depth, direction: depth > slide.depth ? "forward" : "back" });
+  }
+
+  // What counts as "a different screen" — for the slide animation, and for
+  // resetting the scroll position so a new pane never opens half scrolled.
+  const paneKey = `${pane}:${entry?.id ?? row?.id ?? ""}`;
 
   const openRow = (rowId: string) => {
     onOpenRowSettings(rowId);
@@ -170,6 +179,7 @@ export function TimelineSheet({
       closable
       onClose={onClose}
       onPositionChange={onPositionChange}
+      contentKey={paneKey}
       header={
         <div className="sheet-title-stack">
           <div className="pane-topbar">
@@ -195,7 +205,7 @@ export function TimelineSheet({
         </div>
       }
     >
-      <div className={`sheet-pane sheet-pane-${direction}`} key={`${pane}:${row?.id ?? ""}`}>
+      <div className={`sheet-pane sheet-pane-${slide.direction}`} key={paneKey}>
         {pane === "list" && (
           <TimelineListPane layout={layout} onOpenRow={openRow} onAddTimeline={onAddTimeline} />
         )}
