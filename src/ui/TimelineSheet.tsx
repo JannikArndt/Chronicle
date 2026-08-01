@@ -173,7 +173,7 @@ export function TimelineSheet({
   return (
     <BottomSheet
       ref={sheetHandleRef}
-      className="row-sheet"
+      className="timeline-sheet"
       anchors={anchors}
       open={open}
       closable
