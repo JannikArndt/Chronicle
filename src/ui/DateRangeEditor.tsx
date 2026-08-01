@@ -31,6 +31,10 @@ type Handle = "start" | "end";
 // the value it holds — one word for one state, everywhere it appears.
 const ONGOING_TEXT = "still ongoing";
 
+// How far the finger must travel before dragging the end handle of an ongoing
+// entry commits an end date to it.
+const END_ONGOING_DRAG_PX = 10;
+
 interface DateRangeEditorProps {
   start: FuzzyDate;
   end: FuzzyDate | undefined;
@@ -41,6 +45,7 @@ interface DateRangeEditorProps {
 export function DateRangeEditor({ start, end, disabled, onChange }: DateRangeEditorProps) {
   const laneRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<Handle | null>(null);
+  const pressClientXRef = useRef(0);
   const nowMs = Date.now();
   const effectiveEndMs = end?.ms ?? nowMs;
 
@@ -81,6 +86,7 @@ export function DateRangeEditor({ start, end, disabled, onChange }: DateRangeEdi
     const handle: Handle =
       Math.abs(fraction - startFraction) <= Math.abs(fraction - endFraction) ? "start" : "end";
     draggingRef.current = handle;
+    pressClientXRef.current = event.clientX;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragTo(event, handle);
   };
@@ -89,8 +95,16 @@ export function DateRangeEditor({ start, end, disabled, onChange }: DateRangeEdi
     const ms = msAtClientX(event.clientX, handle);
     // Handles never cross: dragging the start past the end drags the end along
     // would be surprising, so it simply stops.
-    if (handle === "start") setStart(Math.min(ms, effectiveEndMs));
-    else if (end) setEnd(Math.max(ms, start.ms));
+    if (handle === "start") {
+      setStart(Math.min(ms, effectiveEndMs));
+      return;
+    }
+    // Dragging the end handle of an ongoing entry *ends* it — otherwise that
+    // handle, sitting visibly at today, does nothing at all. But only once the
+    // finger has actually travelled: pointerdown alone lands here too, and a
+    // stray tap on the lane must not silently end something still going.
+    const draggedFar = Math.abs(event.clientX - pressClientXRef.current) >= END_ONGOING_DRAG_PX;
+    if (end || draggedFar) setEnd(Math.max(ms, start.ms));
   };
 
   return (
