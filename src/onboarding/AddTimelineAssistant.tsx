@@ -277,6 +277,9 @@ function EntryTable({
             placeholder={itemNoun}
             onChange={(event) => editRow(index, { title: event.target.value })}
             onBlur={() => commitRow(index)}
+            // Return commits by blurring rather than by ending the whole flow —
+            // you are part-way through one row, not finished with the timeline.
+            onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
           />
           <input
             className="entry-table-year"
@@ -285,6 +288,7 @@ function EntryTable({
             inputMode="numeric"
             onChange={(event) => editRow(index, { fromText: event.target.value })}
             onBlur={() => commitRow(index)}
+            onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
           />
           <input
             className="entry-table-year"
