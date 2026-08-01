@@ -39,7 +39,7 @@ describe("computeTicks", () => {
 
 // The span-driven ladder. Each case names the span it is describing, because
 // the scale that produces it is not readable on its own.
-describe("the axis ladder below five years", () => {
+describe("the axis ladder", () => {
   const forSpan = (spanDays: number, width = WIDTH) =>
     computeTicks({ startMs: T0, msPerPx: (spanDays * DAY_MS) / width }, width);
 
@@ -75,6 +75,20 @@ describe("the axis ladder below five years", () => {
     const { fine, coarse } = forSpan(10);
     expect(coarse.every((t) => /^[A-Z][a-z]+ '\d{2}$/.test(t.label))).toBe(true);
     expect(fine.length).toBeGreaterThanOrEqual(10);
+  });
+
+  test("years shorten to '16 rather than surrendering to decades", () => {
+    // 12 years on a phone gives each year ~32px — too tight for "2016", but
+    // "'16" fits, and the subtitle still answers which year this is. Wider
+    // still and years give way to decades, as before.
+    const tight = forSpan(12 * 365, PHONE_WIDTH);
+    expect(tight.fine.every((t) => /^'\d{2}$/.test(t.label))).toBe(true);
+    expect(tight.coarse.every((t) => /^\d{4}$/.test(t.label))).toBe(true);
+  });
+
+  test("a year with room to spell itself out still does", () => {
+    const roomy = forSpan(12 * 365, WIDTH);
+    expect(roomy.fine.every((t) => /^\d{4}$/.test(t.label))).toBe(true);
   });
 
   // The bug this ladder exists to make unreachable: a decade title above
