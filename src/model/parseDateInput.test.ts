@@ -40,7 +40,8 @@ describe("what the user typed sets the precision", () => {
 
 describe("ongoing", () => {
   test("now, ongoing and present all mean the same thing", () => {
-    for (const text of ["now", "NOW", "ongoing", "present"]) {
+    // "still ongoing" is what the end field displays, so it has to parse back.
+    for (const text of ["now", "NOW", "ongoing", "present", "still ongoing", "Still Ongoing"]) {
       expect(parseDateInput(text)).toEqual({ kind: "ongoing" });
     }
   });

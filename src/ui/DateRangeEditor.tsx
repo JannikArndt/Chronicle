@@ -26,6 +26,11 @@ const GRANULARITY_OPTIONS: { value: Precision; label: string }[] = [
 
 type Handle = "start" | "end";
 
+// The model stores "ongoing" as *no end date at all*, but a missing value is
+// not something a user can read, tap or type. So the end field presents it as
+// the value it holds — one word for one state, everywhere it appears.
+const ONGOING_TEXT = "still ongoing";
+
 interface DateRangeEditorProps {
   start: FuzzyDate;
   end: FuzzyDate | undefined;
@@ -102,22 +107,16 @@ export function DateRangeEditor({ start, end, disabled, onChange }: DateRangeEdi
           onCommitPrecision={(precision) =>
             onChange({ start: { ...start, ms: snapMsToPrecision(start.ms, precision), precision } })
           }
-          refuseOngoing="“now” can only be an end date."
+          refuseOngoing={`“${ONGOING_TEXT}” can only be an end date.`}
         />
         <DateBlock
           caption="Ended"
           value={end}
           disabled={disabled}
-          ongoingLabel="→ still ongoing"
-          onToggleOngoing={() => {
-            if (end) {
-              onChange({ end: undefined });
-              recomputeRange(start.ms, nowMs);
-            } else {
-              const restored: FuzzyDate = { ms: snapMsToPrecision(nowMs, "month"), precision: "month" };
-              onChange({ end: restored });
-              recomputeRange(start.ms, restored.ms);
-            }
+          emptyLabel={ONGOING_TEXT}
+          onChooseOngoing={() => {
+            onChange({ end: undefined });
+            recomputeRange(start.ms, nowMs);
           }}
           onCommitMs={(ms, precision) => {
             onChange({ end: { ...(end ?? {}), ms, precision } });
@@ -166,14 +165,16 @@ export function DateRangeEditor({ start, end, disabled, onChange }: DateRangeEdi
 }
 
 // One side of the editor: caption, the date (tap to type), and the granularity
-// control. The End block also carries the ongoing toggle, directly under the
-// value it replaces rather than off below the lane.
+// control. There is no ongoing *toggle* — an earlier build had one sitting
+// beside a field that also accepted "now", so two controls claimed the same
+// meaning and could visibly disagree. Ongoing is a value of the End field now,
+// and the only way to reach it is to edit that field.
 function DateBlock({
   caption,
   value,
   disabled,
-  ongoingLabel,
-  onToggleOngoing,
+  emptyLabel,
+  onChooseOngoing,
   onCommitMs,
   onCommitPrecision,
   refuseOngoing,
@@ -181,8 +182,11 @@ function DateBlock({
   caption: string;
   value: FuzzyDate | undefined;
   disabled?: boolean;
-  ongoingLabel?: string;
-  onToggleOngoing?: () => void;
+  // What an absent date reads as. Only the End block can be absent.
+  emptyLabel?: string;
+  // Present makes this block able to hold "ongoing": the shortcut button appears
+  // while editing, and a typed "still ongoing" is accepted.
+  onChooseOngoing?: () => void;
   onCommitMs: (ms: number, precision: Precision) => void;
   onCommitPrecision: (precision: Precision) => void;
   refuseOngoing?: string;
@@ -190,23 +194,42 @@ function DateBlock({
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Set when the field is closed by something other than blur. Removing a
+  // focused input can still fire a blur, and that late commit would parse the
+  // half-typed text and overwrite the value the user just chose.
+  const closedRef = useRef(false);
+
+  const openEditor = () => {
+    closedRef.current = false;
+    // An ongoing end starts empty rather than pre-filled: the shortcut button is
+    // right there to put it back, and typing a real date is the far likelier
+    // reason to have opened the field.
+    setText(value ? formatByPrecision(value) : "");
+    setError(null);
+    setEditing(true);
+  };
+
+  const closeEditor = () => {
+    closedRef.current = true;
+    setEditing(false);
+    setError(null);
+  };
 
   const commit = () => {
+    if (closedRef.current) return;
     const parsed = parseDateInput(text);
     if (parsed.kind === "date") {
       onCommitMs(parsed.ms, parsed.precision);
-      setEditing(false);
-      setError(null);
+      closeEditor();
       return;
     }
     if (parsed.kind === "ongoing") {
-      if (refuseOngoing) {
-        setError(refuseOngoing);
+      if (refuseOngoing || !onChooseOngoing) {
+        setError(refuseOngoing ?? ACCEPTED_DATE_FORMATS_HINT);
         return;
       }
-      onToggleOngoing?.();
-      setEditing(false);
-      setError(null);
+      onChooseOngoing();
+      closeEditor();
       return;
     }
     // The value is left untouched and the field stays open with a hint — never
@@ -232,27 +255,29 @@ function DateBlock({
       ) : (
         <button
           type="button"
-          className="date-block-value"
+          className={`date-block-value ${value ? "" : "date-block-value-ongoing"}`}
           disabled={disabled}
-          onClick={() => {
-            setText(value ? formatByPrecision(value) : "");
-            setError(null);
-            setEditing(true);
-          }}
+          onClick={openEditor}
         >
-          {value ? formatByPrecision(value) : "now →"}
+          {value ? formatByPrecision(value) : (emptyLabel ?? "—")}
         </button>
       )}
       {error && <div className="date-block-error">{error}</div>}
 
-      {ongoingLabel && (
+      {editing && onChooseOngoing && (
         <button
           type="button"
-          className={`date-ongoing-toggle ${value ? "" : "date-ongoing-toggle-on"}`}
-          disabled={disabled}
-          onClick={onToggleOngoing}
+          className="date-ongoing-fill"
+          // Blur fires before click and would commit — and unmount this button
+          // before its own click ever ran. Keeping focus in the field is what
+          // makes the shortcut reachable at all.
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => {
+            onChooseOngoing();
+            closeEditor();
+          }}
         >
-          {ongoingLabel}
+          {ONGOING_TEXT}
         </button>
       )}
 

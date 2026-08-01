@@ -33,7 +33,7 @@ interface EntrySheetProps {
 // have none, so the peek state never shows an empty second line.
 function dateRangeText(entry: TimelineEntry): string {
   const start = formatByPrecision(entry.start);
-  return entry.end ? `${start} – ${formatByPrecision(entry.end)}` : `${start} – ongoing`;
+  return entry.end ? `${start} – ${formatByPrecision(entry.end)}` : `${start} – still ongoing`;
 }
 
 export function EntrySheet({
@@ -115,6 +115,18 @@ export function EntrySheet({
     >
       <div className="sheet-section">When</div>
       <DateRangeEditor start={shown.start} end={shown.end} disabled={readOnly} onChange={change} />
+
+      {/* Only ever appears on the bar, and only when the full title won't fit
+          (pickBarLabel decides), so it sits below the things you always edit. */}
+      <div className="sheet-section">Short name</div>
+      <input
+        className="entry-short-title"
+        type="text"
+        placeholder="Used on the timeline when the name is too long"
+        value={shown.shortTitle ?? ""}
+        disabled={readOnly}
+        onChange={(event) => change({ shortTitle: event.target.value || undefined })}
+      />
 
       <div className="sheet-section">Notes</div>
       <textarea
