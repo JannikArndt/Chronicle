@@ -44,6 +44,10 @@ interface BottomSheetProps {
   header: ReactNode;
   children: ReactNode;
   className?: string;
+  // Changes when the content is a different screen rather than the same screen
+  // updated. The list is scrolled back to the top, so a pane never opens
+  // already scrolled down to wherever the previous one was left.
+  contentKey?: string;
 }
 
 // How far the finger must travel down the content before an overscroll counts
@@ -80,6 +84,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     header,
     children,
     className,
+    contentKey,
   },
   handleRef,
 ) {
@@ -143,6 +148,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     applyPosition(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialAnchorIndex]);
+
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [contentKey]);
 
   // Rotation and URL-bar collapse move the anchors under a sheet that is
   // already on screen. Joined into a string because a fresh array literal from

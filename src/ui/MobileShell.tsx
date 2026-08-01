@@ -97,10 +97,9 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
     [viewportHeight, entryOpen],
   );
 
-  // Everything docked at the top — chips, search panel, life strip — stacks in
-  // one container, and the canvas is told to start its axis below it. Measured
-  // rather than computed: the strip's height changes with the timeline count
-  // and the search panel grows when its filters expand.
+  // Everything docked at the top — the chips and the life strip — stacks in one
+  // container, and the canvas is told to start its axis below it. Measured
+  // rather than computed: the strip's height changes with the timeline count.
   const topStackRef = useRef<HTMLDivElement>(null);
   const [axisTop, setAxisTop] = useState(0);
   useLayoutEffect(() => {
@@ -117,14 +116,9 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   // The strip's viewport window follows the canvas frame by frame.
   const [view, setView] = useState<EngineView | null>(null);
 
-  // Remembered so the FAB can be put back where it belongs after it unmounts
-  // and returns — its position is style, not React state.
-  const sheetPositionRef = useRef(PEEK_ANCHOR_PX);
-
   // Written straight onto the element rather than through state: this runs on
   // every frame of a sheet drag.
   const moveFabWithSheet = (sheetPosition: number, animate: boolean) => {
-    sheetPositionRef.current = sheetPosition;
     const fab = fabRef.current;
     if (!fab) return;
     fab.classList.toggle("fab-snapping", animate);
