@@ -87,6 +87,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
   const listRef = useRef<HTMLDivElement>(null);
   const positionRef = useRef(anchors[initialAnchorIndex]);
   const dragRef = useRef<DragState | null>(null);
+  const hasOpenedRef = useRef(false);
 
   // Everything below runs from event handlers and effects that must not be
   // re-bound on every render, so the live props are read through refs.
@@ -133,7 +134,12 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     // slide down from wherever it last was.
     applyHidden(false);
     sheetRef.current?.getBoundingClientRect();
-    positionRef.current = anchorsRef.current[initialAnchorIndex];
+    // Only the very first open uses the initial anchor; after that the sheet
+    // comes back at the height it was left at. Navigating between the timeline
+    // and entry sheets closes one and opens the other, and resetting here made
+    // every such move collapse to peek.
+    if (!hasOpenedRef.current) positionRef.current = anchorsRef.current[initialAnchorIndex];
+    hasOpenedRef.current = true;
     applyPosition(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialAnchorIndex]);

@@ -12,8 +12,11 @@ import { useState } from "react";
 export interface SheetMenuItem {
   label: string;
   onSelect: () => void;
-  // Renders in the danger colour and sits under a divider.
+  // Renders in the danger colour.
   danger?: boolean;
+  // Present makes the item a toggle: ticked when true, blank when false. Absent
+  // means it is a plain action, which is not the same as `false`.
+  checked?: boolean;
 }
 
 export function SheetMenu({ items }: { items: SheetMenuItem[] }) {
@@ -40,12 +43,15 @@ export function SheetMenu({ items }: { items: SheetMenuItem[] }) {
                 key={item.label}
                 type="button"
                 className={`menu-item ${item.danger ? "menu-item-danger" : ""}`}
+                role={item.checked === undefined ? undefined : "menuitemcheckbox"}
+                aria-checked={item.checked}
                 onClick={() => {
                   setOpen(false);
                   item.onSelect();
                 }}
               >
                 {item.label}
+                {item.checked && <span className="menu-item-check">✓</span>}
               </button>
             ))}
           </div>

@@ -56,12 +56,19 @@ export function RowSheet({
   const state = useAppState((s) => s);
   const merged = mergedDataset(state);
 
-  const self = merged.people.find((person) => person.id === state.dataset.selfPersonId);
+  // The header names whatever the sheet is currently showing. On the overview
+  // that is the collection itself — not you: your name is already a section
+  // header down the list, and repeating it there claimed the whole sheet was
+  // yours even while a public group's timeline was open.
+  const settingsRow = merged.rows.find((candidate) => candidate.id === settingsRowId);
+  const owner = settingsRow
+    ? (merged.people.find((person) => person.id === settingsRow.personId) ??
+      merged.groups.find((group) => group.id === settingsRow.groupId))
+    : undefined;
+
   const rowCount = layout.items.filter((item) => item.kind === "row").length;
-  const birthYear = self?.birthDate === undefined ? null : new Date(self.birthDate).getUTCFullYear();
-  const summary = [birthYear === null ? null : `b. ${birthYear}`, `${rowCount} timelines`]
-    .filter(Boolean)
-    .join(" · ");
+  const groupCount = layout.items.filter((item) => item.kind === "group").length;
+  const summary = [`${groupCount} groups`, `${rowCount} timelines`].join(" · ");
 
   const openRowSettings = (rowId: string) => {
     onOpenRowSettings(rowId);
@@ -79,8 +86,8 @@ export function RowSheet({
       onPositionChange={onPositionChange}
       header={
         <div className="sheet-title-row">
-          <span className="sheet-title">{self?.label ?? "Your timelines"}</span>
-          <span className="sheet-sub">{summary}</span>
+          <span className="sheet-title">{settingsRow ? (owner?.label ?? "Timeline") : "Timelines"}</span>
+          {!settingsRow && <span className="sheet-sub">{summary}</span>}
         </div>
       }
     >
@@ -173,14 +180,17 @@ function RowSettingsPane({ rowId, onBack }: { rowId: string; onBack: () => void 
     }
   };
 
-  const menuItems: SheetMenuItem[] = readOnly
-    ? []
-    : [
-        ...(ownGroups.length > 1
-          ? [{ label: "Move to another group…", onSelect: () => setPicker("group") }]
-          : []),
-        { label: "Remove timeline", onSelect: removeTimeline, danger: true },
-      ];
+  const menuItems: SheetMenuItem[] = [
+    { label: "Show on timeline", onSelect: () => toggleRowHidden(row.id), checked: visible },
+    ...(readOnly
+      ? []
+      : [
+          ...(ownGroups.length > 1
+            ? [{ label: "Move to another group…", onSelect: () => setPicker("group") }]
+            : []),
+          { label: "Remove timeline", onSelect: removeTimeline, danger: true },
+        ]),
+  ];
 
   return (
     <>
@@ -191,85 +201,90 @@ function RowSettingsPane({ rowId, onBack }: { rowId: string; onBack: () => void 
         <SheetMenu items={menuItems} />
       </div>
 
-      <div className="row-settings-head">
-        <button
-          type="button"
-          className="row-settings-emoji"
-          aria-label="Change icon"
-          disabled={readOnly}
-          onClick={() => setPicker("icon")}
-        >
-          {row.icon ?? "🏷️"}
-        </button>
-        <button
-          type="button"
-          className="row-settings-swatch"
-          aria-label="Change colour"
-          style={{ background: row.color }}
-          disabled={readOnly}
-          onClick={() => setPicker("color")}
-        />
-        <EditableLine
-          className="row-settings-name"
-          value={row.label}
-          placeholder="Untitled timeline"
-          readOnly={readOnly}
-          onCommit={(label) => updateRow(row.id, { label })}
-        />
+      {/* The popovers live inside this wrapper so they drop directly beneath the
+          row they belong to — anchored anywhere else they resolve against the
+          whole sheet and land off the bottom of the screen. */}
+      <div className="row-settings-identity">
+        <div className="row-settings-head">
+          <button
+            type="button"
+            className="row-settings-emoji"
+            aria-label="Change icon"
+            disabled={readOnly}
+            onClick={() => setPicker("icon")}
+          >
+            {row.icon ?? "🏷️"}
+          </button>
+          <button
+            type="button"
+            className="row-settings-swatch"
+            aria-label="Change colour"
+            style={{ background: row.color }}
+            disabled={readOnly}
+            onClick={() => setPicker("color")}
+          />
+          <EditableLine
+            className="row-settings-name"
+            value={row.label}
+            placeholder="Untitled timeline"
+            readOnly={readOnly}
+            onCommit={(label) => updateRow(row.id, { label })}
+          />
+        </div>
+
+        {picker === "icon" && (
+          <PickerPopover title="Icon" onDismiss={() => setPicker("none")}>
+            <div className="pick-row">
+              {ROW_ICON_PICKS.map((icon) => (
+                <button
+                  key={icon}
+                  type="button"
+                  className={`icon-pick ${row.icon === icon ? "icon-pick-selected" : ""}`}
+                  onClick={() => {
+                    updateRow(row.id, { icon });
+                    setPicker("none");
+                  }}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </PickerPopover>
+        )}
+
+        {picker === "color" && (
+          <PickerPopover title="Colour" onDismiss={() => setPicker("none")}>
+            <div className="pick-row">
+              {ROW_COLOR_PICKS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={`Colour ${color}`}
+                  className={`color-dot ${row.color === color ? "color-dot-selected" : ""}`}
+                  style={{ background: color }}
+                  onClick={() => {
+                    updateRow(row.id, { color });
+                    setPicker("none");
+                  }}
+                />
+              ))}
+            </div>
+          </PickerPopover>
+        )}
+
+        {picker === "group" && (
+          <SheetMenuPicker
+            title="Move to group"
+            options={ownGroups.map((group) => ({
+              id: group.id,
+              label: group.label,
+              current: group.id === row.groupId,
+            }))}
+            onPick={(groupId) => updateRow(row.id, { groupId })}
+            onDismiss={() => setPicker("none")}
+          />
+        )}
       </div>
-
-      {picker === "icon" && (
-        <PickerPopover title="Icon" onDismiss={() => setPicker("none")}>
-          <div className="pick-row">
-            {ROW_ICON_PICKS.map((icon) => (
-              <button
-                key={icon}
-                type="button"
-                className={`icon-pick ${row.icon === icon ? "icon-pick-selected" : ""}`}
-                onClick={() => {
-                  updateRow(row.id, { icon });
-                  setPicker("none");
-                }}
-              >
-                {icon}
-              </button>
-            ))}
-          </div>
-        </PickerPopover>
-      )}
-
-      {picker === "color" && (
-        <PickerPopover title="Colour" onDismiss={() => setPicker("none")}>
-          <div className="pick-row">
-            {ROW_COLOR_PICKS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                aria-label={`Colour ${color}`}
-                className={`color-dot ${row.color === color ? "color-dot-selected" : ""}`}
-                style={{ background: color }}
-                onClick={() => {
-                  updateRow(row.id, { color });
-                  setPicker("none");
-                }}
-              />
-            ))}
-          </div>
-        </PickerPopover>
-      )}
-
-      {picker === "group" && (
-        <SheetMenuPicker
-          title="Move to group"
-          options={ownGroups.map((group) => ({
-            id: group.id,
-            label: group.label,
-            current: group.id === row.groupId,
-          }))}
-          onPick={(groupId) => updateRow(row.id, { groupId })}
-          onDismiss={() => setPicker("none")}
-        />
-      )}
 
       <div className="sheet-section">Entries · {entries.length}</div>
       {entries.length === 0 && <div className="sheet-empty">Nothing on this timeline yet.</div>}
@@ -288,12 +303,6 @@ function RowSettingsPane({ rowId, onBack }: { rowId: string; onBack: () => void 
           <span className="sheet-chevron">›</span>
         </button>
       ))}
-
-      <div className="sheet-section">Settings</div>
-      <button type="button" className="sheet-row" onClick={() => toggleRowHidden(row.id)}>
-        <span className="sheet-row-label">Show on timeline</span>
-        <span className={`switch ${visible ? "switch-on" : ""}`} role="switch" aria-checked={visible} />
-      </button>
     </>
   );
 }
