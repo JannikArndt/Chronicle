@@ -126,42 +126,43 @@ describe("viewportWindow", () => {
   const BAND = 60;
   // Rows taller than the canvas: the case where the vertical window is not the
   // whole band.
-  const scrolled = { scrollY: 100, visibleHeight: 200, totalHeight: 600 };
+  const scrolled = { startMs: 25, endMs: 75, scrollY: 100, visibleHeight: 200, totalHeight: 600 };
 
   it("maps the visible time span onto the strip", () => {
-    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, null, BAND);
+    const window = viewportWindow(scrolled, range, 200, BAND);
     expect(window.x0).toBe(50);
     expect(window.x1).toBe(150);
   });
 
   it("clamps a view panned off the end of the data to the strip", () => {
-    const window = viewportWindow({ startMs: 500, endMs: 550 }, range, 200, null, BAND);
+    const window = viewportWindow({ ...scrolled, startMs: 500, endMs: 550 }, range, 200, BAND);
     expect(window.x0).toBe(200);
     expect(window.x1).toBe(200);
   });
 
   it("spans the whole lane band when every row is already on screen", () => {
-    const everything = { scrollY: 0, visibleHeight: 400, totalHeight: 300 };
-    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, everything, BAND);
+    const everything = { ...scrolled, scrollY: 0, visibleHeight: 400, totalHeight: 300 };
+    const window = viewportWindow(everything, range, 200, BAND);
     expect(window.y0).toBe(0);
     expect(window.y1).toBe(BAND);
   });
 
   it("shrinks and moves down as the canvas scrolls past rows below the fold", () => {
-    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, scrolled, BAND);
+    const window = viewportWindow(scrolled, range, 200, BAND);
     expect(window.y0).toBe(10);
     expect(window.y1).toBe(30);
   });
 
   it("clamps the bottom edge to the band when scrolled past the last row", () => {
-    const overscrolled = { scrollY: 550, visibleHeight: 200, totalHeight: 600 };
-    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, overscrolled, BAND);
+    const overscrolled = { ...scrolled, scrollY: 550 };
+    const window = viewportWindow(overscrolled, range, 200, BAND);
     expect(window.y1).toBe(BAND);
     expect(window.y0).toBe(55);
   });
 
-  it("treats a missing vertical view as the whole band", () => {
-    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, null, BAND);
+  it("survives a layout with no height at all — an empty dataset", () => {
+    const empty = { ...scrolled, scrollY: 0, visibleHeight: 0, totalHeight: 0 };
+    const window = viewportWindow(empty, range, 200, BAND);
     expect(window.y0).toBe(0);
     expect(window.y1).toBe(BAND);
   });

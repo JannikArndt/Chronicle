@@ -141,7 +141,7 @@ function paintStrip(
   // The window is a window on both axes: with more timelines than fit on the
   // canvas it also shrinks vertically and rides up and down as you scroll.
   const band = laneBandHeight(lanes.length, cssHeight);
-  const visible = viewportWindow(view, range, drawableWidth, view, band);
+  const visible = viewportWindow(view, range, drawableWidth, band);
   const x0 = SIDE_INSET_PX + visible.x0;
   const width = Math.max(MIN_WINDOW_WIDTH_PX, visible.x1 - visible.x0);
   const y0 = TOP_INSET_PX + visible.y0 - 2;
