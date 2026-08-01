@@ -1061,9 +1061,11 @@ textarea {
 
 /* ---------- bottom sheet ---------- */
 
+/* Above the floating top stack (z 60): fully extended, a sheet reaches into the
+   life strip's band, and sliding *under* it read as the sheet being cut off. */
 .sheet {
   position: absolute;
-  z-index: 50;
+  z-index: 65;
   left: 0;
   right: 0;
   bottom: 0;
@@ -1222,21 +1224,23 @@ textarea {
   color: var(--color-text-faint);
 }
 
-.sheet-soon-tag {
-  flex: none;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 2px 7px;
+/* Back on the left, ⋯ on the right — the same arrangement in the timeline pane
+   and the entry pane, so navigating between them doesn't move the controls. */
+.pane-topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 4px;
 }
 
 .sheet-back {
-  display: block;
-  width: 100%;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   text-align: left;
   border: none;
   background: none;
@@ -1253,19 +1257,52 @@ textarea {
   padding: 2px 8px 6px;
 }
 
-.sheet-danger-button {
-  display: block;
-  width: calc(100% - 16px);
-  margin: 16px 8px 8px;
-  padding: 10px;
-  border: 1px solid var(--color-danger);
-  border-radius: 10px;
-  background: none;
-  color: var(--color-danger);
-  font: inherit;
-  font-weight: 600;
-  font-size: 14px;
-  text-align: center;
+/* Rare and destructive actions live behind this rather than at the bottom of a
+   scrolling pane, where a thumb reaching for the last entry finds "Remove". */
+.sheet-menu-button {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font-size: 17px;
+  line-height: 1;
+}
+
+/* Anchored to the ⋯ itself, not to the sheet, so it stays under the button
+   however far the pane beneath it has been scrolled. */
+.sheet-menu {
+  position: absolute;
+  top: 100%;
+  right: 4px;
+  /* Above .popover-backdrop (40), which is a sibling inside the same sheet. */
+  z-index: 45;
+  min-width: 190px;
+  max-width: calc(100vw - 40px);
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+
+.sheet-menu-title {
+  padding: 4px 10px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.menu-item-current {
+  color: var(--color-accent);
+}
+
+.menu-item-check {
+  float: right;
 }
 
 /* ---------- entry inspector sheet ---------- */
@@ -1486,23 +1523,6 @@ textarea {
   border-color: var(--color-accent);
 }
 
-.entry-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 2px 8px;
-}
-
-.entry-chip {
-  padding: 5px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-bg-subtle);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
 .entry-note {
   display: block;
   width: calc(100% - 16px);
@@ -1528,8 +1548,31 @@ textarea {
   padding: 0 8px 4px;
 }
 
+/* Icon and colour are edited by tapping them, so both need to look pressable
+   without turning the header into a row of form controls. */
 .row-settings-emoji {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-subtle);
   font-size: 20px;
+  line-height: 1;
+}
+
+.row-settings-swatch {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0;
+}
+
+.row-settings-emoji:disabled,
+.row-settings-swatch:disabled {
+  opacity: 0.6;
 }
 
 .row-settings-name {

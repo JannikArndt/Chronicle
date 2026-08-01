@@ -14,6 +14,8 @@ import { BottomSheet } from "./BottomSheet";
 import type { BottomSheetHandle } from "./BottomSheet";
 import { DateRangeEditor } from "./DateRangeEditor";
 import { EditableLine } from "./EditableLine";
+import { SheetMenu } from "./SheetMenu";
+import type { SheetMenuItem } from "./SheetMenu";
 
 interface EntrySheetProps {
   anchors: number[];
@@ -21,6 +23,10 @@ interface EntrySheetProps {
   onClose: () => void;
   onPositionChange: (position: number) => void;
   sheetHandleRef: Ref<BottomSheetHandle>;
+  // Navigates up to the timeline this entry sits on. Until the two sheets merge
+  // into one navigable stack, that means closing this sheet and opening the
+  // other on the right pane — which the shell owns, not this component.
+  onOpenTimeline: (rowId: string) => void;
 }
 
 // An entry's own dates, as one line — the stand-in subtitle for entries that
@@ -30,7 +36,14 @@ function dateRangeText(entry: TimelineEntry): string {
   return entry.end ? `${start} – ${formatByPrecision(entry.end)}` : `${start} – ongoing`;
 }
 
-export function EntrySheet({ anchors, open, onClose, onPositionChange, sheetHandleRef }: EntrySheetProps) {
+export function EntrySheet({
+  anchors,
+  open,
+  onClose,
+  onPositionChange,
+  sheetHandleRef,
+  onOpenTimeline,
+}: EntrySheetProps) {
   const state = useAppState((s) => s);
   const merged = mergedDataset(state);
   const entry = state.draft ?? merged.entries.find((candidate) => candidate.id === state.selectedEntryId);
@@ -45,9 +58,19 @@ export function EntrySheet({ anchors, open, onClose, onPositionChange, sheetHand
   const readOnly = isPublicId(shown.id);
   const isDraft = state.draft?.id === shown.id;
   const row = merged.rows.find((candidate) => candidate.id === shown.rowId);
-  const group = merged.groups.find((candidate) => candidate.id === row?.groupId);
-  const person = merged.people.find((candidate) => candidate.id === row?.personId);
   const change = (patch: Partial<TimelineEntry>) => updateEntry(shown.id, patch);
+
+  const removeEntry = () => {
+    const cascade = collectEntryCascade(state.dataset, shown.id);
+    if (window.confirm(`Delete “${shown.title}”? ${describeCascade(cascade)}`)) {
+      deleteEntryWithCascade(shown.id);
+      onClose();
+    }
+  };
+
+  // A draft has nothing to remove yet — it is not in the dataset until titled.
+  const menuItems: SheetMenuItem[] =
+    readOnly || isDraft ? [] : [{ label: "Remove from timeline", onSelect: removeEntry, danger: true }];
 
   return (
     <BottomSheet
@@ -60,6 +83,14 @@ export function EntrySheet({ anchors, open, onClose, onPositionChange, sheetHand
       onPositionChange={onPositionChange}
       header={
         <div className="sheet-title-stack">
+          <div className="pane-topbar">
+            {row && (
+              <button type="button" className="sheet-back" onClick={() => onOpenTimeline(row.id)}>
+                ‹ {row.icon ?? "🏷️"} {row.label}
+              </button>
+            )}
+            <SheetMenu items={menuItems} />
+          </div>
           <EditableLine
             className="sheet-title"
             value={shown.title}
@@ -81,17 +112,6 @@ export function EntrySheet({ anchors, open, onClose, onPositionChange, sheetHand
       <div className="sheet-section">When</div>
       <DateRangeEditor start={shown.start} end={shown.end} disabled={readOnly} onChange={change} />
 
-      <div className="sheet-section">Connected</div>
-      <div className="entry-chips">
-        {group && group.label !== row?.label && <span className="entry-chip">{group.label}</span>}
-        {row && (
-          <span className="entry-chip">
-            {row.icon ?? "🏷️"} {row.label}
-          </span>
-        )}
-        {person && <span className="entry-chip">👤 {person.label}</span>}
-      </div>
-
       <div className="sheet-section">Notes</div>
       <textarea
         className="entry-note"
@@ -101,22 +121,6 @@ export function EntrySheet({ anchors, open, onClose, onPositionChange, sheetHand
         disabled={readOnly}
         onChange={(event) => change({ description: event.target.value || undefined })}
       />
-
-      {!readOnly && !isDraft && (
-        <button
-          type="button"
-          className="sheet-danger-button"
-          onClick={() => {
-            const cascade = collectEntryCascade(state.dataset, shown.id);
-            if (window.confirm(`Delete “${shown.title}”? ${describeCascade(cascade)}`)) {
-              deleteEntryWithCascade(shown.id);
-              onClose();
-            }
-          }}
-        >
-          Remove from timeline
-        </button>
-      )}
     </BottomSheet>
   );
 }

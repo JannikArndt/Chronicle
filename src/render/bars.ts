@@ -60,6 +60,50 @@ export function labelAnchorX(geom: BarGeometry, textWidth: number, viewportWidth
   return Math.max(x, Math.max(geom.xSolidStart + padding, 0 + padding));
 }
 
+// The x a label must stop before: where the next bar on this row begins. Rows
+// are concurrent, so "next" is not simply the following array element — a short
+// bar frequently sits wholly inside a long one, and it is precisely that case
+// the label must not be drawn across.
+//
+// Only bars starting to the right of this label's anchor can clamp it; one that
+// starts further left is already behind this bar's own label position.
+export function labelLimitX(index: number, geometries: BarGeometry[], viewportWidth: number): number {
+  const own = geometries[index];
+  let limit = viewportWidth;
+  for (let i = 0; i < geometries.length; i++) {
+    if (i === index) continue;
+    const other = geometries[i];
+    if (other.xVisualStart > own.xSolidStart && other.xVisualStart < limit) limit = other.xVisualStart;
+  }
+  return limit;
+}
+
+// Shortens a label to fit, with an ellipsis. `measure` is the caller's
+// ctx.measureText, which keeps this function pure and unit-testable — the
+// canvas is the only thing that knows how wide a string actually is.
+//
+// Below MIN_LABEL_WIDTH_PX there is no honest label left to draw, so nothing is
+// drawn: "…" on its own tells the reader less than the bar's colour does.
+export const MIN_LABEL_WIDTH_PX = 24;
+
+export function truncateToWidth(
+  text: string,
+  available: number,
+  measure: (candidate: string) => number,
+): string {
+  if (available < MIN_LABEL_WIDTH_PX) return "";
+  if (measure(text) <= available) return text;
+
+  let fits = 0;
+  let tooLong = text.length;
+  while (fits < tooLong) {
+    const middle = Math.ceil((fits + tooLong) / 2);
+    if (measure(`${text.slice(0, middle).trimEnd()}…`) <= available) fits = middle;
+    else tooLong = middle - 1;
+  }
+  return fits === 0 ? "" : `${text.slice(0, fits).trimEnd()}…`;
+}
+
 // Falls back to shortTitle only when the full title actually overflows the
 // bar's near-opaque span — never swaps just because a shortTitle exists.
 export function pickBarLabel(
