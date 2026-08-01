@@ -64,9 +64,10 @@ export interface ViewportWindow {
   y1: number;
 }
 
-// The canvas's vertical position, as the minimap needs it: how far down the
-// laid-out rows the view sits, and how much of them it covers.
-export interface VerticalView {
+// Everything the minimap needs to know about where the canvas is looking: a
+// span of time across, and a slice of the laid-out rows down. The engine's
+// EngineView satisfies this, which is why nothing here imports it.
+export interface MiniMapView extends MiniMapRange {
   scrollY: number;
   visibleHeight: number;
   totalHeight: number;
@@ -130,10 +131,9 @@ export function miniMapTimeRange(lanes: MiniMapLane[], nowMs: number): MiniMapRa
 // the span rather than a TimeScale, because that is what the engine reports
 // through onViewChange.
 export function viewportWindow(
-  view: MiniMapRange,
+  view: MiniMapView,
   range: MiniMapRange,
   stripWidth: number,
-  vertical: VerticalView | null,
   laneBandHeight: number,
 ): ViewportWindow {
   const msToStripX = (ms: number) =>
@@ -141,7 +141,7 @@ export function viewportWindow(
   return {
     x0: clamp(msToStripX(view.startMs), 0, stripWidth),
     x1: clamp(msToStripX(view.endMs), 0, stripWidth),
-    ...verticalWindow(vertical, laneBandHeight),
+    ...verticalWindow(view, laneBandHeight),
   };
 }
 
@@ -149,13 +149,13 @@ export function viewportWindow(
 // of canvas, so the visible slice maps across as a plain proportion. A canvas
 // that shows everything gets the full band — never a window smaller than the
 // thing it is a window onto.
-function verticalWindow(vertical: VerticalView | null, laneBandHeight: number): { y0: number; y1: number } {
-  if (!vertical || vertical.totalHeight <= 0 || vertical.visibleHeight >= vertical.totalHeight) {
+function verticalWindow(view: MiniMapView, laneBandHeight: number): { y0: number; y1: number } {
+  if (view.totalHeight <= 0 || view.visibleHeight >= view.totalHeight) {
     return { y0: 0, y1: laneBandHeight };
   }
-  const scale = laneBandHeight / vertical.totalHeight;
-  const y0 = clamp(vertical.scrollY * scale, 0, laneBandHeight);
-  const y1 = clamp((vertical.scrollY + vertical.visibleHeight) * scale, y0, laneBandHeight);
+  const scale = laneBandHeight / view.totalHeight;
+  const y0 = clamp(view.scrollY * scale, 0, laneBandHeight);
+  const y1 = clamp((view.scrollY + view.visibleHeight) * scale, y0, laneBandHeight);
   return { y0, y1 };
 }
 

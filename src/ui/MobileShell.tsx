@@ -135,6 +135,16 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetOpen]);
 
+  // Opening a timeline's pane means the sheet is open, and saying so here is
+  // load-bearing: the sheet may currently be on screen only because an entry is
+  // selected (tapped on the canvas after flicking the sheet away). Going back
+  // from that entry to its timeline deselects it, and without this the sheet
+  // would slide shut instead of showing the pane you asked for.
+  const openRowPane = (rowId: string) => {
+    setSettingsRowId(rowId);
+    setSheetKeptOpen(true);
+  };
+
   // Flicking the sheet away also drops whatever it was showing — leaving an
   // entry selected on the canvas with nothing on screen naming it is the state
   // that reads as "the app lost my tap".
@@ -232,7 +242,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
         engineRef={engineRef}
         raiseSheet={() => sheetHandleRef.current?.raiseToAtLeastAnchor(HALF_ANCHOR_INDEX)}
         settingsRowId={settingsRowId}
-        onOpenRowSettings={setSettingsRowId}
+        onOpenRowSettings={openRowPane}
         onCloseRowSettings={() => setSettingsRowId(null)}
         onAddEntry={(rowId, startMs) => startAdding({ rowId, startMs })}
         onAddTimeline={startAddingTimeline}
