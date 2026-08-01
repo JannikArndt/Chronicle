@@ -40,18 +40,40 @@ type RowChoice = { kind: "existing"; rowId: string } | { kind: "new" };
 
 interface AddEntryAssistantProps {
   onFinished: () => void;
+  // Set when the flow was started from a timeline that already exists: the
+  // "what kind of thing" and "which timeline" questions are already answered,
+  // so they are not asked.
+  startOnRowId?: string;
+  // Where that timeline currently reaches to, as the year to open the slider on.
+  startMs?: number;
+  // Called by "Done" with the id of the entry just created, so the shell can
+  // move the canvas to it. Without this you add something and never see it.
+  onShowEntry?: (entryId: string) => void;
 }
 
-export function AddEntryAssistant({ onFinished }: AddEntryAssistantProps) {
-  const flow = useAssistantFlow<Phase>("category");
+export function AddEntryAssistant({
+  onFinished,
+  startOnRowId,
+  startMs,
+  onShowEntry,
+}: AddEntryAssistantProps) {
+  const firstPhase: Phase = startOnRowId === undefined ? "category" : "name";
+  const flow = useAssistantFlow<Phase>(firstPhase);
   const nowMs = Date.now();
   const currentYear = new Date(nowMs).getUTCFullYear();
   const firstYear = firstYearOnTheAxis(currentYear);
 
   const [category, setCategory] = useState<EntryCategory | null>(null);
   const [title, setTitle] = useState("");
-  const [rowChoice, setRowChoice] = useState<RowChoice | null>(null);
-  const [startYear, setStartYear] = useState(Math.round((firstYear + currentYear) / 2));
+  const [createdEntryId, setCreatedEntryId] = useState<string | null>(null);
+  const [rowChoice, setRowChoice] = useState<RowChoice | null>(
+    startOnRowId === undefined ? null : { kind: "existing", rowId: startOnRowId },
+  );
+  const [startYear, setStartYear] = useState(
+    startMs === undefined
+      ? Math.round((firstYear + currentYear) / 2)
+      : new Date(startMs).getUTCFullYear(),
+  );
   const [vagueness, setVagueness] = useState(VAGUENESS_OPTIONS[0]);
   const [ongoing, setOngoing] = useState(true);
   const [endYear, setEndYear] = useState(currentYear);
@@ -76,20 +98,41 @@ export function AddEntryAssistant({ onFinished }: AddEntryAssistantProps) {
     flow.advance("row");
   };
 
+  // A flow that already knows its timeline has nothing left to ask about where
+  // this goes, so it skips straight to when it happened.
+  const canLeaveNameStep = (): boolean =>
+    title.trim() !== "" && (startOnRowId !== undefined || category !== null);
+
+  const leaveNameStep = () => {
+    if (!canLeaveNameStep()) return;
+    if (startOnRowId !== undefined) flow.advance("start");
+    else if (category) goToTargetOrAsk(category);
+  };
+
   const commitAndFinish = () => {
     const rowId = resolveRowId(rowChoice, category);
     if (!rowId) return; // Nowhere to put it — the picker below always offers a row.
-    addEntry({ ...pendingEntry, rowId });
+    setCreatedEntryId(addEntry({ ...pendingEntry, rowId }));
     flow.advance("done");
+  };
+
+  // Ending the flow on the thing you made rather than on an empty canvas. Falls
+  // back to plain dismissal when the host has nothing to show it with.
+  const finishAndShow = () => {
+    if (createdEntryId && onShowEntry) onShowEntry(createdEntryId);
+    else onFinished();
   };
 
   const startOver = () => {
     setCategory(null);
     setTitle("");
-    setRowChoice(null);
+    setCreatedEntryId(null);
+    // A flow started from a timeline stays on that timeline — "add another"
+    // there means another one of these, not another one of anything.
+    setRowChoice(startOnRowId === undefined ? null : { kind: "existing", rowId: startOnRowId });
     setVagueness(VAGUENESS_OPTIONS[0]);
     setOngoing(true);
-    flow.advance("category");
+    flow.advance(firstPhase);
   };
 
   const preview = (
@@ -129,39 +172,44 @@ export function AddEntryAssistant({ onFinished }: AddEntryAssistantProps) {
     case "name":
       return (
         <AssistantStepShell
-          prompt={category?.nameQuestion ?? "Give it a name"}
-          hint="Tap a suggestion or type your own."
+          prompt={category?.nameQuestion ?? "What do you want to add here?"}
+          hint={category ? "Tap a suggestion or type your own." : undefined}
           stepIndex={flow.stepIndex}
-          onBack={flow.back}
+          onBack={flow.stepIndex === 0 ? undefined : flow.back}
           onSkip={onFinished}
           skipLabel="Cancel"
         >
-          <div className="suggestion-row">
-            {(category ?? ENTRY_CATEGORIES[0]).suggestions.map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                className={`suggestion ${title === suggestion ? "suggestion-on" : ""}`}
-                onClick={() => setTitle(suggestion)}
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
+          {/* No category means the timeline was chosen first, and the canned
+              suggestions of some other category would only mislead. */}
+          {category && (
+            <div className="suggestion-row">
+              {category.suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  className={`suggestion ${title === suggestion ? "suggestion-on" : ""}`}
+                  onClick={() => setTitle(suggestion)}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
           <input
             type="text"
             value={title}
-            placeholder="Or type it…"
+            placeholder={category ? "Or type it…" : "Name it…"}
+            autoFocus={category === null}
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && category && title.trim() !== "") goToTargetOrAsk(category);
+              if (event.key === "Enter") leaveNameStep();
             }}
           />
           <button
             type="button"
             className="small-button"
-            disabled={category === null || title.trim() === ""}
-            onClick={() => category && goToTargetOrAsk(category)}
+            disabled={!canLeaveNameStep()}
+            onClick={leaveNameStep}
           >
             Next →
           </button>
@@ -297,12 +345,17 @@ export function AddEntryAssistant({ onFinished }: AddEntryAssistantProps) {
           hint="Saved on this device only — nothing leaves your phone unless you export it."
           stepIndex={flow.stepIndex}
           onSkip={onFinished}
-          skipLabel="Done"
+          skipLabel="Close"
         >
           {preview}
-          <button type="button" className="small-button" onClick={startOver}>
-            Add another
-          </button>
+          <div className="assistant-actions">
+            <button type="button" className="small-button small-button-primary" onClick={finishAndShow}>
+              Done
+            </button>
+            <button type="button" className="small-button" onClick={startOver}>
+              Add another
+            </button>
+          </div>
         </AssistantStepShell>
       );
   }

@@ -18,6 +18,9 @@
 
   --color-accent: #c2410c;
   --color-accent-soft: rgba(194, 65, 12, 0.12);
+  /* Text and icons painted *on* the accent. Deliberately not overridden in the
+     dark block: the accent stays dark enough that white is right in both. */
+  --color-on-accent: #ffffff;
 
   --color-danger: #b91c1c;
   --color-danger-border: #e8b4b4;
@@ -442,6 +445,21 @@ textarea {
   border-radius: 6px;
   padding: 5px 10px;
   white-space: nowrap;
+}
+
+/* The one action a step wants you to take. Used where a step offers two, so
+   "Done" doesn't look like an alternative to "Add another". */
+.small-button-primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: 700;
+}
+
+.assistant-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .danger-button {
@@ -1072,7 +1090,7 @@ textarea {
   border: none;
   border-radius: 50%;
   background: var(--color-accent);
-  color: #ffffff;
+  color: var(--color-on-accent);
   font-size: 24px;
   display: grid;
   place-items: center;
@@ -1135,14 +1153,8 @@ textarea {
   margin: 0 auto 8px;
 }
 
-.sheet-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-/* The inspector stacks instead: its subtitle is a line of its own, long enough
-   that sitting it beside the title would squeeze both. */
+/* Title above subtitle: the subtitle is a line of its own, long enough that
+   sitting it beside the title would squeeze both. */
 .sheet-title-stack {
   display: flex;
   flex-direction: column;
@@ -1268,6 +1280,72 @@ textarea {
   justify-content: space-between;
   gap: 8px;
   padding-right: 4px;
+}
+
+/* The list pane has no back link, so its title takes the back link's place. */
+.pane-topbar .sheet-title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* "Show on timeline": secondary to the pane's content but the only way back to
+   the picture, so it sits beside the ⋯ rather than inside it. */
+.sheet-locate {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* Panes slide sideways within the sheet, the way a phone's navigation stack
+   does — the direction says whether you went deeper or came back. */
+.sheet-pane {
+  animation: pane-in-from-right 180ms ease-out;
+}
+
+.sheet-pane-back {
+  animation-name: pane-in-from-left;
+}
+
+@keyframes pane-in-from-right {
+  from {
+    transform: translateX(26px);
+    opacity: 0;
+  }
+}
+
+@keyframes pane-in-from-left {
+  from {
+    transform: translateX(-26px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-pane {
+    animation: none;
+  }
+}
+
+/* The last thing in a timeline's entry list: adding the next one. Reads as a
+   list row rather than a button, because that is where it lives. */
+.sheet-add-row {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 6px 8px 12px;
+  padding: 10px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
 }
 
 .sheet-back {
@@ -1994,6 +2072,23 @@ textarea {
        chips, or a slider plus a preview) and must not be cut off. */
     overflow-y: auto;
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+
+  /* Adding one entry is not a first-run rite: it gets a sheet, with the canvas
+     still visible above it, so you can see what you are adding to. Onboarding
+     keeps the full screen — it is the only thing happening. */
+  .assistant-overlay-sheet {
+    align-items: end;
+    background: var(--color-overlay-backdrop);
+  }
+
+  .assistant-overlay-sheet .assistant-shell {
+    height: auto;
+    max-height: 86dvh;
+    border-radius: 18px 18px 0 0;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.24);
   }
 }
 

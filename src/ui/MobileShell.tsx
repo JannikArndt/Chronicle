@@ -10,14 +10,14 @@ import type { MutableRefObject } from "react";
 import type { EngineView, TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import { AddEntryAssistant } from "../onboarding/AddEntryAssistant";
-import { clearSelection, setSearch } from "../state/actions";
-import { appStore, isPublicId, useAppState } from "../state/store";
+import { clearSelection, selectEntry, setSearch } from "../state/actions";
+import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
 import { replaceDataset } from "../state/actions";
 import { CanvasHost } from "./CanvasHost";
-import { EntrySheet } from "./EntrySheet";
+import { centerOnEntry } from "./centerOnEntry";
 import { MiniMap } from "./MiniMap";
-import { RowSheet } from "./RowSheet";
+import { TimelineSheet } from "./TimelineSheet";
 import { useViewportHeight } from "./useIsMobile";
 import type { BottomSheetHandle } from "./BottomSheet";
 
@@ -27,10 +27,9 @@ const PEEK_ANCHOR_PX = 96;
 const HALF_ANCHOR_FRACTION = 0.45;
 const FULL_ANCHOR_FRACTION = 0.84;
 
-// The entry inspector's peek anchor is taller: it has to hold a title and a
+// The entry pane's peek anchor is taller: it has to hold a title and a
 // subtitle, which is the whole point of the peek state.
 const ENTRY_PEEK_ANCHOR_PX = 142;
-const ENTRY_HALF_ANCHOR_FRACTION = 0.46;
 
 // The FAB floats just above the sheet's top edge, and fades out once the sheet
 // covers enough of the screen that "add" is no longer the obvious next action.
@@ -44,6 +43,14 @@ const HALF_ANCHOR_INDEX = 1;
 // Breathing room between the lowest floating control and the axis beneath it.
 const AXIS_CLEARANCE_PX = 8;
 
+// What the add flow was opened with. An empty object is the FAB — "add
+// something, somewhere". With a row it came from that timeline's pane, which
+// answers two of the flow's questions before it starts.
+interface AddEntryRequest {
+  rowId?: string;
+  startMs?: number;
+}
+
 interface MobileShellProps {
   layout: Layout;
   engineRef: MutableRefObject<TimelineEngine | null>;
@@ -56,38 +63,36 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   const railContentRef = useRef<HTMLDivElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
   const sheetHandleRef = useRef<BottomSheetHandle>(null);
-  const entrySheetHandleRef = useRef<BottomSheetHandle>(null);
 
   const viewportHeight = useViewportHeight();
-  const anchors = useMemo(
-    () => [
-      PEEK_ANCHOR_PX,
-      Math.round(viewportHeight * HALF_ANCHOR_FRACTION),
-      Math.round(viewportHeight * FULL_ANCHOR_FRACTION),
-    ],
-    [viewportHeight],
-  );
-  const entryAnchors = useMemo(
-    () => [
-      ENTRY_PEEK_ANCHOR_PX,
-      Math.round(viewportHeight * ENTRY_HALF_ANCHOR_FRACTION),
-      Math.round(viewportHeight * FULL_ANCHOR_FRACTION),
-    ],
-    [viewportHeight],
-  );
 
-  const [rowSheetOpen, setRowSheetOpen] = useState(true);
-  // Which timeline's settings pane the row sheet shows, held here because the
-  // entry sheet navigates into it too (its "‹ Places lived" link).
+  const [sheetKeptOpen, setSheetKeptOpen] = useState(true);
+  // Which timeline the sheet's middle pane shows. Held here rather than in the
+  // sheet because selecting an entry anywhere — canvas, list, search — has to
+  // be able to say which timeline "back" leads to.
   const [settingsRowId, setSettingsRowId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [addEntryOpen, setAddEntryOpen] = useState(false);
+  const [addEntry, setAddEntry] = useState<AddEntryRequest | null>(null);
 
-  // The inspector's visibility is derived from the store, not held here: the
-  // canvas, the timeline sheet and the FAB all select entries through the same
-  // actions, and any of them opening this sheet must look identical.
-  const entrySheetOpen = useAppState((s) => s.draft !== undefined || s.selectedEntryId !== undefined);
+  // Derived from the store, not held here: the canvas, the list and search all
+  // select entries through the same actions, and each of them must open the
+  // entry pane identically.
+  const entryOpen = useAppState((s) => s.draft !== undefined || s.selectedEntryId !== undefined);
+  const sheetOpen = sheetKeptOpen || entryOpen;
+
+  // One anchor set for one sheet — except its peek height, which has to hold
+  // whatever the current pane's header is: a title for the list, a title *and*
+  // a subtitle for an entry. Changing it mid-life is safe: the sheet clamps its
+  // position into the new anchors.
+  const anchors = useMemo(
+    () => [
+      entryOpen ? ENTRY_PEEK_ANCHOR_PX : PEEK_ANCHOR_PX,
+      Math.round(viewportHeight * HALF_ANCHOR_FRACTION),
+      Math.round(viewportHeight * FULL_ANCHOR_FRACTION),
+    ],
+    [viewportHeight, entryOpen],
+  );
 
   // Everything docked at the top — chips, search panel, life strip — stacks in
   // one container, and the canvas is told to start its axis below it. Measured
@@ -129,33 +134,40 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   // With the sheet thrown away there is no edge to ride, so the FAB drops to
   // its own resting position above the safe area.
   useEffect(() => {
-    if (!rowSheetOpen) moveFabWithSheet(FAB_RESTING_OFFSET_PX, true);
+    if (!sheetOpen) moveFabWithSheet(FAB_RESTING_OFFSET_PX, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowSheetOpen]);
+  }, [sheetOpen]);
 
-  // Coming back from an entry surface, the FAB is a fresh element with no
-  // transform on it yet.
-  useEffect(() => {
-    if (!entrySheetOpen) moveFabWithSheet(sheetPositionRef.current, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entrySheetOpen]);
-
-  // Going "up" from an entry to the timeline it sits on. Deselecting is what
-  // closes the entry sheet, since its visibility is derived from the selection.
-  const showTimelineForEntry = (rowId: string) => {
+  // Flicking the sheet away also drops whatever it was showing — leaving an
+  // entry selected on the canvas with nothing on screen naming it is the state
+  // that reads as "the app lost my tap".
+  const closeSheet = () => {
     clearSelection();
-    setSettingsRowId(rowId);
-    setRowSheetOpen(true);
-    sheetHandleRef.current?.raiseToAtLeastAnchor(HALF_ANCHOR_INDEX);
+    setSettingsRowId(null);
+    setSheetKeptOpen(false);
   };
 
-  // The FAB opens the add-entry assistant — but that assistant needs somewhere
-  // to put a new timeline, and a dataset with no group of your own has no such
-  // place. Setup is the honest next step there.
-  const startAddingEntry = () => {
+  // The add flow needs somewhere to put a new timeline, and a dataset with no
+  // group of your own has no such place. Setup is the honest next step there.
+  const startAdding = (request: AddEntryRequest) => {
     const hasSomewhereToPutIt = appStore.getState().dataset.groups.some((group) => !isPublicId(group.id));
-    if (hasSomewhereToPutIt) setAddEntryOpen(true);
+    if (hasSomewhereToPutIt) setAddEntry(request);
     else onStartOnboarding();
+  };
+
+  // Closing the add flow *on* what it made: the canvas moves to the new entry
+  // and the sheet opens on it. Adding something and being returned to an
+  // unchanged screen is what made the old flow feel like it had failed.
+  const showNewEntry = (entryId: string) => {
+    setAddEntry(null);
+    const entry = mergedDataset(appStore.getState()).entries.find(
+      (candidate) => candidate.id === entryId,
+    );
+    if (!entry) return;
+    setSettingsRowId(entry.rowId);
+    setSheetKeptOpen(true);
+    selectEntry(entryId);
+    centerOnEntry(engineRef.current, layout, entry, Date.now());
   };
 
   return (
@@ -181,49 +193,45 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
 
       {menuOpen && <MobileMenu close={() => setMenuOpen(false)} onStartOnboarding={onStartOnboarding} />}
 
-      {!entrySheetOpen && (
-        <button
-          ref={fabRef}
-          type="button"
-          className="mobile-fab"
-          aria-label="Add entry"
-          onClick={startAddingEntry}
-        >
-          ＋
-        </button>
-      )}
+      <button
+        ref={fabRef}
+        type="button"
+        className="mobile-fab"
+        aria-label="Add entry"
+        onClick={() => startAdding({})}
+      >
+        ＋
+      </button>
 
-      {!rowSheetOpen && !entrySheetOpen && (
-        <button type="button" className="chip-pill mobile-reopen" onClick={() => setRowSheetOpen(true)}>
+      {!sheetOpen && (
+        <button type="button" className="chip-pill mobile-reopen" onClick={() => setSheetKeptOpen(true)}>
           🗂 Timelines
         </button>
       )}
 
-      <RowSheet
+      <TimelineSheet
         layout={layout}
         anchors={anchors}
-        open={rowSheetOpen && !entrySheetOpen}
-        onClose={() => setRowSheetOpen(false)}
+        open={sheetOpen}
+        onClose={closeSheet}
         onPositionChange={(position) => moveFabWithSheet(position, false)}
         sheetHandleRef={sheetHandleRef}
+        engineRef={engineRef}
         raiseSheet={() => sheetHandleRef.current?.raiseToAtLeastAnchor(HALF_ANCHOR_INDEX)}
         settingsRowId={settingsRowId}
         onOpenRowSettings={setSettingsRowId}
         onCloseRowSettings={() => setSettingsRowId(null)}
+        onAddEntry={(rowId, startMs) => startAdding({ rowId, startMs })}
       />
 
-      <EntrySheet
-        anchors={entryAnchors}
-        open={entrySheetOpen}
-        onClose={clearSelection}
-        onPositionChange={() => {}}
-        sheetHandleRef={entrySheetHandleRef}
-        onOpenTimeline={showTimelineForEntry}
-      />
-
-      {addEntryOpen && (
-        <div className="assistant-overlay">
-          <AddEntryAssistant onFinished={() => setAddEntryOpen(false)} />
+      {addEntry && (
+        <div className="assistant-overlay assistant-overlay-sheet">
+          <AddEntryAssistant
+            startOnRowId={addEntry.rowId}
+            startMs={addEntry.startMs}
+            onFinished={() => setAddEntry(null)}
+            onShowEntry={showNewEntry}
+          />
         </div>
       )}
     </div>

@@ -1,0 +1,57 @@
+// The first pane of the timeline sheet: every timeline, grouped.
+//
+// Rendered from the same computeLayout() result the canvas paints from, so the
+// list can never drift from what is on screen. Groups are section headers — an
+// early flat list read as "where did my grouping go".
+
+import type { Layout } from "../render/layout";
+import { mergedDataset, useAppState } from "../state/store";
+
+export function TimelineListPane({
+  layout,
+  onOpenRow,
+}: {
+  layout: Layout;
+  onOpenRow: (rowId: string) => void;
+}) {
+  const state = useAppState((s) => s);
+  const merged = mergedDataset(state);
+  const hidden = new Set(state.hiddenRowIds);
+
+  return (
+    <>
+      {layout.items.map((item) => {
+        if (item.kind === "group") {
+          return (
+            <div key={item.id} className="sheet-section">
+              {item.group?.label}
+            </div>
+          );
+        }
+        if (item.kind === "person") {
+          return (
+            <div key={item.id} className="sheet-subsection">
+              {item.person?.label}
+            </div>
+          );
+        }
+        const row = item.row!;
+        const entryCount = merged.entries.filter((entry) => entry.rowId === row.id).length;
+        return (
+          <button
+            key={row.id}
+            type="button"
+            className={`sheet-row ${hidden.has(row.id) ? "sheet-row-hidden" : ""}`}
+            style={{ paddingLeft: 8 + item.depth * 14 }}
+            onClick={() => onOpenRow(row.id)}
+          >
+            <span className="sheet-row-emoji">{row.icon ?? "🏷️"}</span>
+            <span className="sheet-row-label">{row.label}</span>
+            <span className="sheet-row-count">{entryCount}</span>
+            <span className="sheet-chevron">›</span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
