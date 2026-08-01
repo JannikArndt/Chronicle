@@ -1073,6 +1073,11 @@ textarea {
   border-radius: 14px;
   padding: 8px;
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.14);
+  /* The world-events list makes this the tallest thing on screen, and the
+     catalog only grows. Scroll rather than run off the bottom of a small
+     phone. */
+  max-height: calc(100dvh - 70px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto;
 }
 
 .mobile-fab {
