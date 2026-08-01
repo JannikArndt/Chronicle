@@ -57,6 +57,7 @@ interface TimelineSheetProps {
   onOpenRowSettings: (rowId: string) => void;
   onCloseRowSettings: () => void;
   onAddEntry: (rowId: string, startMs: number) => void;
+  onAddTimeline: () => void;
 }
 
 // An entry's own dates, as one line — the stand-in subtitle for entries that
@@ -79,6 +80,7 @@ export function TimelineSheet({
   onOpenRowSettings,
   onCloseRowSettings,
   onAddEntry,
+  onAddTimeline,
 }: TimelineSheetProps) {
   const state = useAppState((s) => s);
   const merged = mergedDataset(state);
@@ -194,7 +196,9 @@ export function TimelineSheet({
       }
     >
       <div className={`sheet-pane sheet-pane-${direction}`} key={`${pane}:${row?.id ?? ""}`}>
-        {pane === "list" && <TimelineListPane layout={layout} onOpenRow={openRow} />}
+        {pane === "list" && (
+          <TimelineListPane layout={layout} onOpenRow={openRow} onAddTimeline={onAddTimeline} />
+        )}
         {pane === "row" && settingsRowId !== null && (
           <RowPane
             rowId={settingsRowId}
