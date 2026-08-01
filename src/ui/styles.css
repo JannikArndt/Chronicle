@@ -599,27 +599,10 @@ textarea {
   flex: none;
 }
 
-.picker-subrow {
-  margin-left: 20px;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-}
-
-.picker-blurb {
-  color: var(--color-text-muted);
-}
-
-.picker-subtitle,
 .picker-hint {
   padding: 4px 8px;
   font-size: 11px;
   color: var(--color-text-muted);
-}
-
-.picker-subtitle {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-top: 4px;
 }
 
 .picker-error {
@@ -1250,10 +1233,6 @@ textarea {
   opacity: 0.45;
 }
 
-.sheet-row-static {
-  color: var(--color-text-secondary);
-}
-
 .sheet-row-emoji {
   flex: none;
   width: 26px;
@@ -1703,10 +1682,6 @@ textarea {
   resize: vertical;
 }
 
-.entry-sheet .field {
-  padding: 0 8px 6px;
-}
-
 .row-settings-head {
   display: flex;
   align-items: center;
@@ -1776,39 +1751,6 @@ textarea {
 .icon-pick-selected {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
-}
-
-/* A switch, not a checkbox: this is the only place row visibility lives on
-   mobile, and it has to read as a setting rather than a list marker. */
-.switch {
-  flex: none;
-  position: relative;
-  width: 40px;
-  height: 24px;
-  border-radius: 13px;
-  background: var(--color-border-strong);
-  transition: background 0.18s;
-}
-
-.switch::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  transition: transform 0.18s;
-}
-
-.switch-on {
-  background: var(--color-accent);
-}
-
-.switch-on::after {
-  transform: translateX(16px);
 }
 
 /* iOS Safari zooms the whole page when a focused field is under 16px. Every
