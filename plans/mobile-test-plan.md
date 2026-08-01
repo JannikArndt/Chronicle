@@ -162,6 +162,11 @@ because you *are* looking at all of them.
 **C1-b — tapping navigates in both directions**
 Tap near the bottom-left of the strip.
 ✅ The canvas jumps both back in time **and** down to those timelines.
+Now press and **drag sideways** along the strip.
+✅ Time scrubs, and the vertical position **stays put** — it should not jerk up
+and down as your finger wobbles. (Deliberate: the strip is ~60px tall standing
+in for every timeline you have, so one pixel of wobble is worth tens of pixels
+of canvas.)
 
 ---
 

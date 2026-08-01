@@ -179,16 +179,19 @@ export function MiniMap({ layout, engineRef, view }: MiniMapProps) {
     return () => observer.disconnect();
   }, [lanes, range, view, colors]);
 
-  const flyTo = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    const canvas = event.currentTarget;
-    const bounds = canvas.getBoundingClientRect();
+  // `alsoVertical` is true only where the finger lands, never while it moves.
+  // The strip is a map of both axes, but it is 60-odd pixels tall standing in
+  // for the whole stack of timelines, so one wobbly pixel of a sideways drag is
+  // worth tens of pixels of canvas — following y continuously reads as the
+  // timeline jerking up and down while you scrub through time.
+  const flyTo = (event: ReactPointerEvent<HTMLCanvasElement>, alsoVertical: boolean) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
     const drawableWidth = bounds.width - SIDE_INSET_PX * 2;
     const engine = engineRef.current;
     if (!engine) return;
     engine.centerOnMs(stripXToMs(event.clientX - bounds.left - SIDE_INSET_PX, range, drawableWidth));
-    // The strip is a map of both axes, so a tap on it means "take me there" in
-    // both. Rows that all fit on screen make this a no-op — setScrollY clamps.
-    if (view) {
+    // Rows that all fit on screen make this a no-op — setScrollY clamps.
+    if (alsoVertical && view) {
       const band = laneBandHeight(lanes.length, bounds.height);
       engine.centerOnLayoutY(
         stripYToLayoutY(event.clientY - bounds.top - TOP_INSET_PX, band, view.totalHeight),
@@ -203,10 +206,10 @@ export function MiniMap({ layout, engineRef, view }: MiniMapProps) {
       style={{ height }}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
-        flyTo(event);
+        flyTo(event, true);
       }}
       onPointerMove={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) flyTo(event);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) flyTo(event, false);
       }}
     />
   );
