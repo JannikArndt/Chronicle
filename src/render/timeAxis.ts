@@ -48,6 +48,7 @@ export type LabelStyle =
   | "monthInitial"
   | "monthShort"
   | "monthFull"
+  | "yearShort"
   | "dayOfMonth";
 
 function floorToUnit(ms: number, unit: Unit): Date {
@@ -113,6 +114,7 @@ function labelFor(date: Date, unit: Unit, style: LabelStyle = "default"): string
   if (style === "monthInitial") return FULL_MONTH_NAMES[date.getUTCMonth()][0];
   if (style === "monthShort") return MONTH_NAMES[date.getUTCMonth()];
   if (style === "monthFull") return FULL_MONTH_NAMES[date.getUTCMonth()];
+  if (style === "yearShort") return `'${String(date.getUTCFullYear()).slice(2)}`;
   if (style === "dayOfMonth") return String(date.getUTCDate());
   switch (unit) {
     case "hour":
@@ -145,6 +147,13 @@ function ticksForUnit(scale: TimeScale, widthPx: number, unit: Unit, style: Labe
 }
 
 const MIN_FINE_SPACING_PX = 45;
+// How tight year-numbered ticks may get once they are spelled "'16".
+const MIN_SHORT_YEAR_SPACING_PX = 26;
+
+// Units whose label is a year number, and can therefore lose its century.
+function isYearNumbered(unit: Unit): boolean {
+  return unit === "year" || unit === "decade" || unit === "century";
+}
 
 const DAY = 86_400_000;
 const MONTH_MS = 30.44 * DAY;
@@ -203,14 +212,20 @@ function pickUnits(scale: TimeScale, widthPx: number): UnitChoice {
   // Above five years, density picks the fine unit and the coarse one is the
   // very next step up — never two, which is where the old bug came from.
   for (let i = 0; i < UNITS.length; i++) {
-    if (UNITS[i].approxMs / scale.msPerPx >= MIN_FINE_SPACING_PX) {
-      const coarseIndex = Math.min(i + 1, UNITS.length - 1);
-      return {
-        fine: UNITS[i].unit,
-        fineStyle: "default",
-        coarse: UNITS[coarseIndex].unit,
-        coarseStyle: "default",
-      };
+    const spacing = UNITS[i].approxMs / scale.msPerPx;
+    const coarseIndex = Math.min(i + 1, UNITS.length - 1);
+    const chosen = (fineStyle: LabelStyle): UnitChoice => ({
+      fine: UNITS[i].unit,
+      fineStyle,
+      coarse: UNITS[coarseIndex].unit,
+      coarseStyle: "default",
+    });
+    if (spacing >= MIN_FINE_SPACING_PX) return chosen("default");
+    // Rather than give up on years and jump to decades, drop the century:
+    // "'16" needs about half the room "2016" does, so the finer unit — the one
+    // that actually answers "which year am I looking at" — survives longer.
+    if (isYearNumbered(UNITS[i].unit) && spacing >= MIN_SHORT_YEAR_SPACING_PX) {
+      return chosen("yearShort");
     }
   }
   return { fine: "century", fineStyle: "default", coarse: "century", coarseStyle: "default" };
