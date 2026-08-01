@@ -25,6 +25,24 @@ const UNITS: { unit: Unit; approxMs: number }[] = [
 ];
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const FULL_MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+// How a tick is written is a separate choice from which unit it marks: the same
+// month boundary reads "April '16" as a title and "A" as a subtitle.
+export type LabelStyle = "default" | "monthYear" | "monthInitial" | "dayOfMonth";
 
 function floorToUnit(ms: number, unit: Unit): Date {
   const d = new Date(ms);
@@ -82,7 +100,12 @@ function nextUnit(date: Date, unit: Unit): Date {
   }
 }
 
-function labelFor(date: Date, unit: Unit): string {
+function labelFor(date: Date, unit: Unit, style: LabelStyle = "default"): string {
+  if (style === "monthYear") {
+    return `${FULL_MONTH_NAMES[date.getUTCMonth()]} '${String(date.getUTCFullYear()).slice(2)}`;
+  }
+  if (style === "monthInitial") return FULL_MONTH_NAMES[date.getUTCMonth()][0];
+  if (style === "dayOfMonth") return String(date.getUTCDate());
   switch (unit) {
     case "hour":
       return `${String(date.getUTCHours()).padStart(2, "0")}:00`;
@@ -101,13 +124,13 @@ function labelFor(date: Date, unit: Unit): string {
   }
 }
 
-function ticksForUnit(scale: TimeScale, widthPx: number, unit: Unit): Tick[] {
+function ticksForUnit(scale: TimeScale, widthPx: number, unit: Unit, style: LabelStyle): Tick[] {
   const ticks: Tick[] = [];
   let cursor = floorToUnit(xToMs(scale, 0), unit);
   const endMs = xToMs(scale, widthPx);
   // Hard cap keeps a bad unit choice from generating thousands of ticks.
   while (cursor.getTime() < endMs && ticks.length < 500) {
-    ticks.push({ ms: cursor.getTime(), label: labelFor(cursor, unit) });
+    ticks.push({ ms: cursor.getTime(), label: labelFor(cursor, unit, style) });
     cursor = nextUnit(cursor, unit);
   }
   return ticks;
@@ -115,37 +138,85 @@ function ticksForUnit(scale: TimeScale, widthPx: number, unit: Unit): Tick[] {
 
 const MIN_FINE_SPACING_PX = 45;
 
-function pickUnits(scale: TimeScale): { fine: Unit; coarse: Unit } {
+const DAY = 86_400_000;
+const TWO_WEEKS_MS = 14 * DAY;
+const TWO_MONTHS_MS = 62 * DAY;
+const SIX_QUARTERS_MS = 18 * 30.44 * DAY;
+const FIVE_YEARS_MS = 5 * 365.25 * DAY;
+
+interface UnitChoice {
+  fine: Unit;
+  fineStyle: LabelStyle;
+  coarse: Unit;
+  coarseStyle: LabelStyle;
+}
+
+// Chosen from the span actually on screen, not from pixel density alone.
+//
+// Below five years the ladder is fixed, because density alone used to pair a
+// decade title with quarter subtitles — "Q1" with nothing anywhere on the axis
+// saying which year's Q1. The coarse unit is now always exactly one meaningful
+// step above the fine one, which makes that pairing unreachable.
+function pickUnits(scale: TimeScale, widthPx: number): UnitChoice {
+  const spanMs = widthPx * scale.msPerPx;
+
+  if (spanMs <= TWO_WEEKS_MS) {
+    return { fine: "day", fineStyle: "dayOfMonth", coarse: "month", coarseStyle: "monthYear" };
+  }
+  if (spanMs <= TWO_MONTHS_MS) {
+    // Week ticks labelled by the date they start on: "6", "13", "20".
+    return { fine: "week", fineStyle: "dayOfMonth", coarse: "month", coarseStyle: "monthYear" };
+  }
+  if (spanMs <= SIX_QUARTERS_MS) {
+    return { fine: "month", fineStyle: "monthInitial", coarse: "year", coarseStyle: "default" };
+  }
+  if (spanMs < FIVE_YEARS_MS) {
+    return { fine: "quarter", fineStyle: "default", coarse: "year", coarseStyle: "default" };
+  }
+
+  // Above five years, density picks the fine unit and the coarse one is the
+  // very next step up — never two, which is where the old bug came from.
   for (let i = 0; i < UNITS.length; i++) {
     if (UNITS[i].approxMs / scale.msPerPx >= MIN_FINE_SPACING_PX) {
-      const coarseIndex = Math.min(i + (UNITS[i].unit === "week" || UNITS[i].unit === "quarter" ? 2 : 1), UNITS.length - 1);
-      return { fine: UNITS[i].unit, coarse: UNITS[coarseIndex].unit };
+      const coarseIndex = Math.min(i + 1, UNITS.length - 1);
+      return {
+        fine: UNITS[i].unit,
+        fineStyle: "default",
+        coarse: UNITS[coarseIndex].unit,
+        coarseStyle: "default",
+      };
     }
   }
-  return { fine: "century", coarse: "century" };
+  return { fine: "century", fineStyle: "default", coarse: "century", coarseStyle: "default" };
 }
 
 export function computeTicks(scale: TimeScale, widthPx: number): { fine: Tick[]; coarse: Tick[] } {
-  const { fine, coarse } = pickUnits(scale);
-  let fineTicks = ticksForUnit(scale, widthPx, fine);
-  let coarseTicks = ticksForUnit(scale, widthPx, coarse);
+  const { fine, fineStyle, coarse, coarseStyle } = pickUnits(scale, widthPx);
+  let fineTicks = ticksForUnit(scale, widthPx, fine, fineStyle);
+  let coarseTicks = ticksForUnit(scale, widthPx, coarse, coarseStyle);
   // A period wider than the viewport still needs its label visible: fall back
   // to the period containing the left edge so neither level is ever blank.
+  // (The renderer pins an off-screen-left coarse label to the edge for the same
+  // reason — a title you cannot see is the same as no title.)
   if (coarseTicks.length === 0) {
     const containing = floorToUnit(xToMs(scale, 0), coarse);
-    coarseTicks = [{ ms: containing.getTime(), label: labelFor(containing, coarse) }];
+    coarseTicks = [{ ms: containing.getTime(), label: labelFor(containing, coarse, coarseStyle) }];
   }
   if (fineTicks.length === 0) {
     const containing = floorToUnit(xToMs(scale, 0), fine);
-    fineTicks = [{ ms: containing.getTime(), label: labelFor(containing, fine) }];
+    fineTicks = [{ ms: containing.getTime(), label: labelFor(containing, fine, fineStyle) }];
   }
   return { fine: fineTicks, coarse: coarseTicks };
 }
 
 // "Pick on timeline" (§6): the clicked date snaps to a unit appropriate for
 // the zoom level, and that unit also determines the committed precision.
-export function snapForScale(scale: TimeScale, ms: number): { ms: number; precision: Precision } {
-  const { fine } = pickUnits(scale);
+export function snapForScale(
+  scale: TimeScale,
+  ms: number,
+  widthPx: number,
+): { ms: number; precision: Precision } {
+  const { fine } = pickUnits(scale, widthPx);
   const snapped = floorToUnit(ms, fine);
   switch (fine) {
     case "hour":

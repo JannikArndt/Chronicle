@@ -5,6 +5,31 @@ thing without describing it. Each entry says what it is, then **where it lives**
 
 ---
 
+## The shape of everything
+
+```mermaid
+graph TD
+    D[Dataset<br/><i>one per browser, in IndexedDB</i>]
+    D --> P[Person<br/>“Jannik”, “Mum”]
+    D --> G[Group<br/>“Me”, “My family”]
+    D --> R[Row / timeline<br/>“Places lived”<br/><i>has colour + icon</i>]
+    D --> E[Entry<br/>“Lived in Berlin”<br/><i>drawn as a bar</i>]
+
+    E -->|rowId| R
+    R -->|groupId| G
+    R -.->|personId, optional| P
+    G -.->|is or contains| P
+    E -.->|parentEntryId, optional| E
+
+    S([selfPersonId]) -.->|“which one is me”| P
+    D --- S
+```
+
+Read it as sentences: **an entry sits on a row, a row sits in a group, a group
+either is or contains people.** Everything else is optional.
+
+---
+
 ## The data (what you own)
 
 **Dataset** — everything you have, as one object: people, groups, rows, entries.
@@ -77,6 +102,38 @@ starts to appear, where it is fully solid, where it fades out. One gradient does
 all of it (butting a solid rect against a gradient rect shows a seam).
 → `fuzzyDate.ts` (`rampBounds`), `src/render/bars.ts`
 
+### Anatomy of a bar
+
+```
+      visualStart   solidStart              solidEnd   visualEnd
+           │            │                       │          │
+           ▼            ▼                       ▼          ▼
+           ░░▒▒▓▓███████████████████████████████▓▓▒▒░░
+           └─── ramp ──┘   ← fully opaque →    └── ramp ──┘
+              in                                    out
+
+           ← “around 2011” ──→        ←── “ended mid-2019, roughly” ──→
+```
+
+The two ramps look identical but can come from two different causes:
+
+```
+   PRECISION FUZZ                        FADE IN / FADE OUT
+   “I don’t know exactly when”           “it genuinely started gradually”
+   month → 15 d   year → 182 d           fadeInDays: 400
+   circa → 365 d  (or fuzzDays: 730)     fadeOutDays: 90
+
+               ╲                        ╱
+                ╲──── one gradient ────╱
+                   (never two rects — the seam shows)
+```
+
+An **ongoing** entry has no end at all, and is drawn open:
+
+```
+   ░░▒▒▓▓████████████████████████████▶      (not a wall at today’s date)
+```
+
 ---
 
 ## The picture (how it gets drawn)
@@ -119,6 +176,78 @@ long one.
 ---
 
 ## The interface
+
+### Two shells, one dataset
+
+```mermaid
+graph LR
+    App[App.tsx] -->|useIsMobile| Desk[Desktop shell]
+    App --> Mob[MobileShell]
+
+    Desk --> Rail[Rail<br/><i>left column of timelines</i>]
+    Desk --> C1[Canvas]
+    Desk --> DP[Detail panel<br/><i>right side</i>]
+
+    Mob --> MM[Minimap / life strip]
+    Mob --> C2[Canvas<br/><i>full-bleed</i>]
+    Mob --> RS[Row sheet<br/><i>replaces the rail</i>]
+    Mob --> ES[Entry sheet<br/><i>replaces the detail panel</i>]
+    Mob --> FAB[FAB ＋]
+
+    Rail --> L{{computeLayout}}
+    C1 --> L
+    C2 --> L
+    MM --> L
+    RS --> L
+```
+
+`computeLayout()` is the single source both the drawing and the lists read from —
+that shared result is what keeps them from drifting apart.
+
+### The mobile screen
+
+```
+┌──────────────────────────────────────┐
+│  🔍 Search                       ⋯   │ ← chips
+│ ┌──────────────────────────────────┐ │
+│ │▬▬▬  ▬▬▬▬▬▬▬  ▬▬   ┃▬▬▬▬▬┃  ▬▬▬▬ │ │ ← minimap (life strip)
+│ │ ▬▬▬▬▬▬▬▬  ▬▬▬     ┃ ▬▬▬ ┃       │ │   one lane per timeline
+│ │   ▬▬  ▬▬▬▬▬▬▬▬▬▬  ┃▬▬▬▬▬┃  ▬▬▬  │ │   ┃ ┃ = viewport window
+│ └──────────────────────────────────┘ │        ↑ “top stack”, measured
+│  2010      2015      2020      2025  │ ← axis, starts below the stack
+│ ─────────────────────────────────────│
+│    ░▓██████████▓░                    │
+│         ░▓████████████████▶          │ ← canvas: pan, pinch, tap a bar
+│  ░▓████▓░      ░▓██████▓░            │
+│                                  ⊕   │ ← FAB, rides the sheet’s edge
+│ ╭──────────────────────────────────╮ │
+│ │             ───                  │ │ ← grab handle
+│ │  Your timelines                  │ │ ← sheet header (visible at peek)
+│ │  b. 1987 · 12 timelines          │ │
+│ ╰──────────────────────────────────╯ │
+└──────────────────────────────────────┘
+```
+
+### Sheet anchors
+
+A sheet rests at one of three heights and snaps to the nearest when you let go —
+weighted by flick speed, so a fast flick skips past the middle one.
+
+```
+   FULL ─────╮  ┌────────────────┐   84% of the screen
+             │  │ ▨▨▨▨▨▨▨▨▨▨▨▨▨▨ │   reading and editing
+             │  │ ▨▨▨▨▨▨▨▨▨▨▨▨▨▨ │
+   HALF ─────┤  ├────────────────┤   ~45%
+             │  │ ▨▨▨▨▨▨▨▨▨▨▨▨▨▨ │   browsing, canvas still visible
+             │  │                │
+   PEEK ─────┤  ├────────────────┤   96 px — just the header
+             │  │                │   “your timelines live here”
+   CLOSED ───╯  └────────────────┘   thrown away; a chip brings it back
+```
+
+Dragging the sheet's *content* only moves the sheet if the list is already
+scrolled to its top — otherwise you are scrolling the list. That distinction is
+what keeps every button inside a sheet tappable.
 
 **Shell** — the whole app frame. There are **two**: the desktop shell and
 `MobileShell`. `App.tsx` branches once between them. They are not one layout with

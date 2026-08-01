@@ -78,6 +78,9 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   );
 
   const [rowSheetOpen, setRowSheetOpen] = useState(true);
+  // Which timeline's settings pane the row sheet shows, held here because the
+  // entry sheet navigates into it too (its "‹ Places lived" link).
+  const [settingsRowId, setSettingsRowId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [addEntryOpen, setAddEntryOpen] = useState(false);
@@ -137,6 +140,15 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
     if (!entrySheetOpen) moveFabWithSheet(sheetPositionRef.current, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entrySheetOpen]);
+
+  // Going "up" from an entry to the timeline it sits on. Deselecting is what
+  // closes the entry sheet, since its visibility is derived from the selection.
+  const showTimelineForEntry = (rowId: string) => {
+    clearSelection();
+    setSettingsRowId(rowId);
+    setRowSheetOpen(true);
+    sheetHandleRef.current?.raiseToAtLeastAnchor(HALF_ANCHOR_INDEX);
+  };
 
   // The FAB opens the add-entry assistant — but that assistant needs somewhere
   // to put a new timeline, and a dataset with no group of your own has no such
@@ -204,6 +216,9 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
         onPositionChange={(position) => moveFabWithSheet(position, false)}
         sheetHandleRef={sheetHandleRef}
         raiseSheet={() => sheetHandleRef.current?.raiseToAtLeastAnchor(HALF_ANCHOR_INDEX)}
+        settingsRowId={settingsRowId}
+        onOpenRowSettings={setSettingsRowId}
+        onCloseRowSettings={() => setSettingsRowId(null)}
       />
 
       <EntrySheet
@@ -212,6 +227,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
         onClose={clearSelection}
         onPositionChange={() => {}}
         sheetHandleRef={entrySheetHandleRef}
+        onOpenTimeline={showTimelineForEntry}
       />
 
       {addEntryOpen && (

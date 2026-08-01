@@ -1,5 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { barGeometry, gradientStops, labelAnchorX, pickBarLabel } from "./bars";
+import {
+  barGeometry,
+  gradientStops,
+  labelAnchorX,
+  labelLimitX,
+  MIN_LABEL_WIDTH_PX,
+  pickBarLabel,
+  truncateToWidth,
+} from "./bars";
+import type { BarGeometry } from "./bars";
 import { DAY_MS } from "../model/fuzzyDate";
 import type { TimelineEntry } from "../model/types";
 
@@ -98,5 +107,74 @@ describe("pickBarLabel", () => {
 
   test("swaps to shortTitle when the title overflows and a shortTitle is set", () => {
     expect(pickBarLabel({ title: "A very long title indeed", shortTitle: "Long" }, geom, 500)).toBe("shortTitle");
+  });
+});
+
+describe("labelLimitX", () => {
+  // Three bars on one row: a long one, a short one nested inside it, and one
+  // that starts before all of them.
+  const bar = (visualStart: number, solidStart: number): BarGeometry =>
+    ({ xVisualStart: visualStart, xSolidStart: solidStart, xSolidEnd: 0, xVisualEnd: 0 }) as BarGeometry;
+
+  test("falls back to the viewport edge when nothing follows", () => {
+    expect(labelLimitX(0, [bar(10, 20)], 800)).toBe(800);
+  });
+
+  test("stops at the nearest bar starting to the right", () => {
+    const geometries = [bar(10, 20), bar(300, 310), bar(120, 130)];
+    expect(labelLimitX(0, geometries, 800)).toBe(120);
+  });
+
+  test("a bar nested inside a longer one still clamps it", () => {
+    // This is the reported bug: the short bar sits within the long bar's span,
+    // and the long bar's label used to be drawn straight across it.
+    const geometries = [bar(0, 0), bar(200, 200)];
+    expect(labelLimitX(0, geometries, 800)).toBe(200);
+  });
+
+  test("ignores bars that start left of this label's anchor", () => {
+    const geometries = [bar(400, 410), bar(50, 60)];
+    expect(labelLimitX(0, geometries, 800)).toBe(800);
+  });
+});
+
+describe("truncateToWidth", () => {
+  // One unit per character keeps the arithmetic in the test obvious. Budgets
+  // stay above MIN_LABEL_WIDTH_PX so they exercise the cut, not the guard.
+  const measure = (text: string) => text.length;
+  const LONG_TITLE = "Studied computer science at university";
+
+  test("leaves a label that already fits alone", () => {
+    expect(truncateToWidth("Berlin", 100, measure)).toBe("Berlin");
+  });
+
+  test("cuts to the available width and marks the cut", () => {
+    const result = truncateToWidth("Studied computer science", 30, measure);
+    expect(result).toBe("Studied computer science"); // 24 units — nothing to cut
+    expect(truncateToWidth("Studied computer science", 40, measure)).toBe("Studied computer science");
+  });
+
+  test("keeps as much of the label as fits, plus the ellipsis", () => {
+    // 29 characters and the ellipsis come to exactly 30 units.
+    expect(truncateToWidth(LONG_TITLE, 30, measure)).toBe("Studied computer science at u…");
+  });
+
+  test("does not leave a dangling space before the ellipsis", () => {
+    // The cut lands on the space after "science"; trimming it back makes the
+    // label one unit shorter than the budget, which is fine — a floating "…"
+    // is not.
+    expect(truncateToWidth(LONG_TITLE, 25, measure)).toBe("Studied computer science…");
+  });
+
+  test("draws nothing rather than a lone ellipsis in a sliver of space", () => {
+    expect(truncateToWidth("Berlin", MIN_LABEL_WIDTH_PX - 1, measure)).toBe("");
+  });
+
+  test("never returns a label wider than the space given", () => {
+    for (let available = MIN_LABEL_WIDTH_PX; available < 60; available++) {
+      expect(measure(truncateToWidth("A fairly long entry title here", available, measure))).toBeLessThanOrEqual(
+        available,
+      );
+    }
   });
 });

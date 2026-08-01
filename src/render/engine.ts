@@ -6,7 +6,7 @@
 import { computeLayout } from "./layout";
 import type { Layout, LayoutItem } from "./layout";
 import { ROW_HEIGHT } from "./layout";
-import { barGeometry, gradientStops, labelAnchorX, pickBarLabel } from "./bars";
+import { barGeometry, gradientStops, labelAnchorX, labelLimitX, pickBarLabel, truncateToWidth } from "./bars";
 import type { BarGeometry } from "./bars";
 import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
 import type { TimeScale } from "./timeScale";
@@ -17,6 +17,12 @@ import type { Precision, TimelineDataset, TimelineEntry, TimelineRow } from "../
 
 const FAVICON_SIZE_PX = 12;
 const FAVICON_GAP_PX = 4;
+
+// Breathing room between a truncated label and the bar that clamped it.
+const LABEL_END_PADDING_PX = 6;
+
+// Minimum gap between two axis titles before the pinned one gives way.
+const AXIS_LABEL_GAP_PX = 10;
 
 export const AXIS_HEIGHT = 46;
 const PLUS_RADIUS = 11;
@@ -408,7 +414,7 @@ export class TimelineEngine {
 
   private handleClick(x: number, y: number): void {
     if (this.input.picking) {
-      const snapped = snapForScale(this.scale, xToMs(this.scale, x));
+      const snapped = snapForScale(this.scale, xToMs(this.scale, x), this.width);
       this.callbacks.onPickDate(snapped.ms, snapped.precision);
       this.hoverX = null;
       return;
@@ -576,15 +582,20 @@ export class TimelineEngine {
       .filter((e) => e.rowId === row.id)
       .sort((a, b) => a.start.ms - b.start.ms);
 
-    for (const entry of entries) {
-      const geom = barGeometry(entry, this.scale, nowMs);
-      if (geom.xVisualEnd < 0 || geom.xVisualStart > this.width) continue;
+    // Every bar's geometry up front, because a label's width budget depends on
+    // where its neighbours start — not just on its own bar.
+    const geometries = entries.map((entry) => barGeometry(entry, this.scale, nowMs));
+
+    entries.forEach((entry, index) => {
+      const geom = geometries[index];
+      if (geom.xVisualEnd < 0 || geom.xVisualStart > this.width) return;
       let alpha = 1;
       if (emphasis && !emphasis.has(entry.id)) alpha = 0.22;
       if (relatedIds && !relatedIds.has(entry.id)) alpha = Math.min(alpha, 0.25);
-      this.drawBar(entry, geom, item, color, alpha, entry.id === this.input.selectedEntryId);
+      const limit = labelLimitX(index, geometries, this.width);
+      this.drawBar(entry, geom, item, color, alpha, entry.id === this.input.selectedEntryId, limit);
       if (row.parentRowId) this.drawSubEntryBracket(entry, geom, item);
-    }
+    });
 
     if (row.id === this.input.selectedRowId && !this.input.draft) {
       this.drawPlusAffordances(row, entries, item, nowMs);
@@ -598,6 +609,8 @@ export class TimelineEngine {
     color: string,
     alpha: number,
     selected: boolean,
+    // Where the next bar on this row starts; the label may not reach it.
+    labelLimit: number,
   ): void {
     const { ctx } = this;
     const verticalPadding = item.compact ? 3 : 6;
@@ -681,17 +694,26 @@ export class TimelineEngine {
         pickBarLabel(entry, geom, titleWidth + iconSpace) === "shortTitle" && !!entry.shortTitle;
       labelText = useShortTitle ? entry.shortTitle! : entry.title;
     }
-    const textWidth = ctx.measureText(labelText).width;
+    // Clamped to the neighbouring bar, then cut to fit. Before this, a long
+    // title was drawn at full length across the bar next to it AND had that
+    // width folded into its own tap target below — which is what made the
+    // covered entry unselectable.
+    const labelX = labelAnchorX(geom, ctx.measureText(labelText).width + iconSpace, this.width);
+    const available = labelLimit - labelX - iconSpace - LABEL_END_PADDING_PX;
+    labelText = truncateToWidth(labelText, available, (candidate) => ctx.measureText(candidate).width);
+    const textWidth = labelText === "" ? 0 : ctx.measureText(labelText).width;
 
-    const labelX = labelAnchorX(geom, textWidth + iconSpace, this.width);
     ctx.fillStyle = readableTextColor(colorToRgb(this.ctx, color), this.colors);
     ctx.textBaseline = "middle";
     if (icon) {
       ctx.drawImage(icon, labelX, top + barHeight / 2 - FAVICON_SIZE_PX / 2, FAVICON_SIZE_PX, FAVICON_SIZE_PX);
     }
-    ctx.fillText(labelText, labelX + iconSpace, top + barHeight / 2);
+    if (labelText !== "") ctx.fillText(labelText, labelX + iconSpace, top + barHeight / 2);
     ctx.restore();
 
+    // The label still widens the tap target — that is how a one-pixel bar stays
+    // tappable — but it can no longer reach past the neighbour it was clamped
+    // to, so it cannot steal that entry's taps.
     this.entryHits.push({
       x0: Math.min(x0, labelX),
       x1: Math.max(x1, labelX + iconSpace + textWidth),
@@ -895,11 +917,19 @@ export class TimelineEngine {
     ctx.textBaseline = "middle";
     ctx.font = "600 12px -apple-system, system-ui, sans-serif";
     ctx.fillStyle = this.colors.axisCoarseText;
-    for (const tick of ticks.coarse) {
+    // The coarse label is never culled on the left: it is pinned to the edge
+    // instead. Scrolled to 2012–2019 there is no decade boundary on screen at
+    // all, and culling it left the axis showing years with nothing above them.
+    // It gives way as soon as the next period's own label would collide.
+    ticks.coarse.forEach((tick, index) => {
       const x = msToX(this.scale, tick.ms);
-      if (x < -60 || x > this.width) continue;
-      ctx.fillText(tick.label, Math.max(x + 4, 4), top + 14);
-    }
+      if (x > this.width) return;
+      const next = ticks.coarse[index + 1];
+      const nextX = next ? msToX(this.scale, next.ms) : Infinity;
+      const pinnedX = Math.max(x + 4, 4);
+      if (nextX < pinnedX + ctx.measureText(tick.label).width + AXIS_LABEL_GAP_PX) return;
+      ctx.fillText(tick.label, pinnedX, top + 14);
+    });
     ctx.font = "11px -apple-system, system-ui, sans-serif";
     ctx.fillStyle = this.colors.axisFineText;
     for (const tick of ticks.fine) {
@@ -911,7 +941,7 @@ export class TimelineEngine {
 
   private drawPickGuide(x: number): void {
     const { ctx } = this;
-    const snapped = snapForScale(this.scale, xToMs(this.scale, x));
+    const snapped = snapForScale(this.scale, xToMs(this.scale, x), this.width);
     const guideX = Math.round(msToX(this.scale, snapped.ms)) + 0.5;
     ctx.save();
     ctx.strokeStyle = this.colors.guide;

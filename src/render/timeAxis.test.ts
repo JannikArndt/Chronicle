@@ -37,13 +37,54 @@ describe("computeTicks", () => {
   });
 });
 
+// The span-driven ladder. Each case names the span it is describing, because
+// the scale that produces it is not readable on its own.
+describe("the axis ladder below five years", () => {
+  const forSpan = (spanDays: number) =>
+    computeTicks({ startMs: T0, msPerPx: (spanDays * DAY_MS) / WIDTH }, WIDTH);
+
+  test("under five years: years over quarters", () => {
+    const { fine, coarse } = forSpan(4 * 365);
+    expect(coarse.every((t) => /^\d{4}$/.test(t.label))).toBe(true);
+    expect(fine.every((t) => /^Q[1-4]$/.test(t.label))).toBe(true);
+  });
+
+  test("under six quarters: years over single-letter months", () => {
+    const { fine, coarse } = forSpan(400);
+    expect(coarse.every((t) => /^\d{4}$/.test(t.label))).toBe(true);
+    expect(fine.every((t) => /^[JFMASOND]$/.test(t.label))).toBe(true);
+  });
+
+  test("under two months: month-and-year over the date each week starts on", () => {
+    const { fine, coarse } = forSpan(50);
+    expect(coarse.every((t) => /^[A-Z][a-z]+ '\d{2}$/.test(t.label))).toBe(true);
+    expect(fine.every((t) => /^\d{1,2}$/.test(t.label))).toBe(true);
+  });
+
+  test("under two weeks: month-and-year over days", () => {
+    const { fine, coarse } = forSpan(10);
+    expect(coarse.every((t) => /^[A-Z][a-z]+ '\d{2}$/.test(t.label))).toBe(true);
+    expect(fine.length).toBeGreaterThanOrEqual(10);
+  });
+
+  // The bug this ladder exists to make unreachable: a decade title above
+  // quarter subtitles tells you it is Q1 of *some* year in the 2010s.
+  test("quarters are never paired with anything coarser than a year", () => {
+    for (let spanDays = 20; spanDays < 5 * 365; spanDays += 7) {
+      const { fine, coarse } = forSpan(spanDays);
+      if (!fine.some((t) => /^Q[1-4]$/.test(t.label))) continue;
+      expect(coarse.every((t) => /^\d{4}$/.test(t.label)), `span ${spanDays}d`).toBe(true);
+    }
+  });
+});
+
 describe("snapForScale", () => {
   test("snaps to day at deep zoom and to year when zoomed far out", () => {
-    const deep = snapForScale({ startMs: T0, msPerPx: DAY_MS / 30 }, T0 + 3.7 * DAY_MS);
+    const deep = snapForScale({ startMs: T0, msPerPx: DAY_MS / 30 }, T0 + 3.7 * DAY_MS, WIDTH);
     expect(deep.precision).toBe("day");
     expect(deep.ms % DAY_MS).toBe(0);
 
-    const wide = snapForScale({ startMs: T0, msPerPx: 400 * DAY_MS }, T0);
+    const wide = snapForScale({ startMs: T0, msPerPx: 400 * DAY_MS }, T0, WIDTH);
     expect(wide.precision).toBe("year");
   });
 });
