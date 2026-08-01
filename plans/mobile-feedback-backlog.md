@@ -9,12 +9,12 @@ Status: `[ ]` open · `[~]` in progress · `[x]` done · `[?]` needs a decision 
 
 ## A. Sheets
 
-**A1 `[ ]` A fully-extended sheet slides under the minimap.**
+**A1 `[x]` A fully-extended sheet slides under the minimap.**
 Its top edge should sit *above* the life strip, not behind it. Fix is a z-index
 plus a full anchor that accounts for the top stack's measured height.
 → `MobileShell.tsx` (`FULL_ANCHOR_FRACTION`, `axisTop`), `styles.css`
 
-**A2 `[?]` "Ongoing" is modelled honestly but presented confusingly.**
+**A2 `[ ]` "Ongoing" is modelled honestly but presented confusingly.**
 Two separate complaints, one root cause: internally *ongoing* means **no end**,
 but the editor shows it as a toggle sitting next to a date field that also
 accepts "now" — so two controls claim the same meaning and disagree.
@@ -30,7 +30,7 @@ Agreed redesign:
   disappears, because the toggle no longer exists outside edit mode.
 → `DateRangeEditor.tsx`, `dateLaneRange.ts`, `parseDateInput.ts`
 
-**A3 `[?]` "Connected" is a bad section with a bad name.**
+**A3 `[x]` "Connected" is a bad section with a bad name.**
 It shows three read-only chips: the entry's **group**, its **row**, its
 **person** — i.e. *where this entry lives*, nothing more. There is no
 relationship concept behind it; `parentEntryId` (sub-entries) exists in the model
@@ -39,7 +39,7 @@ row (tappable, navigating to that timeline), or drop the section entirely.
 Recommendation: **rename to "Timeline", keep only the row chip, make it tappable.**
 → `EntrySheet.tsx:84`
 
-**A4 `[?]` No confirming action at the bottom of a sheet — only "Remove".**
+**A4 `[x]` No confirming action at the bottom of a sheet — only "Remove".**
 Users do expect a way to say "I'm finished" and a bottom-anchored destructive
 button is a known misfire risk. Recommendation: **no OK button** (it implies
 unsaved changes, and everything is already saved), but **move the remove button
@@ -52,26 +52,26 @@ drag-down or a tap on the canvas.
 
 ## B. Timelines sheet (row sheet)
 
-**B1 `[ ]` The timeline pane should lead with identity: colour, icon, name — all
+**B1 `[x]` The timeline pane should lead with identity: colour, icon, name — all
 three tappable to edit,** as one header block. Today the name is editable but
 colour and icon are pick-rows further down the pane.
 → `RowSheet.tsx` (`RowSettingsPane`, `RowAppearance`)
 
-**B2 `[ ]` Then the entries list** (already there — just below the header block).
+**B2 `[x]` Then the entries list** (already there — just below the header block).
 
 **B3 `[ ]` An "add entry" action at the bottom of the entries list,** prefilled
 with this timeline and a start year derived from the entries above it: the
 highest existing end year, or today if the last entry is ongoing.
 Depends on E3 (assistant in a sheet) to avoid a full-screen jump from here.
 
-**B4 `[?]` "Group · moving soon" — decide or delete.**
+**B4 `[x]` "Group · moving soon" — decide or delete.**
 It is a placeholder I added: a row belongs to a group, moving it between groups
 is not designed for mobile, so the field is shown read-only with a tag. It gives
 the user nothing. Recommendation: **delete the row entirely** until moving is
 designed. Group membership is already visible from the section headers.
 → `RowSheet.tsx:164`
 
-**B5 `[ ]` Settings move to the bottom.** Visibility toggle (and anything later)
+**B5 `[x]` Settings move to the bottom.** Visibility toggle (and anything later)
 belongs down with "Remove timeline", not between the name and the entries.
 
 **B6 `[ ]` Tapping an entry should navigate *within* the sheet, not swap sheets.**
@@ -123,35 +123,31 @@ was just created** so you see what you made.
 **E2 `[ ]` Present the add flow in a sheet, not full screen.**
 → `styles.css` (`.assistant-overlay`), `MobileShell.tsx`
 
-**E3 `[?]` The big one: guided creation of whole *timelines*, not just entries.**
+**E3 `[ ]` Guided creation of whole *timelines*, not just entries.**
 The plural is the product direction. "Bands I played in", "Places I lived",
 "Competitions", "Shows I watched", "Supplements I took", "Cars I drove",
 "Habits", "Meetups", "Favourite foods", "People", "Schools I went to", "Books I
 read".
 
-The leverage is **prefilling with domain knowledge**, so the user confirms rather
-than types:
-- Books/shows/films have publication or broadcast years — anyone who read Harry
-  Potter probably read it near release.
-- A first car is usually around age 18; school years follow from birth year.
-- Universities, schools, cities are enumerable lists.
+**Scoped for now: build the flow, not the knowledge.** A guided
+"add a timeline" that names the timeline, picks its icon and colour, and then
+collects entries one after another — the shape `PlacesTable` already has in
+onboarding, which is the closest existing thing: a live-editable table of rows,
+each with a label and a year, where row N's start is derived from row N−1's end.
+That component solved the two hard problems already (never write inside a
+`setState` updater; reflow every later row when an earlier one changes), so it
+is the model to follow rather than reinvent.
 
-Open questions before this can be planned:
-- Where does the knowledge come from — bundled data in `public-data/`, Wikidata
-  at runtime (the famous-people spike already talks SPARQL), or both?
-- Offline/privacy: bundled data keeps the no-backend promise; live queries leak
-  what the user is typing. The Nominatim place lookup already crosses that line
-  knowingly, so there is precedent, but it needs a decision, not a drift.
-- How much is confirmed vs. auto-created? Nothing should appear on the timeline
-  the user did not agree to.
-
-Deserves its own plan document before any code.
+**Deferred: the domain knowledge** (release years for books and shows, "your
+first car was probably at 18", lists of universities). Preferably as bundled
+`public-data/`, which keeps the no-backend promise — but out of scope until the
+flow itself exists.
 
 ---
 
 ## F. Time axis
 
-**F1 `[ ]` The axis goes coarse far too early, and can show a nonsense pair.**
+**F1 `[x]` The axis goes coarse far too early, and can show a nonsense pair.**
 Today the fine unit is chosen by "first unit at least 45 px wide" and the coarse
 one is 1–2 steps above it, which can produce **decades over quarters** — Q1, with
 no way to tell 2015 from 2016. That is a real bug, not just density.
@@ -171,7 +167,7 @@ Coarse must always be exactly one meaningful step above fine — never two.
 
 ## G. Bars
 
-**G1 `[ ]` Entry labels overflow their bar, cover the next one, and steal its taps.**
+**G1 `[x]` Entry labels overflow their bar, cover the next one, and steal its taps.**
 Three fixes, in order of importance:
 1. **Truncate** the label with an ellipsis to the space actually available —
    today it is drawn at full length past the bar's end.
