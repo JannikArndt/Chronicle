@@ -10,6 +10,7 @@ import type { MutableRefObject } from "react";
 import type { EngineView, TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import { AddEntryAssistant } from "../onboarding/AddEntryAssistant";
+import { AddTimelineAssistant } from "../onboarding/AddTimelineAssistant";
 import { clearSelection, selectEntry, setSearch } from "../state/actions";
 import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
@@ -74,6 +75,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [addEntry, setAddEntry] = useState<AddEntryRequest | null>(null);
+  const [addTimelineOpen, setAddTimelineOpen] = useState(false);
 
   // Derived from the store, not held here: the canvas, the list and search all
   // select entries through the same actions, and each of them must open the
@@ -155,6 +157,22 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
     else onStartOnboarding();
   };
 
+  // Same guard as adding an entry: a new timeline needs a group of your own.
+  const startAddingTimeline = () => {
+    const hasSomewhereToPutIt = appStore.getState().dataset.groups.some((group) => !isPublicId(group.id));
+    if (hasSomewhereToPutIt) setAddTimelineOpen(true);
+    else onStartOnboarding();
+  };
+
+  // The new timeline's own pane is the useful place to land: it lists what was
+  // just entered and offers "add an entry" for the ones that were forgotten.
+  const showNewTimeline = (rowId: string) => {
+    setAddTimelineOpen(false);
+    setSettingsRowId(rowId);
+    setSheetKeptOpen(true);
+    sheetHandleRef.current?.raiseToAtLeastAnchor(HALF_ANCHOR_INDEX);
+  };
+
   // Closing the add flow *on* what it made: the canvas moves to the new entry
   // and the sheet opens on it. Adding something and being returned to an
   // unchanged screen is what made the old flow feel like it had failed.
@@ -222,6 +240,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
         onOpenRowSettings={setSettingsRowId}
         onCloseRowSettings={() => setSettingsRowId(null)}
         onAddEntry={(rowId, startMs) => startAdding({ rowId, startMs })}
+        onAddTimeline={startAddingTimeline}
       />
 
       {addEntry && (
@@ -231,6 +250,15 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
             startMs={addEntry.startMs}
             onFinished={() => setAddEntry(null)}
             onShowEntry={showNewEntry}
+          />
+        </div>
+      )}
+
+      {addTimelineOpen && (
+        <div className="assistant-overlay assistant-overlay-sheet">
+          <AddTimelineAssistant
+            onFinished={() => setAddTimelineOpen(false)}
+            onShowTimeline={showNewTimeline}
           />
         </div>
       )}

@@ -10,9 +10,11 @@ import { mergedDataset, useAppState } from "../state/store";
 export function TimelineListPane({
   layout,
   onOpenRow,
+  onAddTimeline,
 }: {
   layout: Layout;
   onOpenRow: (rowId: string) => void;
+  onAddTimeline: () => void;
 }) {
   const state = useAppState((s) => s);
   const merged = mergedDataset(state);
@@ -52,6 +54,12 @@ export function TimelineListPane({
           </button>
         );
       })}
+      {/* At the foot of the list, where "and one more" belongs. A whole
+          timeline is a bigger thing than one entry, which is why it is here
+          rather than behind the ＋ that adds entries. */}
+      <button type="button" className="sheet-add-row" onClick={onAddTimeline}>
+        ＋ New timeline
+      </button>
     </>
   );
 }
