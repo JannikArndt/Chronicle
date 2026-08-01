@@ -930,6 +930,18 @@ textarea {
 /* `100dvh`, not `inset: 0`: with `viewport-fit=cover` the layout viewport stays
    as tall as the *retracted* address bar, so anything anchored to the bottom
    hides behind mobile Safari's bar. The dynamic viewport unit tracks the bar. */
+/* The mobile shell's z-index ladder, bottom to top. Everything here floats over
+   one full-bleed canvas, so these are the only thing keeping them in order —
+   and `.mobile-shell` deliberately sets no z-index, so `.assistant-overlay`
+   (rendered outside it, in App.tsx) can sit above the lot in the same stacking
+   context. Add a new layer to this list rather than picking a number.
+
+     52  .mobile-reopen      the "🗂 Timelines" chip, only up when the sheet is gone
+     55  .mobile-fab         rides the sheet's top edge
+     60  .mobile-top-stack   chips + life strip
+     65  .sheet              a raised sheet must cover the strip, not slide under it
+     80  .mobile-menu        the ⋯ menu, over everything the shell itself draws
+     90  .assistant-overlay  onboarding and the add flows: modal over all of it   */
 .mobile-shell {
   position: absolute;
   top: 0;
@@ -1824,10 +1836,15 @@ textarea {
 
 /* ---------- onboarding assistant ---------- */
 
+/* Above every layer of the mobile shell — see the ladder above `.mobile-shell`.
+   `.mobile-shell` sets no z-index of its own, so it creates no stacking context
+   and its children compete with this overlay directly in the root one. At 60
+   this sat *under* the sheet (65) and the ⋯ menu (80), and an assistant with
+   the sheet's header floating over it is not a modal. */
 .assistant-overlay {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 90;
   display: grid;
   place-items: center;
   background: var(--color-overlay-backdrop);
