@@ -5,6 +5,11 @@ per numbered entry. Vocabulary in `docs/GLOSSARY.md`.
 
 Status: `[ ]` open · `[~]` in progress · `[x]` done · `[?]` needs a decision first
 
+**As of 2026-08-02: A–G are all built.** What is left is H3 (a decision, with a
+recommendation below), the rest of H4 (design work, not a bug), and H5 — the
+real-device pass, which only you can do. `plans/mobile-test-plan.md` is the
+script for it.
+
 ---
 
 ## A. Sheets
@@ -14,7 +19,7 @@ Its top edge should sit *above* the life strip, not behind it. Fix is a z-index
 plus a full anchor that accounts for the top stack's measured height.
 → `MobileShell.tsx` (`FULL_ANCHOR_FRACTION`, `axisTop`), `styles.css`
 
-**A2 `[ ]` "Ongoing" is modelled honestly but presented confusingly.**
+**A2 `[x]` "Ongoing" is modelled honestly but presented confusingly.**
 Two separate complaints, one root cause: internally *ongoing* means **no end**,
 but the editor shows it as a toggle sitting next to a date field that also
 accepts "now" — so two controls claim the same meaning and disagree.
@@ -59,7 +64,7 @@ colour and icon are pick-rows further down the pane.
 
 **B2 `[x]` Then the entries list** (already there — just below the header block).
 
-**B3 `[ ]` An "add entry" action at the bottom of the entries list,** prefilled
+**B3 `[x]` An "add entry" action at the bottom of the entries list,** prefilled
 with this timeline and a start year derived from the entries above it: the
 highest existing end year, or today if the last entry is ongoing.
 Depends on E3 (assistant in a sheet) to avoid a full-screen jump from here.
@@ -74,7 +79,7 @@ designed. Group membership is already visible from the section headers.
 **B5 `[x]` Settings move to the bottom.** Visibility toggle (and anything later)
 belongs down with "Remove timeline", not between the name and the entries.
 
-**B6 `[ ]` Tapping an entry should navigate *within* the sheet, not swap sheets.**
+**B6 `[x]` Tapping an entry should navigate *within* the sheet, not swap sheets.**
 Today the row sheet closes and the entry sheet opens at a different height, with
 no way back. Wanted: the timeline pane slides left, the entry pane slides in from
 the right, **in the same sheet at the same height**, with a **back button top
@@ -83,7 +88,7 @@ up — it needs to extend one level deeper and absorb the entry sheet's content.
 Structurally the biggest item here: `EntrySheet` and `RowSheet` become two panes
 of one navigable sheet.
 
-**B7 `[ ]` A "show on the timeline" button, top right of the entry pane** —
+**B7 `[x]` A "show on the timeline" button, top right of the entry pane** —
 lowers the sheet to peek and highlights the entry on the canvas. ("Canvas" is our
 word; the user-facing phrasing is **"Show on timeline"** or **"Find it"**.)
 Needs an engine call to centre on an entry — `centerOnMs()` exists, vertical
@@ -93,7 +98,7 @@ centring does not.
 
 ## C. Minimap
 
-**C1 `[ ]` The viewport window ignores vertical scrolling.**
+**C1 `[x]` The viewport window ignores vertical scrolling.**
 It spans the strip's full height regardless of which timelines are on screen.
 With enough rows to scroll vertically it should shrink and move up/down, exactly
 as it already narrows and moves horizontally. `viewportWindow()` returns `x0/x1`
@@ -105,7 +110,7 @@ layout's total height.
 
 ## D. Search
 
-**D1 `[ ]` Replace the search toolbar with an expanding button.**
+**D1 `[x]` Replace the search toolbar with an expanding button.**
 The 🔍 chip should grow into a text field in place; no second bar appearing above
 the strip. **Remove the filters entirely.** (Bonus: this shrinks the top stack, so
 the axis stops being pushed down when search is open.)
@@ -115,15 +120,15 @@ the axis stops being pushed down when search is open.)
 
 ## E. Adding things
 
-**E1 `[ ]` Finish the add-entry flow properly:** a **"Done"** primary action next
+**E1 `[x]` Finish the add-entry flow properly:** a **"Done"** primary action next
 to the secondary "Add another", and on Done, **move the canvas to the entry that
 was just created** so you see what you made.
 → `AddEntryAssistant.tsx` (`commitAndFinish`, done step)
 
-**E2 `[ ]` Present the add flow in a sheet, not full screen.**
+**E2 `[x]` Present the add flow in a sheet, not full screen.**
 → `styles.css` (`.assistant-overlay`), `MobileShell.tsx`
 
-**E3 `[ ]` Guided creation of whole *timelines*, not just entries.**
+**E3 `[x]` Guided creation of whole *timelines*, not just entries.**
 The plural is the product direction. "Bands I played in", "Places I lived",
 "Competitions", "Shows I watched", "Supplements I took", "Cars I drove",
 "Habits", "Meetups", "Favourite foods", "People", "Schools I went to", "Books I
@@ -183,18 +188,35 @@ Three fixes, in order of importance:
 
 ## H. Housekeeping
 
-**H1 `[ ]` Delete the design mock** `plans/mobile-shell-mock.html` once the items
+**H1 `[x]` Delete the design mock** `plans/mobile-shell-mock.html` once the items
 above have taken what they need from it.
 
-**H2 `[ ]` `DataMenu.tsx` and `MobileShell`'s `MobileMenu` duplicate the import
-handler** — extract one.
+**H2 `[x]` `DataMenu.tsx` and `MobileShell`'s `MobileMenu` duplicate the import
+handler** — extract one. Done: it was three copies, counting the rail's ＋ menu.
+Now `src/ui/importFlow.ts`.
 
-**H3 `[ ]` `useIsMobile` is a width query only**, so a narrow desktop window gets
+**H3 `[?]` `useIsMobile` is a width query only**, so a narrow desktop window gets
 the mobile shell. Decide whether that is acceptable or add `pointer: coarse`.
 
-**H4 `[ ]` Rail actions with no mobile equivalent:** ＋ Group, ＋ Person,
-🌍 World events, 🌟 Famous people are private components inside `RowRail.tsx` and
-would need extracting before `RowSheet` could offer them.
+**Left as-is, deliberately, and here is the argument** — over to you if you
+disagree: the thing that actually fails in a 500px-wide desktop window is the
+*desktop* shell. The rail plus the detail panel plus the canvas need width that
+isn't there. `pointer: coarse` would keep that broken layout on screen and give
+a fine pointer a shell it can't use. The one real cost is that sheet drag with
+a mouse is unusual — but it works, because BottomSheet is Pointer Events
+throughout and never assumes touch.
+
+**H4 `[~]` Rail actions with no mobile equivalent:** ＋ Group, ＋ Person,
+🌍 World events, 🌟 Famous people were all private components inside
+`RowRail.tsx`.
+- 🌍 World events: **done** — extracted to `WorldEventsPicker.tsx`, now in the
+  mobile ⋯ menu. It is a list of checkboxes, so it needed no redesign.
+- 🌟 Famous people: still rail-only. Extractable the same way, but it carries
+  the Wikidata search *and* the 🐞 debug panel that is itself on the pre-release
+  TODO list — worth doing those two together.
+- ＋ Group / ＋ Person: not extraction problems but design ones. A row's group
+  can now be changed from the row pane's ⋯; *creating* a group or a person on a
+  phone has no designed home yet.
 
 **H5 `[ ]` Real-device iOS Safari pass** is still owed: pinch vs page zoom,
 `100dvh` as the URL bar collapses, safe areas, keyboard covering a sheet.
