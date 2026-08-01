@@ -95,9 +95,21 @@ export interface EngineCallbacks {
   onRequestDraft: (rowId: string, startMs: number) => void;
   onPickDate: (ms: number, precision: Precision) => void;
   onScrollSync: (scrollY: number) => void;
-  // Fired whenever the visible time span changes, so an overview (the mobile
-  // minimap) can track pan and pinch frame by frame.
-  onViewChange?: (startMs: number, endMs: number) => void;
+  // Fired whenever the visible window changes, so an overview (the mobile
+  // minimap) can track pan, pinch and vertical scroll frame by frame.
+  onViewChange?: (view: EngineView) => void;
+}
+
+// What part of the whole timeline is on screen: a time span across, and a slice
+// of the laid-out rows down. Both are needed by the minimap, and reporting them
+// together is what keeps its window from lagging one axis behind the other.
+export interface EngineView {
+  startMs: number;
+  endMs: number;
+  // In layout pixels, measured from the top of the first row.
+  scrollY: number;
+  visibleHeight: number;
+  totalHeight: number;
 }
 
 export interface EngineInput {
@@ -164,7 +176,7 @@ export class TimelineEngine {
   private activePointers = new Map<number, { x: number; y: number }>();
   private pinchStart?: { distance: number; midX: number; scale: TimeScale };
   private hoverX: number | null = null;
-  private lastEmittedView: { startMs: number; endMs: number } | null = null;
+  private lastEmittedView: EngineView | null = null;
   private hatchPattern: CanvasPattern | null = null;
   // Resolved once at construction and re-resolved on OS theme change (see
   // attachEvents) — never a second hardcoded color table that could drift
@@ -252,6 +264,12 @@ export class TimelineEngine {
   // the view without changing how far in the user was.
   centerOnMs(ms: number): void {
     this.scale = clampScale({ ...this.scale, startMs: ms - (this.width / 2) * this.scale.msPerPx });
+    this.requestDraw();
+  }
+
+  // The vertical counterpart, in layout pixels — the minimap's other axis.
+  centerOnLayoutY(y: number): void {
+    this.setScrollY(y - (this.height - this.contentTop()) / 2);
     this.requestDraw();
   }
 
@@ -489,11 +507,26 @@ export class TimelineEngine {
   // Announced from the draw loop rather than from each pan/zoom entry point:
   // every one of them ends in a repaint, so this catches all of them once.
   private emitViewChangeIfMoved(): void {
-    const startMs = this.scale.startMs;
-    const endMs = xToMs(this.scale, this.width);
-    if (this.lastEmittedView?.startMs === startMs && this.lastEmittedView.endMs === endMs) return;
-    this.lastEmittedView = { startMs, endMs };
-    this.callbacks.onViewChange?.(startMs, endMs);
+    const view: EngineView = {
+      startMs: this.scale.startMs,
+      endMs: xToMs(this.scale, this.width),
+      scrollY: this.scrollY,
+      visibleHeight: this.height - this.contentTop(),
+      totalHeight: this.input.layout.totalHeight,
+    };
+    const last = this.lastEmittedView;
+    if (
+      last &&
+      last.startMs === view.startMs &&
+      last.endMs === view.endMs &&
+      last.scrollY === view.scrollY &&
+      last.visibleHeight === view.visibleHeight &&
+      last.totalHeight === view.totalHeight
+    ) {
+      return;
+    }
+    this.lastEmittedView = view;
+    this.callbacks.onViewChange?.(view);
   }
 
   private drawGridlines(ticks: { fine: { ms: number }[]; coarse: { ms: number }[] }): void {

@@ -5,6 +5,7 @@ import {
   miniMapMetrics,
   miniMapTimeRange,
   stripXToMs,
+  stripYToLayoutY,
   viewportWindow,
 } from "./miniMap";
 import type { TimelineDataset } from "../model/types";
@@ -122,17 +123,58 @@ describe("miniMapTimeRange", () => {
 
 describe("viewportWindow", () => {
   const range = { startMs: 0, endMs: 100 };
+  const BAND = 60;
+  // Rows taller than the canvas: the case where the vertical window is not the
+  // whole band.
+  const scrolled = { scrollY: 100, visibleHeight: 200, totalHeight: 600 };
 
   it("maps the visible time span onto the strip", () => {
-    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200);
+    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, null, BAND);
     expect(window.x0).toBe(50);
     expect(window.x1).toBe(150);
   });
 
   it("clamps a view panned off the end of the data to the strip", () => {
-    const window = viewportWindow({ startMs: 500, endMs: 550 }, range, 200);
+    const window = viewportWindow({ startMs: 500, endMs: 550 }, range, 200, null, BAND);
     expect(window.x0).toBe(200);
     expect(window.x1).toBe(200);
+  });
+
+  it("spans the whole lane band when every row is already on screen", () => {
+    const everything = { scrollY: 0, visibleHeight: 400, totalHeight: 300 };
+    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, everything, BAND);
+    expect(window.y0).toBe(0);
+    expect(window.y1).toBe(BAND);
+  });
+
+  it("shrinks and moves down as the canvas scrolls past rows below the fold", () => {
+    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, scrolled, BAND);
+    expect(window.y0).toBe(10);
+    expect(window.y1).toBe(30);
+  });
+
+  it("clamps the bottom edge to the band when scrolled past the last row", () => {
+    const overscrolled = { scrollY: 550, visibleHeight: 200, totalHeight: 600 };
+    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, overscrolled, BAND);
+    expect(window.y1).toBe(BAND);
+    expect(window.y0).toBe(55);
+  });
+
+  it("treats a missing vertical view as the whole band", () => {
+    const window = viewportWindow({ startMs: 25, endMs: 75 }, range, 200, null, BAND);
+    expect(window.y0).toBe(0);
+    expect(window.y1).toBe(BAND);
+  });
+});
+
+describe("stripYToLayoutY", () => {
+  it("inverts the lane-band mapping", () => {
+    expect(stripYToLayoutY(30, 60, 600)).toBe(300);
+  });
+
+  it("clamps a drag that leaves the band", () => {
+    expect(stripYToLayoutY(-20, 60, 600)).toBe(0);
+    expect(stripYToLayoutY(999, 60, 600)).toBe(600);
   });
 });
 
