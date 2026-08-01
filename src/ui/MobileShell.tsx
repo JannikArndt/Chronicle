@@ -13,9 +13,10 @@ import { AddEntryAssistant } from "../onboarding/AddEntryAssistant";
 import { AddTimelineAssistant } from "../onboarding/AddTimelineAssistant";
 import { clearSelection, selectEntry, setSearch } from "../state/actions";
 import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
-import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
-import { replaceDataset } from "../state/actions";
+import { triggerDownload } from "../storage/exportImport";
 import { CanvasHost } from "./CanvasHost";
+import { importDatasetWithConfirmation } from "./importFlow";
+import { WorldEventsPicker } from "./WorldEventsPicker";
 import { centerOnEntry } from "./centerOnEntry";
 import { MiniMap } from "./MiniMap";
 import { TimelineSheet } from "./TimelineSheet";
@@ -315,24 +316,34 @@ function MobileSearchChip({ open, setOpen }: { open: boolean; setOpen: (open: bo
 }
 
 function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOnboarding: () => void }) {
+  const [showingWorldEvents, setShowingWorldEvents] = useState(false);
+
   const handleImport = () => {
-    triggerImportFlow((result) => {
-      if (!result.ok) {
-        window.alert(result.error);
-        return;
-      }
-      const counts = `${result.dataset.entries.length} entries in ${result.dataset.rows.length} rows`;
-      if (window.confirm(`Replace your current data with this import (${counts})? This cannot be undone.`)) {
-        replaceDataset(result.dataset);
-      }
-    });
+    importDatasetWithConfirmation((message) => window.alert(message));
     close();
   };
+
+  if (showingWorldEvents) {
+    return (
+      <>
+        <div className="popover-backdrop" onClick={close} />
+        <div className="mobile-menu">
+          <WorldEventsPicker back={() => setShowingWorldEvents(false)} />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       <div className="popover-backdrop" onClick={close} />
       <div className="mobile-menu">
+        {/* The one rail action that translates to a phone unchanged: it is a
+            list of checkboxes, not a layout. ＋ Group, ＋ Person and 🌟 Famous
+            people still have no mobile home — see the backlog. */}
+        <button type="button" className="menu-item" onClick={() => setShowingWorldEvents(true)}>
+          🌍 World events…
+        </button>
         <button
           type="button"
           className="menu-item"

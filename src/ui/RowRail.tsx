@@ -16,7 +16,6 @@ import {
   deleteRowWithCascade,
   moveRow,
   reorderGroup,
-  replaceDataset,
   selectRow,
   addFamousPerson,
   removeFamousRow,
@@ -25,14 +24,13 @@ import {
   toggleGroupCollapsed,
   toggleRowCollapsed,
   toggleRowHidden,
-  toggleWorldEvents,
   updatePerson,
   updateRow,
 } from "../state/actions";
 import { isPublicId, useAppState, userBirthMs } from "../state/store";
 import type { Person } from "../model/types";
-import { triggerImportFlow } from "../storage/exportImport";
-import { loadPublicCatalog } from "../publicData/loader";
+import { importDatasetWithConfirmation } from "./importFlow";
+import { WorldEventsPicker } from "./WorldEventsPicker";
 import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
 import { fetchWikidataBiography, searchWikidataCandidates } from "../publicData/famous/wikidata";
 import type { SparqlBinding, WikidataCandidate } from "../publicData/famous/wikidata";
@@ -782,16 +780,7 @@ function RailAddMenu({
   onStartOnboarding: () => void;
 }) {
   const handleImport = () => {
-    triggerImportFlow((result) => {
-      if (!result.ok) {
-        window.alert(result.error);
-        return;
-      }
-      const counts = `${result.dataset.entries.length} entries in ${result.dataset.rows.length} rows`;
-      if (window.confirm(`Replace your current data with this import (${counts})? This cannot be undone.`)) {
-        replaceDataset(result.dataset);
-      }
-    });
+    importDatasetWithConfirmation((message) => window.alert(message));
     close();
   };
 
@@ -827,32 +816,6 @@ function RailAddMenu({
       >
         ✨ Replay setup assistant
       </button>
-    </div>
-  );
-}
-
-// Toggle any of the bundled world-events datasets on/off. Nothing shows until
-// picked here, so the catalog can grow without cluttering a fresh timeline.
-function WorldEventsPicker({ back }: { back: () => void }) {
-  const catalog = loadPublicCatalog();
-  const activeKeys = useAppState((s) => s.activeWorldKeys);
-
-  return (
-    <div className="popover-form">
-      <button type="button" className="menu-item" onClick={back}>
-        ◂ Back
-      </button>
-      <div className="popover-title">World events</div>
-      {catalog.map((item) => (
-        <label key={item.key} className="menu-item picker-row">
-          <input
-            type="checkbox"
-            checked={activeKeys.includes(item.key)}
-            onChange={() => toggleWorldEvents(item.key)}
-          />
-          <span>{item.label}</span>
-        </label>
-      ))}
     </div>
   );
 }
