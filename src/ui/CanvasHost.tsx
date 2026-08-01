@@ -5,7 +5,7 @@
 import { useEffect, useRef } from "react";
 import type { MutableRefObject, RefObject } from "react";
 import { TimelineEngine } from "../render/engine";
-import type { EngineInput } from "../render/engine";
+import type { EngineInput, EngineView } from "../render/engine";
 import type { Layout } from "../render/layout";
 import {
   clearSelection,
@@ -23,8 +23,8 @@ interface CanvasHostProps {
   engineRef: MutableRefObject<TimelineEngine | null>;
   // Pixels to leave empty above the axis — the mobile shell floats controls there.
   axisTop?: number;
-  // Called on every change to the visible time span (the minimap follows it).
-  onViewChange?: (startMs: number, endMs: number) => void;
+  // Called on every change to the visible window (the minimap follows it).
+  onViewChange?: (view: EngineView) => void;
 }
 
 // The engine takes its whole input in one call, and two different effects below
@@ -66,7 +66,7 @@ export function CanvasHost({
       onSelectRow: (rowId) => (rowId ? selectRow(rowId) : clearSelection()),
       onRequestDraft: startDraft,
       onPickDate: commitPickedDate,
-      onViewChange: (startMs, endMs) => onViewChangeRef.current?.(startMs, endMs),
+      onViewChange: (view) => onViewChangeRef.current?.(view),
       onScrollSync: (scrollY) => {
         const rail = railContentRef.current;
         if (rail) rail.style.transform = `translateY(${-scrollY}px)`;

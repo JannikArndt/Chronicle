@@ -7,7 +7,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
-import type { TimelineEngine } from "../render/engine";
+import type { EngineView, TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import { AddEntryAssistant } from "../onboarding/AddEntryAssistant";
 import { clearSelection } from "../state/actions";
@@ -108,7 +108,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   }, []);
 
   // The strip's viewport window follows the canvas frame by frame.
-  const [view, setView] = useState<{ startMs: number; endMs: number } | null>(null);
+  const [view, setView] = useState<EngineView | null>(null);
 
   // Remembered so the FAB can be put back where it belongs after it unmounts
   // and returns — its position is style, not React state.
@@ -166,7 +166,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
         railContentRef={railContentRef}
         engineRef={engineRef}
         axisTop={axisTop}
-        onViewChange={(startMs, endMs) => setView({ startMs, endMs })}
+        onViewChange={setView}
       />
 
       <div className="mobile-top-stack" ref={topStackRef}>

@@ -9,13 +9,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject, PointerEvent as ReactPointerEvent } from "react";
 import { readThemeColors } from "../render/engine";
-import type { ColorTable, TimelineEngine } from "../render/engine";
+import type { ColorTable, EngineView, TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import {
   miniMapLanes,
   miniMapMetrics,
   miniMapTimeRange,
   stripXToMs,
+  stripYToLayoutY,
   viewportWindow,
 } from "../render/miniMap";
 import type { MiniMapLane, MiniMapRange } from "../render/miniMap";
@@ -29,6 +30,7 @@ const TICK_LANE_HEIGHT_PX = 14;
 const BAR_OPACITY = 0.85;
 const WINDOW_FILL_OPACITY = 0.1;
 const MIN_WINDOW_WIDTH_PX = 8;
+const MIN_WINDOW_HEIGHT_PX = 10;
 const MIN_BAR_WIDTH_PX = 1.5;
 
 // Round year gaps to choose between, coarse enough that labels never collide.
@@ -40,8 +42,8 @@ const MIN_LABEL_SPACING_PX = 58;
 interface MiniMapProps {
   layout: Layout;
   engineRef: MutableRefObject<TimelineEngine | null>;
-  // The main canvas's visible span, fed by the engine's onViewChange.
-  view: { startMs: number; endMs: number } | null;
+  // The main canvas's visible window, fed by the engine's onViewChange.
+  view: EngineView | null;
 }
 
 // The canvas is painted in JS, so it has to re-read the CSS custom properties
@@ -68,11 +70,19 @@ function tickYearsFor(range: MiniMapRange, width: number): { step: number; label
   };
 }
 
+// The vertical extent the lanes occupy. It stands for the whole stack of
+// timelines, so it is what the viewport window's height is measured against —
+// not the strip's full height, which also carries the year ticks.
+function laneBandHeight(laneCount: number, cssHeight: number): number {
+  const available = cssHeight - TOP_INSET_PX - TICK_LANE_HEIGHT_PX;
+  return Math.max(0, Math.min(laneCount * miniMapMetrics(laneCount).pitch, available));
+}
+
 function paintStrip(
   canvas: HTMLCanvasElement,
   lanes: MiniMapLane[],
   range: MiniMapRange,
-  view: { startMs: number; endMs: number } | null,
+  view: EngineView | null,
   colors: ColorTable,
 ): void {
   const context = canvas.getContext("2d");
@@ -128,16 +138,21 @@ function paintStrip(
   context.globalAlpha = 1;
 
   if (!view) return;
-  const visible = viewportWindow(view, range, drawableWidth);
+  // The window is a window on both axes: with more timelines than fit on the
+  // canvas it also shrinks vertically and rides up and down as you scroll.
+  const band = laneBandHeight(lanes.length, cssHeight);
+  const visible = viewportWindow(view, range, drawableWidth, view, band);
   const x0 = SIDE_INSET_PX + visible.x0;
   const width = Math.max(MIN_WINDOW_WIDTH_PX, visible.x1 - visible.x0);
+  const y0 = TOP_INSET_PX + visible.y0 - 2;
+  const height = Math.max(MIN_WINDOW_HEIGHT_PX, visible.y1 - visible.y0) + 4;
   context.globalAlpha = WINDOW_FILL_OPACITY;
   context.fillStyle = colors.guide;
-  context.fillRect(x0, 2, width, cssHeight - 4);
+  context.fillRect(x0, y0, width, height);
   context.globalAlpha = 1;
   context.strokeStyle = colors.guide;
   context.lineWidth = 2;
-  context.strokeRect(x0, 2, width, cssHeight - 4);
+  context.strokeRect(x0, y0, width, height);
 }
 
 export function MiniMap({ layout, engineRef, view }: MiniMapProps) {
@@ -168,9 +183,17 @@ export function MiniMap({ layout, engineRef, view }: MiniMapProps) {
     const canvas = event.currentTarget;
     const bounds = canvas.getBoundingClientRect();
     const drawableWidth = bounds.width - SIDE_INSET_PX * 2;
-    engineRef.current?.centerOnMs(
-      stripXToMs(event.clientX - bounds.left - SIDE_INSET_PX, range, drawableWidth),
-    );
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.centerOnMs(stripXToMs(event.clientX - bounds.left - SIDE_INSET_PX, range, drawableWidth));
+    // The strip is a map of both axes, so a tap on it means "take me there" in
+    // both. Rows that all fit on screen make this a no-op — setScrollY clamps.
+    if (view) {
+      const band = laneBandHeight(lanes.length, bounds.height);
+      engine.centerOnLayoutY(
+        stripYToLayoutY(event.clientY - bounds.top - TOP_INSET_PX, band, view.totalHeight),
+      );
+    }
   };
 
   return (

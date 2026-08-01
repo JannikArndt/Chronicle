@@ -60,6 +60,16 @@ export interface MiniMapRange {
 export interface ViewportWindow {
   x0: number;
   x1: number;
+  y0: number;
+  y1: number;
+}
+
+// The canvas's vertical position, as the minimap needs it: how far down the
+// laid-out rows the view sits, and how much of them it covers.
+export interface VerticalView {
+  scrollY: number;
+  visibleHeight: number;
+  totalHeight: number;
 }
 
 function clamp(value: number, low: number, high: number): number {
@@ -123,17 +133,41 @@ export function viewportWindow(
   view: MiniMapRange,
   range: MiniMapRange,
   stripWidth: number,
+  vertical: VerticalView | null,
+  laneBandHeight: number,
 ): ViewportWindow {
   const msToStripX = (ms: number) =>
     ((ms - range.startMs) / (range.endMs - range.startMs)) * stripWidth;
   return {
     x0: clamp(msToStripX(view.startMs), 0, stripWidth),
     x1: clamp(msToStripX(view.endMs), 0, stripWidth),
+    ...verticalWindow(vertical, laneBandHeight),
   };
+}
+
+// The lanes occupy `laneBandHeight` px of strip and stand for `totalHeight` px
+// of canvas, so the visible slice maps across as a plain proportion. A canvas
+// that shows everything gets the full band — never a window smaller than the
+// thing it is a window onto.
+function verticalWindow(vertical: VerticalView | null, laneBandHeight: number): { y0: number; y1: number } {
+  if (!vertical || vertical.totalHeight <= 0 || vertical.visibleHeight >= vertical.totalHeight) {
+    return { y0: 0, y1: laneBandHeight };
+  }
+  const scale = laneBandHeight / vertical.totalHeight;
+  const y0 = clamp(vertical.scrollY * scale, 0, laneBandHeight);
+  const y1 = clamp((vertical.scrollY + vertical.visibleHeight) * scale, y0, laneBandHeight);
+  return { y0, y1 };
 }
 
 // The instant a tap or drag at `x` on the strip points at.
 export function stripXToMs(x: number, range: MiniMapRange, stripWidth: number): number {
   const fraction = stripWidth === 0 ? 0 : clamp(x / stripWidth, 0, 1);
   return range.startMs + fraction * (range.endMs - range.startMs);
+}
+
+// The layout row a tap or drag at `y` within the lane band points at — the
+// vertical counterpart of stripXToMs.
+export function stripYToLayoutY(y: number, laneBandHeight: number, totalHeight: number): number {
+  const fraction = laneBandHeight === 0 ? 0 : clamp(y / laneBandHeight, 0, 1);
+  return fraction * totalHeight;
 }
