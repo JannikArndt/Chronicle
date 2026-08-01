@@ -76,6 +76,14 @@ bar on the canvas grows an open right edge.
 that is a focus/blur ordering bug, and worth reporting exactly.
 Also try typing the words: `now`, `ongoing` and `still ongoing` should all work.
 
+**A2-b — the end handle on an ongoing entry**
+Same entry, now look at the lane below the two date blocks.
+✅ **Dragging** the right-hand handle leftwards ends the entry there — the text
+stops saying `still ongoing` and shows that date.
+✅ A single **tap** on the lane does *not* end it. (This is deliberate: with the
+toggle gone, that handle had to do something, but a stray tap must not quietly
+end something that is still going.)
+
 **A4 — the ⋯ menu**
 ✅ A round ⋯ button top right on the timeline and entry panes.
 ✅ Tapping opens a small card; "Remove…" is red.
