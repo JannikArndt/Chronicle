@@ -208,11 +208,13 @@ that shared result is what keeps them from drifting apart.
 
 ```
 ┌──────────────────────────────────────┐
-│  🔍 Search                       ⋯   │ ← chips
+│  🔍 Search                       ⋯   │ ← chips (🔍 grows into the field)
 │ ┌──────────────────────────────────┐ │
-│ │▬▬▬  ▬▬▬▬▬▬▬  ▬▬   ┃▬▬▬▬▬┃  ▬▬▬▬ │ │ ← minimap (life strip)
-│ │ ▬▬▬▬▬▬▬▬  ▬▬▬     ┃ ▬▬▬ ┃       │ │   one lane per timeline
-│ │   ▬▬  ▬▬▬▬▬▬▬▬▬▬  ┃▬▬▬▬▬┃  ▬▬▬  │ │   ┃ ┃ = viewport window
+│ │▬▬▬  ▬▬▬▬▬▬▬  ▬▬    ▬▬▬▬▬   ▬▬▬▬ │ │ ← minimap (life strip)
+│ │ ▬▬▬▬▬▬▬▬  ▬▬▬     ┏━━━━━┓       │ │   one lane per timeline
+│ │   ▬▬  ▬▬▬▬▬▬▬▬▬▬  ┃▬▬▬▬▬┃  ▬▬▬  │ │   ┏━┓ = viewport window:
+│ │ ▬▬▬▬  ▬▬▬▬▬▬      ┗━━━━━┛▬▬  ▬▬ │ │   ┗━┛ narrower AND shorter
+│ │   ▬▬▬▬▬  ▬▬▬▬▬▬▬▬  ▬▬▬▬    ▬▬   │ │       than the whole strip
 │ └──────────────────────────────────┘ │        ↑ “top stack”, measured
 │  2010      2015      2020      2025  │ ← axis, starts below the stack
 │ ─────────────────────────────────────│
@@ -222,8 +224,8 @@ that shared result is what keeps them from drifting apart.
 │                                  ⊕   │ ← FAB, rides the sheet’s edge
 │ ╭──────────────────────────────────╮ │
 │ │             ───                  │ │ ← grab handle
-│ │  Your timelines                  │ │ ← sheet header (visible at peek)
-│ │  b. 1987 · 12 timelines          │ │
+│ │  Timelines                   ⋯   │ │ ← sheet header (visible at peek)
+│ │  3 groups · 12 timelines         │ │
 │ ╰──────────────────────────────────╯ │
 └──────────────────────────────────────┘
 ```
@@ -255,11 +257,12 @@ media queries — the information architecture genuinely differs.
 → `src/ui/App.tsx`, `src/ui/MobileShell.tsx`
 
 **Rail** — *desktop only.* The fixed left column listing every timeline, scrolled
-in lockstep with the canvas. Mobile has no rail; the row sheet replaces it.
+in lockstep with the canvas. Mobile has no rail; the sheet's list pane replaces
+it.
 → `src/ui/RowRail.tsx`
 
 **Detail panel** — *desktop only.* The side panel for the selected entry. Its
-mobile counterpart is the entry sheet.
+mobile counterpart is the sheet's entry pane.
 → `src/ui/DetailPanel.tsx`
 
 **Bottom sheet** *(or just **sheet**)* — a panel that slides up from the bottom
@@ -271,21 +274,42 @@ edge and can be dragged between heights. The mobile app's main surface.
 fast you flicked.
 → `src/ui/sheetSnap.ts`
 
-**Row sheet** — the sheet listing all your timelines; the rail's replacement.
-→ `src/ui/RowSheet.tsx`
+**Timeline sheet** — *the* sheet on mobile. There is only one, and it holds three
+**panes** you navigate between without the sheet itself moving.
+→ `src/ui/TimelineSheet.tsx`
 
-**Entry sheet** — the sheet showing one selected entry; the detail panel's
-replacement. Opens whenever *anything* selects an entry, because its visibility
-is derived from the store rather than passed in as a prop.
-→ `src/ui/EntrySheet.tsx`
+**Pane** — one screen inside the sheet. Three of them, sliding sideways like a
+phone's navigation stack:
+
+```
+   list  ───▶  row  ───▶  entry
+     ◀───────    ◀────────
+  all your     one          one
+  timelines    timeline     entry
+```
+
+→ `TimelineListPane.tsx` (the rail's replacement), `RowPane.tsx`,
+`EntryPane.tsx`
+
+The stack is **derived, not remembered**: an entry being selected *means* the
+entry pane. That is why tapping a bar on the canvas, tapping a row in the list,
+and finding something in search all land in the same place. And "back" from an
+entry goes to its timeline — a *place*, not a history — because you may have
+arrived from the canvas without ever visiting that timeline.
 
 **Minimap** *(also: **life strip**)* — the thin band at the top summarising the
 whole dataset: one lane per timeline, with an orange **viewport window** showing
-which part the canvas is currently looking at. Tap or drag it to jump.
+which part the canvas is currently looking at. Tap or drag it to jump — in both
+directions.
 → `src/ui/MiniMap.tsx`, `src/render/miniMap.ts`
 
-**Viewport window** — the box drawn on the minimap marking the visible slice of
-time. (Today it marks time only, not vertical position.)
+**Viewport window** — the box drawn on the minimap marking what the canvas can
+see: across, a slice of time; down, a slice of your timelines. It shrinks and
+moves on both axes.
+
+**Lane band** — the part of the minimap's height that the lanes occupy (the rest
+is the year ticks). The viewport window's vertical position is measured against
+this, not against the strip's full height.
 
 **FAB** — *floating action button.* The round `＋` hovering over the bottom-right
 of the canvas. The standard mobile term for "the one primary action".
@@ -303,11 +327,28 @@ every keystroke. There is no Save button anywhere in this app.
 drag, plus typed fields.
 → `src/ui/DateRangeEditor.tsx`
 
-**Assistant** — a guided, one-question-per-screen flow. The **setup assistant**
-(name, birth date, places lived) runs on a fresh dataset; the **add-entry
-assistant** is behind the FAB. Assistants create nothing until the last step,
-which is what makes their Back button safe.
+**Still ongoing** — what an entry with **no end date** says in the end field.
+Internally there is no end; to you it is simply the value that field holds. You
+reach it by editing the field — typing it, or tapping the pill that appears
+while editing. There is no toggle, on purpose: a toggle beside a field that also
+accepted "now" meant two controls claiming one meaning.
+
+**Assistant** — a guided, one-question-per-screen flow.
+- **setup assistant** — name, birth date, places lived. Runs on a fresh dataset.
+- **add-entry assistant** — behind the FAB, and behind `＋ Add an entry` at the
+  foot of a timeline, where it arrives already knowing the timeline and the year.
+- **add-timeline assistant** — behind `＋ New timeline` at the foot of the list.
+  Name it, style it, then fill it in.
+
+Assistants create nothing until the last step, which is what makes their Back
+button safe. The exception is a **table step**.
 → `src/onboarding/`
+
+**Table step** — a step showing *every* row at once, editable, saving as you
+type, with no Back button. Used where remembering the fourth thing routinely
+corrects the second (places lived; the entries on a new timeline) — there
+editing a row *is* the correction, so there is nothing to navigate back through.
+→ `PlacesTable.tsx`, `AddTimelineAssistant.tsx`
 
 **Draft** — a half-made entry created by dragging on the canvas. It lives in
 `state.draft` and only joins the dataset once you give it a title. The assistant

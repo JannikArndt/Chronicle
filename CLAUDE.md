@@ -65,14 +65,18 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   with a `ResizeObserver` and its height fed to the engine as `axisTop`, so the axis
   starts *below* the floating controls instead of behind them. `BottomSheet.tsx` is
   the shared primitive (hand-rolled Pointer Events, anchors + `sheetSnap.ts` for
-  velocity-aware snapping); `RowSheet` is the rail's replacement and `EntrySheet` the
-  `DetailPanel`'s. `EntrySheet`'s visibility is *derived from the store*
-  (`draft ?? selectedEntryId`), never from a prop, because the canvas, the timeline
-  sheet and search all select entries through the same actions. `MiniMap.tsx` is a
-  second canvas painting `src/render/miniMap.ts` (pure, tested) — one lane per row,
-  plus the current viewport window; tapping or dragging it calls
-  `engine.centerOnMs()`. `DateRangeEditor.tsx` + `dateLaneRange.ts` are the mobile
-  date editor (two handles on one lane). Desktop still uses `DateField`.
+  velocity-aware snapping). There is exactly **one** sheet: `TimelineSheet.tsx`,
+  holding three panes — `TimelineListPane` (the rail's replacement) →
+  `RowPane` (one timeline) → `EntryPane` (the `DetailPanel`'s replacement).
+  `MiniMap.tsx` is a second canvas painting `src/render/miniMap.ts` (pure, tested) —
+  one lane per row, plus the current viewport window on *both* axes; tapping or
+  dragging it calls `engine.centerOnMs()` and `engine.centerOnLayoutY()`, and it
+  reads the canvas's vertical position from the `EngineView` the engine reports
+  through `onViewChange`. `DateRangeEditor.tsx` + `dateLaneRange.ts` are the mobile
+  date editor (two handles on one lane). Desktop still uses `DateField`. Search on
+  mobile is the chip itself expanding into a field (`MobileSearchChip` in
+  `MobileShell.tsx`), with no filters — `SearchBar.tsx` with its filter panel is
+  desktop-only now.
 - `src/onboarding/` — Typeform-style conversational onboarding, auto-shown on a fresh
   dataset (`shouldShowOnboarding`, gated on `dataset.selfPersonId === undefined &&
   dataset.groups.length === 0`), and manually re-triggerable any time via the rail's
@@ -188,8 +192,29 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   mouse may legitimately rest on a target.
 - **Assistants create nothing until the last step.** `AddEntryAssistant` builds the
   entry — and the row, when a new one is needed — only in `commitAndFinish`, which is
-  what makes its Back button safe. See the onboarding invariants above for the harder
-  case, where identity *must* be committed mid-flow and Back updates in place instead.
+  what makes its Back button safe. The two exceptions are the two live-editable
+  tables — `PlacesTable` and `AddTimelineAssistant`'s `EntryTable` — where editing a
+  row *is* the correction, so writes happen as you type and the step has no Back at
+  all. `AddTimelineAssistant` creates its `TimelineRow` on entering that step for the
+  same reason: entries need a row to sit on. Both tables inherit `PlacesTable`'s two
+  rules verbatim (rows in a ref, mutated by plain functions; every commit reads
+  `rowsRef.current`, never a captured closure) — see the `PlacesTable` invariant
+  above for why either one alone is not enough.
+- **The mobile pane stack is derived, never stored.** `TimelineSheet` computes its
+  pane from the store and from `settingsRowId`: an entry selection means the entry
+  pane, otherwise an opened timeline means the row pane, otherwise the list. That is
+  what lets the canvas, the list and search all select an entry through the same
+  action and land in the same place. `settingsRowId` lives in `MobileShell`, above
+  the sheet, because "back from an entry" leads to a *place* (its timeline) and not
+  to a history — the entry may have been tapped on the canvas, having never visited
+  the timeline at all.
+- **"Ongoing" is a value of the end field, not a control beside it.** The model
+  still stores it as *no end date*, but an earlier build put a toggle next to a
+  field that also accepted "now", so two controls claimed one meaning and could
+  visibly disagree. The end field reads `still ongoing`, and the only way to reach
+  that state is to edit the field — type it, or tap the pill that appears while
+  editing. That pill must `preventDefault` on `pointerdown`: blur fires first,
+  commits, and would unmount the pill before its own click ran.
 
 ## Testing conventions
 
@@ -225,13 +250,18 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   Budget a real-device pass.
 - Public-data collapse state is in-memory only; private group collapse persists.
 - `useIsMobile` is a width query only, not `pointer: coarse` — a narrow desktop
-  window gets the mobile shell.
-- Several rail actions have no mobile equivalent: "＋ Group", "＋ Person",
-  🌍 World events and 🌟 Famous people are all private components inside
-  `RowRail.tsx` and would have to be extracted before `RowSheet` could offer them.
-- A row's group is read-only in the mobile settings pane (tagged "moving soon") —
-  moving a row between groups on mobile is not designed.
-- `DataMenu.tsx` and `MobileShell`'s `MobileMenu` duplicate the import-flow handler.
+  window gets the mobile shell. Left that way deliberately: what actually breaks in
+  a 500px desktop window is the *desktop* shell (rail + panel + canvas need width
+  that isn't there), and `BottomSheet` is Pointer Events throughout, so a mouse can
+  drive it. See H3 in `plans/mobile-feedback-backlog.md`.
+- Rail actions still missing on mobile: "＋ Group" and "＋ Person" (a design gap, not
+  an extraction one — creating a group on a phone has no designed home) and
+  🌟 Famous people (still private to `RowRail.tsx`; worth extracting together with
+  gating its 🐞 debug panel). 🌍 World events is done — `WorldEventsPicker.tsx`.
+- `AddTimelineAssistant` builds the *flow* for creating a timeline; the domain
+  knowledge that would prefill it (release years, "your first car was probably at
+  18", lists of universities) is deliberately deferred, and belongs in
+  `public-data/` when it comes.
 
 ## TODOs before final release (famous-people feature)
 
