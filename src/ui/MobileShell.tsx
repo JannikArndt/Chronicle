@@ -10,7 +10,7 @@ import type { MutableRefObject } from "react";
 import type { EngineView, TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import { AddEntryAssistant } from "../onboarding/AddEntryAssistant";
-import { clearSelection } from "../state/actions";
+import { clearSelection, setSearch } from "../state/actions";
 import { appStore, isPublicId, useAppState } from "../state/store";
 import { triggerDownload, triggerImportFlow } from "../storage/exportImport";
 import { replaceDataset } from "../state/actions";
@@ -18,7 +18,6 @@ import { CanvasHost } from "./CanvasHost";
 import { EntrySheet } from "./EntrySheet";
 import { MiniMap } from "./MiniMap";
 import { RowSheet } from "./RowSheet";
-import { SearchBar } from "./SearchBar";
 import { useViewportHeight } from "./useIsMobile";
 import type { BottomSheetHandle } from "./BottomSheet";
 
@@ -171,19 +170,11 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
 
       <div className="mobile-top-stack" ref={topStackRef}>
         <div className="mobile-chips">
-          <button type="button" className="chip-pill" onClick={() => setSearchOpen(!searchOpen)}>
-            🔍 Search
-          </button>
+          <MobileSearchChip open={searchOpen} setOpen={setSearchOpen} />
           <button type="button" className="chip-round" aria-label="More" onClick={() => setMenuOpen(true)}>
             ⋯
           </button>
         </div>
-
-        {searchOpen && (
-          <div className="mobile-search-panel">
-            <SearchBar />
-          </div>
-        )}
 
         <MiniMap layout={layout} engineRef={engineRef} view={view} />
       </div>
@@ -235,6 +226,54 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
           <AddEntryAssistant onFinished={() => setAddEntryOpen(false)} />
         </div>
       )}
+    </div>
+  );
+}
+
+// The chip *becomes* the field. An earlier build opened a second bar below the
+// chips instead, which pushed the strip and the axis down the screen every time
+// you searched — a toolbar for one input. Filters are gone with it: matches
+// emphasize and everything else dims, which is the filtering that earns its
+// space on a phone.
+function MobileSearchChip({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
+  const search = useAppState((s) => s.search);
+
+  if (!open) {
+    return (
+      <button type="button" className="chip-pill" onClick={() => setOpen(true)}>
+        <span aria-hidden="true">🔍</span>
+        {/* The live query stays visible while collapsed — otherwise the dimmed
+            canvas has no on-screen explanation. */}
+        <span className="chip-label">{search === "" ? "Search" : search}</span>
+      </button>
+    );
+  }
+
+  // Closing always clears: leaving half the timeline dimmed behind a control
+  // that is no longer on screen is how you get a "broken app" report.
+  const close = () => {
+    setSearch("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="chip-pill chip-search">
+      <span aria-hidden="true">🔍</span>
+      <input
+        type="search"
+        className="chip-search-input"
+        placeholder="Search titles, people, places…"
+        value={search}
+        autoFocus
+        onChange={(event) => setSearch(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+          if (event.key === "Escape") close();
+        }}
+      />
+      <button type="button" className="chip-search-close" aria-label="Close search" onClick={close}>
+        ✕
+      </button>
     </div>
   );
 }
