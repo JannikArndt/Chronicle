@@ -40,8 +40,10 @@ describe("computeTicks", () => {
 // The span-driven ladder. Each case names the span it is describing, because
 // the scale that produces it is not readable on its own.
 describe("the axis ladder below five years", () => {
-  const forSpan = (spanDays: number) =>
-    computeTicks({ startMs: T0, msPerPx: (spanDays * DAY_MS) / WIDTH }, WIDTH);
+  const forSpan = (spanDays: number, width = WIDTH) =>
+    computeTicks({ startMs: T0, msPerPx: (spanDays * DAY_MS) / width }, width);
+
+  const PHONE_WIDTH = 390;
 
   test("under five years: years over quarters", () => {
     const { fine, coarse } = forSpan(4 * 365);
@@ -49,10 +51,18 @@ describe("the axis ladder below five years", () => {
     expect(fine.every((t) => /^Q[1-4]$/.test(t.label))).toBe(true);
   });
 
-  test("under six quarters: years over single-letter months", () => {
-    const { fine, coarse } = forSpan(400);
+  test("under six quarters: years over months", () => {
+    const { fine, coarse } = forSpan(400, PHONE_WIDTH);
     expect(coarse.every((t) => /^\d{4}$/.test(t.label))).toBe(true);
     expect(fine.every((t) => /^[JFMASOND]$/.test(t.label))).toBe(true);
+  });
+
+  test("month names grow as the zoom gives them room", () => {
+    // One span, three widths: the spelling follows the pixels each month gets,
+    // which is why it is not a function of the span alone.
+    expect(forSpan(400, PHONE_WIDTH).fine.every((t) => /^[JFMASOND]$/.test(t.label))).toBe(true);
+    expect(forSpan(400, 700).fine.every((t) => /^[A-Z][a-z]{2}$/.test(t.label))).toBe(true);
+    expect(forSpan(400, 1100).fine.every((t) => /^[A-Z][a-z]{2,8}$/.test(t.label))).toBe(true);
   });
 
   test("under two months: month-and-year over the date each week starts on", () => {

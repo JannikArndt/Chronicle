@@ -1259,11 +1259,13 @@ textarea {
 
 /* Rare and destructive actions live behind this rather than at the bottom of a
    scrolling pane, where a thumb reaching for the last entry finds "Remove". */
+/* Bordered, not just tinted: on a translucent sheet in dark mode a subtle fill
+   is nearly the same colour as the sheet behind it. */
 .sheet-menu-button {
   flex: none;
   width: 32px;
   height: 32px;
-  border: none;
+  border: 1px solid var(--color-border-strong);
   border-radius: 999px;
   background: var(--color-bg-subtle);
   color: var(--color-text-secondary);
@@ -1279,6 +1281,9 @@ textarea {
   right: 4px;
   /* Above .popover-backdrop (40), which is a sibling inside the same sheet. */
   z-index: 45;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   min-width: 190px;
   max-width: calc(100vw - 40px);
   padding: 6px;
@@ -1286,6 +1291,27 @@ textarea {
   border-radius: 12px;
   background: var(--color-surface);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+
+/* A drop shadow separates a light card from a light sheet; against a dark one
+   it does almost nothing, so the edge has to carry the separation instead. */
+@media (prefers-color-scheme: dark) {
+  .sheet-menu {
+    border-color: var(--color-border-strong);
+    background: var(--color-bg-hover);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* The identity row's popovers hang from it, so they open next to the icon or
+   swatch that was tapped rather than against the sheet's own bottom edge. */
+.row-settings-identity {
+  position: relative;
+}
+
+.row-settings-identity .sheet-menu {
+  right: auto;
+  left: 8px;
 }
 
 .sheet-menu-title {
@@ -1301,8 +1327,20 @@ textarea {
   color: var(--color-accent);
 }
 
+/* Every menu row is a full-width line: .menu-item has no display of its own and
+   inherits inline-block, which turned this card into a row of buttons. */
+.sheet-menu .menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  font-size: 15px;
+}
+
 .menu-item-check {
-  float: right;
+  flex: none;
+  color: var(--color-accent);
 }
 
 /* ---------- entry inspector sheet ---------- */

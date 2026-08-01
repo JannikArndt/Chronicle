@@ -42,7 +42,13 @@ const FULL_MONTH_NAMES = [
 
 // How a tick is written is a separate choice from which unit it marks: the same
 // month boundary reads "April '16" as a title and "A" as a subtitle.
-export type LabelStyle = "default" | "monthYear" | "monthInitial" | "dayOfMonth";
+export type LabelStyle =
+  | "default"
+  | "monthYear"
+  | "monthInitial"
+  | "monthShort"
+  | "monthFull"
+  | "dayOfMonth";
 
 function floorToUnit(ms: number, unit: Unit): Date {
   const d = new Date(ms);
@@ -105,6 +111,8 @@ function labelFor(date: Date, unit: Unit, style: LabelStyle = "default"): string
     return `${FULL_MONTH_NAMES[date.getUTCMonth()]} '${String(date.getUTCFullYear()).slice(2)}`;
   }
   if (style === "monthInitial") return FULL_MONTH_NAMES[date.getUTCMonth()][0];
+  if (style === "monthShort") return MONTH_NAMES[date.getUTCMonth()];
+  if (style === "monthFull") return FULL_MONTH_NAMES[date.getUTCMonth()];
   if (style === "dayOfMonth") return String(date.getUTCDate());
   switch (unit) {
     case "hour":
@@ -139,10 +147,23 @@ function ticksForUnit(scale: TimeScale, widthPx: number, unit: Unit, style: Labe
 const MIN_FINE_SPACING_PX = 45;
 
 const DAY = 86_400_000;
+const MONTH_MS = 30.44 * DAY;
 const TWO_WEEKS_MS = 14 * DAY;
 const TWO_MONTHS_MS = 62 * DAY;
-const SIX_QUARTERS_MS = 18 * 30.44 * DAY;
+const SIX_QUARTERS_MS = 18 * MONTH_MS;
 const FIVE_YEARS_MS = 5 * 365.25 * DAY;
+
+// A month tick spells itself out as the zoom gives it room: "A" → "Apr" →
+// "April". Thresholds are the width of the longest label in each style plus
+// breathing room, at the 11px the fine row is painted in.
+const SHORT_MONTH_MIN_PX = 34;
+const FULL_MONTH_MIN_PX = 72;
+
+function monthLabelStyle(pxPerMonth: number): LabelStyle {
+  if (pxPerMonth >= FULL_MONTH_MIN_PX) return "monthFull";
+  if (pxPerMonth >= SHORT_MONTH_MIN_PX) return "monthShort";
+  return "monthInitial";
+}
 
 interface UnitChoice {
   fine: Unit;
@@ -168,7 +189,12 @@ function pickUnits(scale: TimeScale, widthPx: number): UnitChoice {
     return { fine: "week", fineStyle: "dayOfMonth", coarse: "month", coarseStyle: "monthYear" };
   }
   if (spanMs <= SIX_QUARTERS_MS) {
-    return { fine: "month", fineStyle: "monthInitial", coarse: "year", coarseStyle: "default" };
+    return {
+      fine: "month",
+      fineStyle: monthLabelStyle(widthPx / (spanMs / MONTH_MS)),
+      coarse: "year",
+      coarseStyle: "default",
+    };
   }
   if (spanMs < FIVE_YEARS_MS) {
     return { fine: "quarter", fineStyle: "default", coarse: "year", coarseStyle: "default" };

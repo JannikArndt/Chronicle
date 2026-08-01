@@ -77,6 +77,10 @@ export function EntrySheet({
       ref={sheetHandleRef}
       className="entry-sheet"
       anchors={anchors}
+      // Half, not peek: an entry opened from the timeline list was already
+      // being read, and dropping it to a header-sized slot hides what you came
+      // for. Tapping a bar on the canvas is the same act one step earlier.
+      initialAnchorIndex={1}
       open={open}
       closable
       onClose={onClose}
