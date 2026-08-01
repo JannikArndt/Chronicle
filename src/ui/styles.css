@@ -435,7 +435,7 @@ textarea {
 
 .icon-button-active {
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
 }
 
 .small-button {
@@ -1605,7 +1605,7 @@ textarea {
 
 .date-granularity-pick-on {
   background: var(--color-accent);
-  color: #ffffff;
+  color: var(--color-on-accent);
 }
 
 /* The lane is a touch surface, so the browser must not try to scroll or zoom
