@@ -36,8 +36,10 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   re-resolve and repaint — never hardcode a second color table in `engine.ts`, it
   will drift out of sync with the DOM theme.
 - `src/state/` — hand-rolled observable store (`useSyncExternalStore`), all mutations
-  in `actions.ts` with a 250ms debounced IndexedDB autosave. New entries are drafts
-  (`state.draft`) and only enter the dataset once titled.
+  in `actions.ts` with a 250ms debounced IndexedDB autosave. Entries created by direct
+  manipulation are drafts (`state.draft`) and only enter the dataset once titled;
+  `addEntry()` is the other path, for an assistant that asks everything first and
+  writes once.
 - `src/publicData/` — loads `public-data/*.json` via `import.meta.glob` at build time
   and namespaces every id/reference as `pub:<file-stem>:`. Read-only, never written.
 - `src/storage/` — IndexedDB (db `chronicle`, store `datasets`, key `main`) and
@@ -54,6 +56,23 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   properties defined on `:root` in `styles.css` with a `@media (prefers-color-scheme:
   dark)` override block — never hardcode a hex color in a new rule; add or reuse a
   variable instead, or the dark theme silently breaks for that element.
+- **Mobile is a second shell, not a restyled first one.** `App.tsx` branches once on
+  `useIsMobile()` (a width media query) into `src/ui/MobileShell.tsx`, and no media
+  query tries to reconcile the two — the information architecture genuinely differs
+  (a timeline row *navigates* into its own settings pane on mobile, *toggles in
+  place* on desktop). The shell is a full-bleed `CanvasHost` with everything else
+  floating over it: `.mobile-top-stack` (chips, search panel, `MiniMap`) is measured
+  with a `ResizeObserver` and its height fed to the engine as `axisTop`, so the axis
+  starts *below* the floating controls instead of behind them. `BottomSheet.tsx` is
+  the shared primitive (hand-rolled Pointer Events, anchors + `sheetSnap.ts` for
+  velocity-aware snapping); `RowSheet` is the rail's replacement and `EntrySheet` the
+  `DetailPanel`'s. `EntrySheet`'s visibility is *derived from the store*
+  (`draft ?? selectedEntryId`), never from a prop, because the canvas, the timeline
+  sheet and search all select entries through the same actions. `MiniMap.tsx` is a
+  second canvas painting `src/render/miniMap.ts` (pure, tested) — one lane per row,
+  plus the current viewport window; tapping or dragging it calls
+  `engine.centerOnMs()`. `DateRangeEditor.tsx` + `dateLaneRange.ts` are the mobile
+  date editor (two handles on one lane). Desktop still uses `DateField`.
 - `src/onboarding/` — Typeform-style conversational onboarding, auto-shown on a fresh
   dataset (`shouldShowOnboarding`, gated on `dataset.selfPersonId === undefined &&
   dataset.groups.length === 0`), and manually re-triggerable any time via the rail's
@@ -141,11 +160,44 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   the canvas engine mirrors the same variables via `getComputedStyle`. A new rule
   with a hardcoded hex color renders correctly in light mode and wrong (or invisible)
   in dark mode — always reuse or extend the variable set instead.
+- **A sheet's whole surface drags, so it must give clicks back**: `BottomSheet`
+  treats content `pointerdown` as a *pending* drag and only calls
+  `setPointerCapture` once the finger has moved past `CONTENT_DRAG_THRESHOLD_PX`
+  downward *and* the list is already scrolled to the top. Capturing eagerly
+  retargets the native click and every button inside the sheet goes dead;
+  capturing never means the page pulls to refresh instead of the sheet moving.
+  Below the top anchor the list gets `.sheet-list-locked` so a drag can't be eaten
+  by an inner scroll.
+- **Every input on a mobile surface is ≥16px** — iOS Safari zooms the page the
+  moment a smaller field takes focus, and an autofocused one means the app *opens*
+  zoomed. The rule lives in the `@media (max-width: 640px)` block in `styles.css`
+  and must name any later, more specific selector that would otherwise win. Never
+  "fix" this with `maximum-scale=1`: that takes pinch-zoom away from everyone who
+  needs it.
+- **The date editor's lane range is recomputed on discrete changes only** — a typed
+  date or the ongoing toggle — never mid-drag. Deriving it on render moves the lane
+  under the finger on every frame. The regression it guards: switching to ongoing
+  throws the end to today and used to park the end handle off-screen.
+- **The minimap reads `--color-*` through the engine's own `readThemeColors()`.**
+  That function and its `ColorTable` are exported for exactly this reason — there is
+  no third colour table, just as there is no second one in `engine.ts`.
+- **Canvas hit-testing picks the *narrowest* overlapping entry** (`EntryHit.barWidth`,
+  with `TAP_SLOP_PX` of slop). Rows are concurrent, so a short bar frequently sits
+  inside a long one; picking the first hit made the short one unselectable by thumb.
+  A tap is also bounded in time (`TAP_MAX_DURATION_MS`) for touch and pen only — a
+  mouse may legitimately rest on a target.
+- **Assistants create nothing until the last step.** `AddEntryAssistant` builds the
+  entry — and the row, when a new one is needed — only in `commitAndFinish`, which is
+  what makes its Back button safe. See the onboarding invariants above for the harder
+  case, where identity *must* be committed mid-flow and Back updates in place instead.
 
 ## Testing conventions
 
 - Vitest, `environment: node`, tests co-located as `src/**/*.test.ts`. Canvas painting
-  itself is not unit-tested — its math (`bars.ts`, `layout.ts`, `timeAxis.ts`) is.
+  itself is not unit-tested — its math (`bars.ts`, `layout.ts`, `timeAxis.ts`,
+  `miniMap.ts`) is. The mobile surfaces follow the same split: the pure parts are
+  tested (`sheetSnap.ts`, `dateLaneRange.ts`, `parseDateInput.ts`,
+  `entryPreviewBar.ts`, `addEntryCategories.ts`), the React components are not.
 - Storage tests import `fake-indexeddb/auto`.
 - `src/publicData/schemaValidation.test.ts` Ajv-validates every `public-data/*.json`
   against `public-data/schema.json`; CI runs this, so a bad contributed file fails PRs.
@@ -167,7 +219,19 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 ## Still open / untested
 
 - Real-device iOS Safari gesture check (pinch vs page zoom) has never been done.
+  **The mobile shell widened this gap** and now depends on it: sheet drag vs page
+  scroll, `100dvh` as the URL bar collapses, `env(safe-area-inset-*)` on notched
+  devices, and the keyboard covering a sheet (`visualViewport` may be needed).
+  Budget a real-device pass.
 - Public-data collapse state is in-memory only; private group collapse persists.
+- `useIsMobile` is a width query only, not `pointer: coarse` — a narrow desktop
+  window gets the mobile shell.
+- Several rail actions have no mobile equivalent: "＋ Group", "＋ Person",
+  🌍 World events and 🌟 Famous people are all private components inside
+  `RowRail.tsx` and would have to be extracted before `RowSheet` could offer them.
+- A row's group is read-only in the mobile settings pane (tagged "moving soon") —
+  moving a row between groups on mobile is not designed.
+- `DataMenu.tsx` and `MobileShell`'s `MobileMenu` duplicate the import-flow handler.
 
 ## TODOs before final release (famous-people feature)
 
