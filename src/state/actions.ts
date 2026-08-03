@@ -4,6 +4,8 @@
 
 import { applyDelete, collectEntryCascade, collectGroupCascade, collectRowCascade } from "../model/cascade";
 import { emptyDataset, newId } from "../model/dataset";
+import { defaultSharedFor } from "../model/sharing";
+import { notifyDatasetChanged } from "../sharing/sync";
 import { loadDataset, loadOverlays, saveDataset, saveOverlays } from "../storage/db";
 import { loadPublicCatalog } from "../publicData/loader";
 import { buildFamousDataset, parseFamousGroupId, remainingRowKeys } from "../publicData/famous/alignToAge";
@@ -24,6 +26,11 @@ function persistSoon(): void {
   clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     void saveDataset(appStore.getState().dataset);
+    // Sharing rides the save that already existed: the sync layer diffs the
+    // shareable subset against what it last sent rather than being told which
+    // record changed, which is why none of the mutations below had to grow a
+    // sync call. Signed out, this returns immediately and no network happens.
+    notifyDatasetChanged();
   }, 250);
 }
 
@@ -364,7 +371,40 @@ export function addSubGroup(parentGroupId: string, label: string, birthDate?: nu
       collapsed: false,
     });
     // A group needs at least one timeline to be visible; start with a generic one.
-    dataset.rows.push({ id: newId("row"), groupId: id, color: "#7a8ba6", icon: "📌", label: "General" });
+    dataset.rows.push({
+      id: newId("row"),
+      groupId: id,
+      color: "#7a8ba6",
+      icon: "📌",
+      label: "General",
+      shared: defaultSharedFor(dataset, id) ? true : undefined,
+    });
+    return dataset;
+  });
+}
+
+// ---------- sharing (schema v7) ----------
+
+// Publishing is always explicit. There is no bulk "share everything" switch:
+// `shareByDefault` changes what the NEXT timeline starts as, and deliberately
+// does not reach back and publish the ones already there.
+export function setRowShared(rowId: string, shared: boolean): void {
+  updateRow(rowId, { shared: shared ? true : undefined });
+}
+
+export function setGroupShared(groupId: string, shared: boolean): void {
+  updateGroup(groupId, { shared: shared ? true : undefined });
+}
+
+export function setGroupShareByDefault(groupId: string, shareByDefault: boolean): void {
+  updateGroup(groupId, { shareByDefault: shareByDefault ? true : undefined });
+}
+
+// Records which account this dataset belongs to, so a device that signs in as
+// someone else does not diff one person's data against another's.
+export function setDatasetAccount(accountId: string | undefined): void {
+  updateDataset((dataset) => {
+    dataset.accountId = accountId;
     return dataset;
   });
 }
@@ -374,7 +414,10 @@ export function addSubGroup(parentGroupId: string, label: string, birthDate?: nu
 export function addRow(groupId: string, label: string, icon = "🏷️"): string {
   const id = newId("row");
   updateDataset((dataset) => {
-    dataset.rows.push({ id, groupId, color: randomPastelColor(), icon, label });
+    // Private unless the group (or one of its ancestors) says otherwise. A new
+    // timeline is never shared by accident — that is the whole rule.
+    const shared = defaultSharedFor(dataset, groupId) ? true : undefined;
+    dataset.rows.push({ id, groupId, color: randomPastelColor(), icon, label, shared });
     return dataset;
   });
   return id;
@@ -391,6 +434,7 @@ export function addSubRow(parentRowId: string, label: string): void {
       icon: "🏷️",
       label,
       parentRowId,
+      shared: defaultSharedFor(dataset, parent.groupId) ? true : undefined,
     });
     return dataset;
   });
