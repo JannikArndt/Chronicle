@@ -1576,16 +1576,17 @@ textarea {
 }
 
 /* The shortcut that fills the end field with "still ongoing". Only visible
-   while that field is being edited. */
+   while that field is being edited. Neutral like every other button here: the
+   accent read as "this is switched on" when it is only an offer. */
 .date-ongoing-fill {
   padding: 4px 9px;
-  border: 1px solid var(--color-accent);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: var(--color-accent-soft);
+  background: var(--color-surface);
   font: inherit;
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-accent);
+  color: var(--color-text-muted);
 }
 
 .date-granularity {
