@@ -62,7 +62,8 @@ Drag the sheet all the way up.
 
 **A2 — "still ongoing" is a value, not a switch**
 Open an entry that has **no end date**.
-✅ Under `Ended` the text reads **still ongoing**, in the accent colour.
+✅ Under `Ended` the text reads **still ongoing**, **greyed** — it is a value, and
+a dim one, because it is a default rather than something you switched on.
 ✅ There is **no** separate "→ still ongoing" button next to it.
 Now tap that text to edit it.
 ✅ A text field opens **and** a small `still ongoing` pill appears below it.
@@ -83,6 +84,16 @@ stops saying `still ongoing` and shows that date.
 ✅ A single **tap** on the lane does *not* end it. (This is deliberate: with the
 toggle gone, that handle had to do something, but a stray tap must not quietly
 end something that is still going.)
+
+**A2-c — dragging a handle survives a wobbly thumb**
+Drag a handle sideways and let your finger drift **up and down** as you go.
+✅ The handle keeps following you for the whole gesture.
+❌ Broken if the drag dies and the **sheet** starts moving instead — that is the
+sheet stealing the pointer, which is what `data-owns-gestures` prevents.
+✅ Under the lane, its **two edge dates** are printed left and right, and the
+`now` line is labelled.
+Note: knowing *which* handle is which mid-drag is still unsolved — A2-c in the
+backlog. Say what you'd want to see, not just that it's missing.
 
 **A4 — the ⋯ menu**
 ✅ A round ⋯ button top right on the timeline and entry panes.
@@ -130,6 +141,9 @@ Needs **two or more of your own groups** to appear at all.
 ✅ A list of your groups, current one ticked.
 ✅ Picking a different one moves the timeline: it jumps to that group's section
 in the list, and on the canvas.
+✅ The line above the icon/colour/name row **updates to the new group's name**.
+❌ Broken if it still names the old group — it used to, because it named the
+row's *person* first and moving never changes the person.
 ✅ With only one group, the menu item is absent (not greyed out — absent).
 
 **B5 — settings are out of the way**
@@ -162,11 +176,15 @@ because you *are* looking at all of them.
 **C1-b — tapping navigates in both directions**
 Tap near the bottom-left of the strip.
 ✅ The canvas jumps both back in time **and** down to those timelines.
-Now press and **drag sideways** along the strip.
+Now press and **drag sideways** along the strip, keeping your finger level.
 ✅ Time scrubs, and the vertical position **stays put** — it should not jerk up
-and down as your finger wobbles. (Deliberate: the strip is ~60px tall standing
-in for every timeline you have, so one pixel of wobble is worth tens of pixels
-of canvas.)
+and down as your finger wobbles. (The strip is ~60px tall standing in for every
+timeline you have, so one pixel of wobble is worth tens of pixels of canvas.)
+Now drag deliberately **up or down**.
+✅ Past about 6px the window follows vertically, and keeps following for the rest
+of that drag.
+❌ Broken if the vertical axis feels dead — that was the over-correction in the
+first fix.
 
 ---
 
@@ -189,10 +207,16 @@ font rule, and it is a hard bug.
 
 ## E. Adding things
 
-**E1/E2 — the add-entry flow**
+**E1/E2 — the add flows are real sheets now**
 Tap the ＋ button.
 ✅ It opens as a **sheet from the bottom**, with the canvas still visible above
-it — not a full screen.
+it — not a full screen, and **not dimmed**.
+✅ Drag its header down: it moves with your finger and **snaps** like the
+timelines sheet. Flick it away: the flow is abandoned.
+✅ **Tap the canvas above it**: the sheet drops to peek (just its title).
+✅ With it parked at peek, **the canvas pans and pinches normally**.
+❌ Broken if any gesture above the sheet does nothing at all — that is the old
+modal backdrop still swallowing events.
 Go through to the end.
 ✅ The last step offers **Done** (filled, primary) and **Add another**
 (secondary), in that order.
