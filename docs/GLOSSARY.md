@@ -10,29 +10,30 @@ thing without describing it. Each entry says what it is, then **where it lives**
 ```mermaid
 graph TD
     D[Dataset<br/><i>one per browser, in IndexedDB</i>]
-    D --> P[Person<br/>“Jannik”, “Mum”]
-    D --> G[Group<br/>“Me”, “My family”]
+    D --> G[Group<br/>“Me”, “My family”, “Finn”<br/><i>a birth date makes it a person</i>]
     D --> R[Row / timeline<br/>“Places lived”<br/><i>has colour + icon</i>]
     D --> E[Entry<br/>“Lived in Berlin”<br/><i>drawn as a bar</i>]
 
     E -->|rowId| R
     R -->|groupId| G
-    R -.->|personId, optional| P
-    G -.->|is or contains| P
+    G -.->|parentGroupId, optional| G
     E -.->|parentEntryId, optional| E
 
-    S([selfPersonId]) -.->|“which one is me”| P
+    S([selfGroupId]) -.->|“which one is me”| G
     D --- S
 ```
 
-Read it as sentences: **an entry sits on a row, a row sits in a group, a group
-either is or contains people.** Everything else is optional.
+Read it as sentences: **an entry sits on a row, a row sits in a group, and a
+group may sit in another group.** Everything else is optional.
+
+There are only three things here. There used to be four — see **Person** below
+for why that turned out to be one too many.
 
 ---
 
 ## The data (what you own)
 
-**Dataset** — everything you have, as one object: people, groups, rows, entries.
+**Dataset** — everything you have, as one object: groups, rows, entries.
 There is exactly one, stored under the key `main` in IndexedDB. Exporting is
 literally this object as JSON.
 → `src/model/types.ts` (`TimelineDataset`), `src/storage/db.ts`
@@ -50,14 +51,24 @@ prevents it.
 → `types.ts` (`TimelineRow`), `src/render/layout.ts`
 
 **Group** — a labelled bundle of rows, drawn as a section header. "Me", "My
-family", "World events". A group either *is* a person or *contains* people —
-never both (a deliberate v1 cut, no nesting).
+family", "World events". A group can hold **sub-groups** ("My family" → "Finn")
+and, if it has a **birth date**, it *is* a person. Your own group is the **self
+group** (`dataset.selfGroupId`), set during setup; it is how the app knows whose
+birth year to show and where new timelines go.
 → `types.ts` (`Group`)
 
-**Person** — a human the rows can belong to. Your own person is the **self
-person** (`dataset.selfPersonId`), set during setup; it is how the app knows
-whose birth year to show and where new timelines go.
-→ `types.ts` (`Person`)
+**Sub-group** — a group nested in another one, drawn with a smaller header. This
+is what a person inside "My family" is. Only one level deep is drawn.
+
+**Person** — **not a thing in the model.** A person is a group with a birth
+date; that date is the only difference, and it is what greys out the time before
+someone was born and puts an age in the header. There used to be a separate
+`Person` entity that both `Group` and `TimelineRow` pointed at, which forced the
+rule "a group either *is* a person or *contains* people, never both" — an
+asymmetry every consumer had to special-case, and the source of a timeline
+keeping a stale owner after being moved. Folded into `Group` in schema v6.
+→ `types.ts` (`Group.birthDate`), `src/storage/exportImport.ts`
+(`foldPeopleIntoGroups`)
 
 **Category** — **gone.** Removed from the model; colour and icon moved onto the
 row. If you see "category" today it means only the *wording group* the add-entry
@@ -71,6 +82,9 @@ people), loaded from `public-data/*.json` at build time. Every id is prefixed
 
 **Schema version** — a number stored in the dataset so an old export can be
 recognised and either upgraded or honestly rejected. Never a silent migration.
+The dataset in IndexedDB goes through the same upgrade as an imported file —
+it used to be discarded on any mismatch, which made every schema bump a
+silent wipe of the one copy of your data.
 → `types.ts` (`SCHEMA_VERSION`), `src/storage/exportImport.ts`
 
 ---
@@ -148,8 +162,9 @@ testing. Framework-agnostic on purpose — no React imports inside it.
 → `src/render/engine.ts`
 
 **Layout** — the computed list of what goes where vertically (group headers,
-people, rows, their heights and y positions). The canvas *and* the DOM rail *and*
-the minimap all render from this one result, which is what keeps them in sync.
+sub-group headers, rows, their heights and y positions). The canvas *and* the
+DOM rail *and* the minimap all render from this one result, which is what keeps
+them in sync.
 → `src/render/layout.ts` (`computeLayout`)
 
 **Time scale** — the mapping between an instant and an x pixel, and back
@@ -356,7 +371,8 @@ does *not* use drafts — it asks everything, then writes once.
 → `src/state/actions.ts`
 
 **Cascade** — the set of things a delete would also take with it (an entry's
-children, a row's entries). Always described before it happens; never silent.
+children, a row's entries, a group's sub-groups). Always described before it
+happens; never silent.
 → `src/model/cascade.ts`
 
 **Store** — the hand-rolled state container. Every mutation goes through

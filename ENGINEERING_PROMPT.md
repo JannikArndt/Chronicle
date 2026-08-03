@@ -37,30 +37,26 @@ interface Category {
   defaultVisibility: "private" | "shareable";
 }
 
-interface Person {
-  id: string;
-  label: string;
-  birthDate?: number;   // ms, UTC. If set: time before this on any of their rows renders "inactive",
-                         // and their group/sub-group header shows a live computed age.
-}
-
+// SUPERSEDED (2026-08-03, schema v6): `Person` no longer exists as its own
+// entity, and `Group.personId` is gone with it — a person turned out to be a
+// group with a birth date, and nothing else. The shape below is what ships.
 interface Group {
   id: string;
   label: string;
-  personId?: string;    // if set, this ENTIRE group IS that person (e.g. "Me") — do not also
-                         // nest a person sub-header for it. If unset, the group may contain zero
-                         // or more person sub-groups (e.g. "Family" -> "Finn"), each of which is
-                         // the future attachment point for importing/subscribing to someone else's
-                         // shared "Me" timeline export (see §7).
+  parentGroupId?: string;  // a nested group, e.g. "Family" -> "Finn". This is what a person inside
+                            // a container group is now, and it is the future attachment point for
+                            // importing/subscribing to someone else's shared "Me" export (see §7).
+  birthDate?: number;      // ms, UTC. What makes this group a PERSON. If set: time before it renders
+                            // "inactive" on this group's rows and on those of its sub-groups, and the
+                            // header shows a live computed age.
   collapsed: boolean;
 }
 
 interface TimelineRow {
   id: string;
-  groupId: string;
-  personId?: string;        // set when this row belongs to a person nested inside a personId-less
-                             // group (e.g. Finn's "Residence" row inside "Family"). Unset when the
-                             // row belongs directly to a personId group (that group's personId applies).
+  groupId: string;          // the INNERMOST group — "Finn", not "Family". SUPERSEDED (2026-08-03):
+                             // `personId` used to sit alongside this; a row's group is now the whole
+                             // answer to whose timeline it is.
   categoryId: string;
   label: string;
   parentRowId?: string;      // set for a sub-timeline (e.g. "Projects at Kestrel" under "Job")
@@ -95,7 +91,7 @@ interface TimelineEntry {
 
 interface TimelineDataset {
   schemaVersion: number;
-  people: Person[];
+  // SUPERSEDED (2026-08-03): `people: Person[]` removed; `selfPersonId` became `selfGroupId`.
   groups: Group[];
   categories: Category[];
   rows: TimelineRow[];
@@ -107,7 +103,7 @@ Notes carried over from discovery, not obvious from the shapes above:
 
 - **Concurrency** is a per-category *default*, always overridable per entry (`concurrencyOverride`). Adding a new entry to an exclusive row does not silently forbid overlap — it auto-closes the previous entry's end date unless the user overrides it, and the UI must show a note explaining that when it's about to happen (see §6). This auto-close only applies to the common case: appending a new entry after the row's chronologically last entry (i.e. no existing entry already extends past the new entry's start). If the new entry's range would instead overlap an existing entry some other way — backfilling into the row's history, inserting mid-timeline — auto-close does not fire: saving is blocked with an inline conflict message naming the overlapping entry, and the user must either adjust that entry's dates first or set `concurrencyOverride: "concurrent"` on one of the two entries.
 - **Sub-timelines** (`parentRowId` on a row, `parentEntryId` on an entry) are just regular rows/entries with a parent reference — no separate data shape.
-- **Person vs. group is intentionally asymmetric.** A group can either *be* a person or *contain* persons — never both, and never a person nested under a person. This was a deliberate simplification, not an oversight; revisit only if a real use case needs it (e.g. a person's own sub-people).
+- **Person vs. group is intentionally asymmetric.** A group can either *be* a person or *contain* persons — never both, and never a person nested under a person. This was a deliberate simplification, not an oversight; revisit only if a real use case needs it (e.g. a person's own sub-people). **SUPERSEDED (2026-08-03, schema v6):** the asymmetry is gone because the distinction is. A group with a `birthDate` *is* a person; a group may hold sub-groups whether or not it has one. Only one level of nesting is drawn, so "a person under a person" still isn't a thing — but now that is a rendering choice, not a shape the model forbids.
 - **`visibility`** exists on every entry now so that a future "publish/subscribe" feature (§7) needs no migration — but no sharing mechanism ships in v1.
 
 ## 3. Storage & sync
@@ -121,7 +117,7 @@ Notes carried over from discovery, not obvious from the shapes above:
 
 Most `public-data/*.json` files will be generated by pasting a prompt into an LLM, not hand-typed. Ship:
 
-1. A JSON Schema (`public-data/schema.json`) validating the `TimelineDataset` shape from §2, restricted to what public data actually needs (no `personId`/`visibility` complexity — public entries are always `shareable` and ownerless).
+1. A JSON Schema (`public-data/schema.json`) validating the `TimelineDataset` shape from §2, restricted to what public data actually needs (no birth dates, nesting or `visibility` complexity — public entries are always `shareable` and ownerless).
 2. A prompt template (`public-data/CONTRIBUTING_PROMPT.md`) that contributors paste into any LLM, parameterized by topic (e.g. "German chancellors", "iPhone release history"), instructing it to emit a schema-conformant file.
 3. One worked example file (e.g. `public-data/iphone-releases.json`) checked in as a reference for both the schema and the prompt template.
 4. **Id namespacing on load, not on authoring.** Contributors and the LLM prompt template only need ids to be unique *within* their own file — the loader automatically prefixes every id (and every reference to an id) from a given `public-data/*.json` file with `pub:<filename-without-ext>:` (e.g. `pub:iphone-releases:cat-1`) when merging it into the view. This is what keeps independently authored public files, and public data merged against the user's private dataset, from silently colliding on ids like `cat-1` or `row-3`.
@@ -138,12 +134,12 @@ Custom Canvas renderer (not SVG/D3, not a timeline library) with virtualization 
 - The bar's label must remain fully legible regardless of where the fade/fuzz alpha is low — anchor the label inside whichever sub-span of the bar is actually near-opaque (compute the solid span explicitly; don't just place the label at a fixed offset from the bar's nominal edge).
 - No end date ("ongoing") renders as a small arrow taper, not a hard-stopped rectangle.
 - Sub-timelines render close to their parent row (small gap, not a full row-gap) and share a vertical bracket line: it runs from the parent row's entry down through the sub-row(s), with a short notch drawn across the parent bar itself where the bracket meets it, so the nesting reads as "cut into" the parent rather than merely adjacent. When a sub-entry doesn't set `parentEntryId`, resolve the attachment at render time: use whichever parent-row entry's date range contains the sub-entry's start date, or, absent one, the nearest parent entry active before it; if no parent entry qualifies, draw no bracket for that sub-entry. Setting `parentEntryId` explicitly overrides this and is the only way to attach across non-overlapping ranges.
-- A person's rows (resolved via `Group.personId` or `TimelineRow.personId`, see §2) render a dimmed, diagonally-hatched "inactive" band from the left edge of the viewport up to their `birthDate`, if set.
+- A person's rows (resolved via the row's group and, failing that, that group's parent — see §2) render a dimmed, diagonally-hatched "inactive" band from the left edge of the viewport up to their `birthDate`, if set.
 
 **Time axis**: always shows a coarser and finer tick simultaneously depending on zoom (years, or year+month, or week+day), never blank. This was a real bug in an early build — the header background was being repainted *after* the axis text was drawn, silently erasing it every frame — so when implementing, draw the header background/border first, then gridlines and text on top of it, never after.
 
-**Groups → persons → rows → sub-rows** is the vertical layout hierarchy (§2). Each loaded public dataset (§3–§4) contributes its own top-level groups — defined in that file's `groups` array, never `personId`-bearing — which render as additional top-level groups appended after the user's private groups; combined with the id namespacing in §4, this is where public data lives both visually and in the id space. Group headers and person sub-headers are collapsible (groups; persons are not, in v1). Each group/person header carries:
-- a single "+" that opens a small menu offering "Person" (only where a person can legally be added — not inside a personId-having group) and "Category" (adds a new timeline row).
+**Groups → sub-groups → rows → sub-rows** is the vertical layout hierarchy (§2). Each loaded public dataset (§3–§4) contributes its own top-level groups — defined in that file's `groups` array, never nested — which render as additional top-level groups appended after the user's private groups; combined with the id namespacing in §4, this is where public data lives both visually and in the id space. Both group and sub-group headers are collapsible. Each header carries:
+- a single "+" that opens a small menu offering "Person or sub-group" (only on a group that isn't already nested) and a new timeline row.
 - a gear (⚙) *only* on group headers/person headers that represent a person — opens a popover to edit that person's name and birthdate (native `<input type="date">`).
 - Icon buttons (add-sub-timeline, edit-category gear, these add/edit-person controls) are hover-revealed only on devices with real hover (`@media (hover: hover) and (pointer: fine)`); on touch devices (no hover to discover them with) they're visible by default. Keep this split — it isn't an inconsistency to "fix" later.
 
@@ -175,7 +171,7 @@ Row-level controls, always visible in the rail: a visibility checkbox, the categ
 
 - **Publish/subscribe sharing**: eventually, a user should be able to publish a subset of their timelines as a static export that others "subscribe" to, iCal-subscription-style, decentralized, with the original owner staying the source of truth — no publish/subscribe UI ships in v1. **DEPRECATED (2026-07-23):** the `visibility`/`defaultVisibility` field this bullet originally reserved for that purpose has been removed. The planned replacement (see `docs/superpowers/plans/2026-07-23-share-feature.md`) instead lets the user pick which groups/rows to include at share time, with no schema field involved — not yet built.
 - **GitHub Gist sync** for non-technical users: still an open problem (see §3). Don't paper over it with a fake solution; leave it as a clearly marked gap.
-- **Nested people** (a person containing their own person sub-groups): the data model's group/person asymmetry (§2) doesn't support this. Not needed yet — revisit only if a real scenario demands it.
+- **Nested people** (a person containing their own person sub-groups): the data model's group/person asymmetry (§2) doesn't support this. Not needed yet — revisit only if a real scenario demands it. **PARTLY SUPERSEDED (2026-08-03):** since v6 the *model* allows it (a group with a `birthDate` can hold sub-groups); the layout still draws only one level, so nothing changes on screen until someone builds it.
 
 ## 8. Tech stack & hosting
 
@@ -188,7 +184,7 @@ Row-level controls, always visible in the rail: a visibility checkbox, the categ
 - **Timezones**: exact-time entries need a defined convention (UTC storage, local display) — decide once, document it, and don't let it drift between the picker, the storage layer, and the renderer.
 - **Accessibility**: v1 explicitly does not support keyboard-only or screen-reader use — the canvas renderer with mouse/touch input is the only interaction path. This is an accepted v1 scope cut, not an oversight to silently work around; don't build keyboard entry-navigation or a non-visual list view for it.
 - **Mobile gesture conflicts**: pinch-zoom and page-level browser zoom/scroll can fight each other if `touch-action` isn't set correctly on the canvas; verify this on a real iOS Safari device, not just a desktop emulator.
-- **Undo/delete safety**: autosave (§6) means there's no "cancel" — deleting or badly editing an entry needs its own explicit confirmation or undo path, since there's no draft state to just discard. Deletes also cascade through the data model's parent/child relationships: deleting a `TimelineRow` cascades to its entries and to any sub-rows (`parentRowId` pointing to it, recursively) and their entries; deleting an entry cascades to entries nested under it via `parentEntryId`; deleting a `Group` cascades the same way through its person sub-groups, their rows, and entries. Every cascade shows a single confirmation stating what will be removed (e.g. "This deletes 3 entries and 1 sub-row") rather than deleting silently. Deleting a `Category` is different — it's a shared flat resource, not part of the row/entry tree — so it's *blocked*, not cascaded, while any row still references it via `categoryId`; the UI must show which rows use it and require reassigning or deleting them first.
+- **Undo/delete safety**: autosave (§6) means there's no "cancel" — deleting or badly editing an entry needs its own explicit confirmation or undo path, since there's no draft state to just discard. Deletes also cascade through the data model's parent/child relationships: deleting a `TimelineRow` cascades to its entries and to any sub-rows (`parentRowId` pointing to it, recursively) and their entries; deleting an entry cascades to entries nested under it via `parentEntryId`; deleting a `Group` cascades the same way through its sub-groups, their rows, and entries. Every cascade shows a single confirmation stating what will be removed (e.g. "This deletes 3 entries and 1 sub-row") rather than deleting silently. Deleting a `Category` is different — it's a shared flat resource, not part of the row/entry tree — so it's *blocked*, not cascaded, while any row still references it via `categoryId`; the UI must show which rows use it and require reassigning or deleting them first.
 - **Import validation**: the manual JSON import path (§3) needs to check `schemaVersion` and reject or migrate mismatched files rather than corrupting IndexedDB silently.
 - **Performance budget**: validate virtualization actually holds up with 30 rows × dense entries × deep zoom on a mid-range mobile device before considering the renderer done — the prototype was only ever tested with a handful of rows and entries.
 

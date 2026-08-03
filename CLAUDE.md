@@ -26,6 +26,13 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   `fuzzyDate.ts` (precision fuzz + fade ramps), `cascade.ts` (delete cascades).
   Every row is concurrent — entries on the same row may freely overlap, with no
   insert-time conflict check (the exclusive-row concept was removed).
+  There are exactly **three** entities: `Group`, `TimelineRow` (a "timeline" in
+  the UI) and `TimelineEntry`. `Person` was folded into `Group` in schema v6 —
+  a group with a `birthDate` *is* a person, and a group nested via
+  `parentGroupId` is what a person inside a container group used to be. Don't
+  reintroduce an owner field on the row: the row's group is the whole answer to
+  "whose timeline is this", which is what stops a moved timeline keeping a
+  stale owner.
 - `src/render/` — the canvas engine. `engine.ts` is a **framework-agnostic** class
   (keep it free of React imports); `timeScale/timeAxis/layout/bars` are pure and
   unit-tested. Both the canvas and the DOM rail render from the same
@@ -45,10 +52,13 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 - `src/storage/` — IndexedDB (db `chronicle`, store `datasets`, key `main`) and
   export/import. `exportImport.ts` accepts any `schemaVersion` from
   `MIN_SUPPORTED_SCHEMA_VERSION` through `SCHEMA_VERSION` and upgrades in place on
-  success (currently a no-op beyond bumping the number, since v1→v2's only diff,
-  `selfPersonId`, is optional); it still rejects anything outside that range, or
-  structurally malformed, with an explicit error — never a silent migration of
-  actual data. `triggerImportFlow()` is the shared file-picker → parse → callback
+  success (two versions carry a real data step: v5 folds each category's colour
+  and icon onto the row, v6 folds `people[]` into `groups[]`); it still rejects
+  anything outside that range, or structurally malformed, with an explicit error
+  — never a silent migration of actual data. **`loadDataset()` runs the same
+  upgrade path**: it used to drop anything whose `schemaVersion` didn't match
+  exactly, which turned every schema bump into a silent wipe of the only copy of
+  the user's data. `triggerImportFlow()` is the shared file-picker → parse → callback
   helper used by both the top-bar Data menu and the rail's "+ Import".
 - `src/ui/` — React shell: rail, detail panel, popovers, search. The rail is DOM and
   is translated by the engine's `onScrollSync` callback every frame (direct style
@@ -84,7 +94,7 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   `MobileShell.tsx`), with no filters — `SearchBar.tsx` with its filter panel is
   desktop-only now.
 - `src/onboarding/` — Typeform-style conversational onboarding, auto-shown on a fresh
-  dataset (`shouldShowOnboarding`, gated on `dataset.selfPersonId === undefined &&
+  dataset (`shouldShowOnboarding`, gated on `dataset.selfGroupId === undefined &&
   dataset.groups.length === 0`), and manually re-triggerable any time via the rail's
   "+" menu → "✨ Replay setup assistant" (for testing; see the invariant below on why
   that path resumes rather than re-creates identity). `AssistantStepShell` is the one
@@ -137,9 +147,9 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   the first place) has no Back button at all, on purpose, because it's live-editable:
   editing a row IS the correction, so there's nothing to navigate back through. For
   the remaining solo steps, re-answering an earlier one after Back would, for the
-  name step, spawn a second Person/Group. The name step's fix is the general
+  name step, spawn a second group. The name step's fix is the general
   pattern: check whether identity was already committed and update in place
-  (`updatePerson`/`updateGroup`) instead of re-creating.
+  (`updateGroup`) instead of re-creating.
 - **`PlacesTable` never puts a dataset write inside a `setState(prev => ...)`
   updater**: React may invoke updater functions more than once (dev StrictMode does
   this deliberately to catch impure ones), which would risk writing an entry twice.
@@ -156,10 +166,10 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   N-1's saved `end`.
 - **Onboarding resume must never re-create identity either**: the same duplication
   risk above applies on fresh mount, not just after Back — replaying the assistant
-  (rail "+" menu) on a dataset that already has `selfPersonId` set must NOT call
+  (rail "+" menu) on a dataset that already has `selfGroupId` set must NOT call
   `completeIdentityStep` again. `findExistingSetup()` in
-  `IdentityBirthPlacesAssistant.tsx` looks up the existing Person/Group/"Places
-  lived" row from `selfPersonId` and seeds `setup`/`name`/`birthDateMs` from it
+  `IdentityBirthPlacesAssistant.tsx` looks up the existing group and its "Places
+  lived" row from `selfGroupId` and seeds `setup`/`name`/`birthDateMs` from it
   before the first render, so `commitName` takes its update-in-place branch
   immediately. Known gap: re-adding a first place whose dates overlap an
   already-recorded entry just creates a second, overlapping entry (rows are
@@ -248,8 +258,9 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 
 - No publish/subscribe sharing; `visibility` exists on entries only to avoid a future
   migration. No Gist sync — it's a marked, honest gap (PAT flow unsolved for
-  non-technical users). No keyboard-only/screen-reader path. No nested people
-  (a group either *is* a person or *contains* persons, never both).
+  non-technical users). No keyboard-only/screen-reader path. Only one level of
+  group nesting is *drawn* — the model no longer forbids more (see v6 above),
+  but `computeLayout` draws a group, then its sub-groups, and stops.
 - Hover-revealed rail controls on fine pointers vs always-visible on touch is an
   intentional split, not an inconsistency.
 
@@ -266,7 +277,7 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   a 500px desktop window is the *desktop* shell (rail + panel + canvas need width
   that isn't there), and `BottomSheet` is Pointer Events throughout, so a mouse can
   drive it. See H3 in `plans/mobile-feedback-backlog.md`.
-- Rail actions still missing on mobile: "＋ Group" and "＋ Person" (a design gap, not
+- Rail actions still missing on mobile: "＋ Group" (a design gap, not
   an extraction one — creating a group on a phone has no designed home) and
   🌟 Famous people (still private to `RowRail.tsx`; worth extracting together with
   gating its 🐞 debug panel). 🌍 World events is done — `WorldEventsPicker.tsx`.

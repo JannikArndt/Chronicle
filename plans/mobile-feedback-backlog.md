@@ -252,17 +252,19 @@ a fine pointer a shell it can't use. The one real cost is that sheet drag with
 a mouse is unusual — but it works, because BottomSheet is Pointer Events
 throughout and never assumes touch.
 
-**H4 `[~]` Rail actions with no mobile equivalent:** ＋ Group, ＋ Person,
+**H4 `[~]` Rail actions with no mobile equivalent:** ＋ Group,
 🌍 World events, 🌟 Famous people were all private components inside
-`RowRail.tsx`.
+`RowRail.tsx`. (＋ Person is gone as a separate action — since the v6 model
+merge a person is a group with a birth date, so the group form carries a date
+field and there is one action instead of two.)
 - 🌍 World events: **done** — extracted to `WorldEventsPicker.tsx`, now in the
   mobile ⋯ menu. It is a list of checkboxes, so it needed no redesign.
 - 🌟 Famous people: still rail-only. Extractable the same way, but it carries
   the Wikidata search *and* the 🐞 debug panel that is itself on the pre-release
   TODO list — worth doing those two together.
-- ＋ Group / ＋ Person: not extraction problems but design ones. A row's group
-  can now be changed from the row pane's ⋯; *creating* a group or a person on a
-  phone has no designed home yet.
+- ＋ Group: not an extraction problem but a design one. A timeline's group can
+  now be changed from the row pane's ⋯ (sub-groups appear there as
+  "Family › Finn"); *creating* a group on a phone has no designed home yet.
 
 **H5 `[ ]` Real-device iOS Safari pass** is still owed: pinch vs page zoom,
 `100dvh` as the URL bar collapses, safe areas, keyboard covering a sheet.
