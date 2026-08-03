@@ -94,12 +94,13 @@ export function TimelineSheet({
   const row = merged.rows.find(
     (candidate) => candidate.id === (entry ? entry.rowId : settingsRowId),
   );
-  // Whose timeline this is — a person if the row names one, otherwise the group
-  // it sits in. Never "you": your name is already a section header in the list,
-  // and repeating it claimed the sheet was yours even with a public row open.
+  // Where this timeline sits: its group, falling back to the person it names.
+  // The person came first here once, which made the line stale the moment a
+  // timeline was moved to another group — moving changes the group, never the
+  // person, so the header went on naming where the row used to live.
   const ownerLabel = row
-    ? (merged.people.find((person) => person.id === row.personId)?.label ??
-      merged.groups.find((group) => group.id === row.groupId)?.label)
+    ? (merged.groups.find((group) => group.id === row.groupId)?.label ??
+      merged.people.find((person) => person.id === row.personId)?.label)
     : undefined;
 
   // Which way the panes slide. Derived by comparing against the last pane shown

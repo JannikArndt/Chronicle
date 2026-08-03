@@ -14,6 +14,7 @@ import { AddTimelineAssistant } from "../onboarding/AddTimelineAssistant";
 import { clearSelection, selectEntry, setSearch } from "../state/actions";
 import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { triggerDownload } from "../storage/exportImport";
+import { AssistantSheet } from "./AssistantSheet";
 import { CanvasHost } from "./CanvasHost";
 import { importDatasetWithConfirmation } from "./importFlow";
 import { WorldEventsPicker } from "./WorldEventsPicker";
@@ -249,23 +250,31 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
       />
 
       {addEntry && (
-        <div className="assistant-overlay assistant-overlay-sheet">
+        <AssistantSheet
+          title="Add an entry"
+          viewportHeight={viewportHeight}
+          onDismiss={() => setAddEntry(null)}
+        >
           <AddEntryAssistant
             startOnRowId={addEntry.rowId}
             startMs={addEntry.startMs}
             onFinished={() => setAddEntry(null)}
             onShowEntry={showNewEntry}
           />
-        </div>
+        </AssistantSheet>
       )}
 
       {addTimelineOpen && (
-        <div className="assistant-overlay assistant-overlay-sheet">
+        <AssistantSheet
+          title="New timeline"
+          viewportHeight={viewportHeight}
+          onDismiss={() => setAddTimelineOpen(false)}
+        >
           <AddTimelineAssistant
             onFinished={() => setAddTimelineOpen(false)}
             onShowTimeline={showNewTimeline}
           />
-        </div>
+        </AssistantSheet>
       )}
     </div>
   );
