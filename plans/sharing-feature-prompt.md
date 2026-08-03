@@ -37,7 +37,7 @@ re-read before starting:
   needed before. Treat every design choice here (who can read what, at rest,
   in transit, on whose server) with the weight that deserves.
 
-One more piece of ground truth, because the CLAUDE.md wording is stale here:
+One more piece of ground truth, easy to get wrong from the scope-cuts wording:
 there is **no `visibility` field in the model right now**. `visibility` /
 `defaultVisibility` existed in schema v1–v3 and were *removed* in schema v4
 (see the comments in `src/storage/exportImport.ts`). Whatever "published /
@@ -188,7 +188,7 @@ per-directory `CLAUDE.md` conventions (`src/model`, `src/state`,
   has been backend-free and privacy-first since inception. Don't let an
   agent pick a BaaS vendor and start syncing personal data without a human
   looking at that decision first.
-- The stale CLAUDE.md line about `visibility` "existing on entries" is called
-  out directly in the prompt so Opus doesn't go looking for a field that was
-  actually removed in schema v4. Worth fixing that CLAUDE.md line separately,
-  independent of this feature.
+- The root `CLAUDE.md` used to claim `visibility` "exists on entries only to
+  avoid a future migration"; that was wrong — the field was removed in schema
+  v4. That line is now corrected in `CLAUDE.md`, and the prompt restates the
+  correction so Opus doesn't go looking for a field that isn't there.
