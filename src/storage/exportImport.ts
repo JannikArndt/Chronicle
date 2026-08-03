@@ -18,9 +18,9 @@ const ARRAY_FIELDS = ["groups", "rows", "entries"] as const;
 // Oldest export shape this importer still reads. v1/v2/v3/v4 files are
 // structurally valid as-is: v2 only added the optional selfPersonId, v3
 // dropped the (now-ignored) `entities`/`linkedEntityIds` fields, and v4
-// dropped `visibility`/`defaultVisibility`. Two versions carry a real data
-// step: v5 folded each category's color and icon onto the row, and v6 folded
-// the whole Person entity into Group (both below).
+// dropped `visibility`/`defaultVisibility`. Three versions carry a real data
+// step: v5 folded each category's color and icon onto the row, v6 folded the
+// whole Person entity into Group, and v7 added sharing (all below).
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
 
 export function validateImport(raw: unknown): ImportResult {
@@ -49,15 +49,41 @@ export function validateImport(raw: unknown): ImportResult {
   }
   // v1→v4 need no data migration: their diffs are either an optional new field
   // (selfPersonId) or removed fields the app no longer reads
-  // (`entities`/`linkedEntityIds`, `visibility`/`defaultVisibility`), so
-  // leftover copies are simply ignored. v5 and v6 are the exceptions: each
-  // removed an entity that carried data the rest of the model still needs.
+  // (`entities`/`linkedEntityIds`), so leftover copies are simply ignored. v5,
+  // v6 and v7 are the exceptions: the first two removed an entity that carried
+  // data the rest of the model still needs, and v7 has a field name to defuse.
   if (schemaVersion < SCHEMA_VERSION) {
     if (Array.isArray(candidate.categories)) foldCategoryColorsIntoRows(candidate);
     if (Array.isArray(candidate.people)) foldPeopleIntoGroups(candidate);
+    dropDeadVisibilityFields(candidate);
     candidate.schemaVersion = SCHEMA_VERSION;
   }
   return { ok: true, dataset: candidate as unknown as TimelineDataset };
+}
+
+// v7 migration: sharing arrives, and with it the one real hazard in this file.
+//
+// v1–v3 had `visibility` on records and `defaultVisibility` on the dataset; v4
+// removed both and this importer has been ignoring the leftovers ever since. v7
+// adds a publish flag that does the same *kind* of job, so two rules keep the
+// dead field from animating:
+//
+//  1. the new fields are `shared`/`shareByDefault`, never `visibility` — a name
+//     collision is impossible, not merely avoided by convention; and
+//  2. the dead keys are deleted here, so no later code can pick them up either.
+//
+// What this deliberately does NOT do is translate `visibility: "public"` into
+// `shared: true`. In a backend-less app that flag never meant anything had left
+// the device — there was nowhere for it to go. Honouring it now would upload
+// someone's timeline to a server on the strength of a three-versions-dead
+// field. Everything migrates to private; publishing is always a deliberate act.
+function dropDeadVisibilityFields(candidate: Record<string, unknown>): void {
+  delete candidate.defaultVisibility;
+  for (const field of ARRAY_FIELDS) {
+    for (const record of candidate[field] as Array<Record<string, unknown>>) {
+      delete record.visibility;
+    }
+  }
 }
 
 // v5 migration: rows used to get their color and icon from a shared Category

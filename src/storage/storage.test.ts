@@ -114,6 +114,49 @@ describe("import validation", () => {
     expect(loaded?.rows).toHaveLength(3);
   });
 
+  // The v7 hazard: v1–v3 wrote a `visibility` field that v4 removed, and v7
+  // adds a publish flag doing the same kind of job. An old file that still
+  // carries the dead field must not be able to publish anything.
+  function v3WithVisibility() {
+    return {
+      schemaVersion: 3,
+      defaultVisibility: "public",
+      groups: [{ id: "g1", label: "Me", collapsed: false, visibility: "public" }],
+      rows: [{ id: "r1", groupId: "g1", label: "Therapy", visibility: "public" }],
+      entries: [{ id: "e1", rowId: "r1", title: "Session", start: { ms: 0, precision: "day" }, visibility: "public" }],
+    };
+  }
+
+  test("a pre-v4 `visibility: public` does not become shared — it migrates to private", () => {
+    const result = validateImport(v3WithVisibility());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.dataset.rows[0].shared).toBeUndefined();
+    expect(result.dataset.groups[0].shared).toBeUndefined();
+    expect(result.dataset.groups[0].shareByDefault).toBeUndefined();
+  });
+
+  test("the dead visibility fields are deleted, so no later code can read them", () => {
+    const result = validateImport(v3WithVisibility());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect("defaultVisibility" in result.dataset).toBe(false);
+    expect("visibility" in result.dataset.groups[0]).toBe(false);
+    expect("visibility" in result.dataset.rows[0]).toBe(false);
+    expect("visibility" in result.dataset.entries[0]).toBe(false);
+  });
+
+  test("a v7 export keeps the sharing flags it was written with", () => {
+    const dataset = emptyDataset();
+    dataset.groups.push({ id: "g1", label: "Me", collapsed: false, shareByDefault: true });
+    dataset.rows.push({ id: "r1", groupId: "g1", label: "Job", shared: true });
+    const result = parseImportFile(serializeDataset(dataset));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.dataset.rows[0].shared).toBe(true);
+    expect(result.dataset.groups[0].shareByDefault).toBe(true);
+  });
+
   test("rejects structurally broken files", () => {
     expect(validateImport({ schemaVersion: 1 }).ok).toBe(false);
     expect(validateImport(null).ok).toBe(false);

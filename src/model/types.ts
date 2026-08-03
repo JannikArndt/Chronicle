@@ -5,7 +5,7 @@
 // A date like "2020-05-14" always means 2020-05-14T00:00:00Z regardless of the
 // viewer's local timezone, so a dataset renders identically on every device.
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export type Precision = "exact" | "day" | "month" | "year" | "circa";
 
@@ -32,6 +32,14 @@ export interface Group {
   // shows a live computed age.
   birthDate?: number;
   collapsed: boolean;
+  // --- sharing (v7) ---
+  // Absent/false is private. NOT called `visibility`: v1–v3 had a field by that
+  // name, v4 removed it, and old exports still carry it — a new field reusing
+  // the name could be fed a three-versions-dead value. See plans/sharing-feature-design.md §D6.
+  shared?: boolean;
+  // The override: rows and sub-groups created under here start shared. Inherited
+  // by sub-groups, so setting it on "My family" covers everyone inside it.
+  shareByDefault?: boolean;
 }
 
 export interface TimelineRow {
@@ -42,6 +50,10 @@ export interface TimelineRow {
   icon?: string; // any emoji, shown before the row label in the rail and inspector — free-text input
   label: string;
   parentRowId?: string; // set for a sub-timeline (e.g. "Projects at Kestrel" under "Job")
+  // --- sharing (v7) ---
+  // The publish switch for one timeline, and the finest granularity there is:
+  // entries have no flag of their own, they follow their row.
+  shared?: boolean;
 }
 
 export interface Place {
@@ -77,4 +89,10 @@ export interface TimelineDataset {
   // Needed because a birth date alone doesn't say *whose*: a partner you added
   // has one too.
   selfGroupId?: string;
+  // --- sharing (v7) ---
+  // The signed-in account this dataset belongs to. An opaque uuid, never an
+  // email: the dataset is the thing users export and pass around, so no
+  // identity — theirs or anyone else's — is allowed to live in it. Grants,
+  // co-owners and invites are server-side only.
+  accountId?: string;
 }

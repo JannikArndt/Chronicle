@@ -3,8 +3,11 @@
 
 import { useSyncExternalStore } from "react";
 import { emptyDataset, mergeDatasets } from "../model/dataset";
+import { isMirrorId } from "../sharing/mirror";
 import type { TimelineDataset, TimelineEntry, Precision } from "../model/types";
 import type { FamousPerson } from "../publicData/famous/types";
+import type { Grant, SharingSession } from "../sharing/backend";
+import type { Mirror } from "../sharing/mirror";
 
 export interface TimeRangeFilter {
   startMs: number;
@@ -42,6 +45,21 @@ export interface AppState {
   // from that person's overlay — a single timeline can be taken away without
   // removing the whole person.
   activeFamous: { person: FamousPerson; aligned: boolean; removedRowKeys: string[] }[];
+  sharing: SharingState;
+}
+
+export interface SharingState {
+  // False when the build has no Supabase project configured — which is the
+  // state of a fresh clone, and must leave the rest of the app untouched.
+  configured: boolean;
+  session?: SharingSession;
+  // Other people's shared timelines. A sibling of `publicDatasets`, never
+  // merged into `dataset` — see plans/sharing-feature-design.md §D8.
+  mirrors: Mirror[];
+  // Who can see what of mine, for the "shared with" list.
+  grants: Grant[];
+  status: "off" | "idle" | "syncing" | "error";
+  error?: string;
 }
 
 const initialState: AppState = {
@@ -54,6 +72,7 @@ const initialState: AppState = {
   collapsedRowIds: [],
   activeWorldKeys: [],
   activeFamous: [],
+  sharing: { configured: false, mirrors: [], grants: [], status: "off" },
 };
 
 type Listener = () => void;
@@ -80,21 +99,47 @@ export function useAppState<T>(selector: (state: AppState) => T): T {
   return useSyncExternalStore(appStore.subscribe, () => selector(appStore.getState()));
 }
 
-let mergedCache: { dataset: TimelineDataset; publics: TimelineDataset[]; merged: TimelineDataset } | null = null;
+let mergedCache: {
+  dataset: TimelineDataset;
+  publics: TimelineDataset[];
+  mirrors: Mirror[];
+  merged: TimelineDataset;
+} | null = null;
 
-// Private data first, public datasets appended — array order drives layout,
-// so public groups always render after the user's own (§5).
+// Your data first, then people you know, then the public datasets — array order
+// drives layout (§5), so this is the on-screen order too. Mirrors sit between
+// the two because a shared timeline from your dad belongs nearer your own life
+// than Mozart's does.
 export function mergedDataset(state: AppState): TimelineDataset {
-  if (mergedCache && mergedCache.dataset === state.dataset && mergedCache.publics === state.publicDatasets) {
+  if (
+    mergedCache &&
+    mergedCache.dataset === state.dataset &&
+    mergedCache.publics === state.publicDatasets &&
+    mergedCache.mirrors === state.sharing.mirrors
+  ) {
     return mergedCache.merged;
   }
-  const merged = mergeDatasets(state.dataset, ...state.publicDatasets);
-  mergedCache = { dataset: state.dataset, publics: state.publicDatasets, merged };
+  const mirrorDatasets = state.sharing.mirrors.map((mirror) => mirror.dataset);
+  const merged = mergeDatasets(state.dataset, ...mirrorDatasets, ...state.publicDatasets);
+  mergedCache = {
+    dataset: state.dataset,
+    publics: state.publicDatasets,
+    mirrors: state.sharing.mirrors,
+    merged,
+  };
   return merged;
 }
 
 export function isPublicId(id: string): boolean {
   return id.startsWith("pub:");
+}
+
+// Anything that isn't yours: bundled public data, or a mirror of someone
+// else's shared timelines. The UI uses this to decide whether to offer an edit
+// at all — a co-owned mirror is the one exception, and it is checked against
+// the mirror's `role` rather than against the id.
+export function isForeignId(id: string): boolean {
+  return isPublicId(id) || isMirrorId(id);
 }
 
 // The user's own birth instant, used to align a famous person's life "to your

@@ -6,7 +6,14 @@
 import type { TimelineDataset } from "../model/types";
 
 export function namespaceDataset(dataset: TimelineDataset, fileStem: string): TimelineDataset {
-  const prefix = `pub:${fileStem}:`;
+  return namespaceWithPrefix(dataset, `pub:${fileStem}:`);
+}
+
+// Same mechanism, arbitrary prefix. Mirrors of other people's shared timelines
+// use `shared:<accountId>:` — owner-scoped because two people can each have a
+// local id `group-abc-1`, and a mirror that collided with another mirror (or
+// with your own data) would render one person's life on another's lane.
+export function namespaceWithPrefix(dataset: TimelineDataset, prefix: string): TimelineDataset {
   const ns = (id: string): string => `${prefix}${id}`;
   const nsOptional = (id: string | undefined): string | undefined => (id === undefined ? undefined : ns(id));
 

@@ -1,6 +1,6 @@
 # Sharing — design doc
 
-Status: **awaiting sign-off on Phase 0.** Nothing in `src/` has changed yet.
+Status: **Phase 0 signed off (§4). Phase 1 in build.**
 
 This is the design for the feature the root `CLAUDE.md` has been deferring under
 "No publish/subscribe sharing… No Gist sync — it's a marked, honest gap." It is
@@ -56,7 +56,7 @@ flags and nothing else — no grants, no email addresses, no mirrors.
 
 ## 2. Phase 0 decisions
 
-### D1 — Backend: **Supabase** (recommended)
+### D1 — Backend: **Supabase** *(decided)*
 
 | | Supabase | Firebase | Custom (Workers + D1/DO) |
 |---|---|---|---|
@@ -80,7 +80,7 @@ unless D3 says otherwise. Magic-link delivery needs SMTP configured (the
 built-in sender is rate-limited to a handful per hour and is dev-only), so a
 transactional email provider is a real, if free-tier, dependency.
 
-### D2 — What leaves the device: **only records marked `shared`** (recommended)
+### D2 — What leaves the device: **shared records by default, with an opt-in to sync everything** *(decided)*
 
 Two models were on the table:
 
@@ -93,13 +93,45 @@ that depends on a policy being right rather than on the data not being there.
 *only timelines you explicitly publish ever leave your device.* A user can
 verify it — the un-published rows have no server row at all.
 
-Recommend **(b)**. It is the minimum exposure that satisfies scenarios 1–4, and
-it makes un-publishing a real deletion rather than a flag flip. The cost is
-honest and should be said out loud in the UI: **signing in is not a backup.**
-Cross-device sync of your *private* data is a separate feature with its own
-opt-in, and it probably wants D3's encryption.
+**Decision: (b) is the default, and (a) is an opt-in setting.** Nobody gets
+their private life uploaded by signing in; someone who actively wants
+multi-device sync can ask for it, knowing what they are asking for.
 
-### D3 — Encryption posture: **server-readable payloads in phase 1**, structured so E2EE stays possible
+That makes the upload gate a function of a mode, not a constant, and the mode is
+threaded through from the start:
+
+```ts
+type SyncMode = "shared-only" | "everything";   // default "shared-only"
+syncSubset(dataset, mode): { groups, rows, entries }
+```
+
+Four consequences, all of which the implementation has to honour:
+
+1. **RLS is already correct for both modes.** The read policy is *"I own it, or
+   it is `shared` and I hold a grant"*. A private row uploaded under
+   `everything` is visible to its owner and to nobody else — the same policy,
+   no second code path.
+2. **Turning the setting back off is a deletion, not a flag flip.** Every
+   private record must be removed from the server, or the setting is a lie.
+   `diff.ts` gets this for free: the shared subset shrinks, so the diff emits
+   tombstones.
+3. **`everything` makes `state.dataset` a merge target.** This is the genuinely
+   new machinery — under `shared-only`, your own data flows one way (device →
+   server) and only *other people's* data flows back, into mirrors. Under
+   `everything`, your own records come back from your other devices and have to
+   be LWW-merged into `state.dataset` itself. A bug there corrupts the user's
+   own data, not a discardable mirror.
+4. **Therefore it ships as its own phase.** Phase 1 implements the gate with
+   both modes and tests both, but wires only `shared-only` into the UI. Full
+   sync lands as **Phase 1b**, immediately after read-only sharing is proven,
+   so the merge-into-own-data path gets its own review rather than riding along
+   with the invite flow.
+
+The mode lives on the account server-side (a second device must know to pull
+everything) and is mirrored locally. The UI still says, plainly, that
+`shared-only` means **signing in is not a backup**.
+
+### D3 — Encryption posture: **server-readable payloads**, structured so E2EE stays possible *(decided)*
 
 The server schema deliberately splits every table into:
 
@@ -295,20 +327,18 @@ Realtime subscriptions are filtered by the same policies.
 
 ---
 
-## 4. Questions for sign-off
+## 4. Sign-off — settled 2026-08-03
 
-These four change what gets built; the rest of this doc is my recommendation and
-I will proceed on it unless told otherwise.
-
-1. **Backend** — Supabase, or something else?
-2. **Does private data ever reach the server** — only-shared (b), or
-   everything-with-RLS (a) to get multi-device sync?
-3. **Audience granularity in phase 1** — is `shared` a single audience (visible
-   to everyone you have granted), or do you need per-person hold-backs ("dad can
-   see this row, my girlfriend cannot") from the start? The scenario text reads
-   as single-audience; per-person needs a `grant_exclusions` table and a
-   noticeably heavier share UI.
-4. **Encryption** — server-readable payloads now, or E2EE from the start?
+1. **Backend** — Supabase. ✅ as proposed.
+2. **What leaves the device** — shared-only **by default**, with an opt-in to
+   sync everything. ↩︎ *Amended from the proposal*, which had no opt-in at all;
+   see D2 for the four consequences and why full sync ships as Phase 1b.
+3. **Audience granularity** — single audience in phase 1. ✅ as proposed.
+   Per-person hold-backs stay out; the extension point is a `grant_exclusions`
+   table.
+4. **Encryption** — server-readable payloads, with the structural/`payload`
+   column split that keeps E2EE a later option rather than a rewrite. ✅ as
+   proposed.
 
 ---
 
@@ -319,9 +349,11 @@ Model → storage → sync → UI, tests alongside, per the per-directory conven
 **`src/model`**
 - `types.ts`: `SCHEMA_VERSION = 7`, the four fields from D6.
 - `sharing.ts` (new, pure): `defaultSharedForNewRow(dataset, groupId)`,
-  `effectiveShared(dataset, row)`, `sharedSubset(dataset)` — the last one is the
-  privacy-critical gate and gets the heaviest tests: nothing private, no
-  orphan entries, no entry whose row is private, no row whose group is gone.
+  `effectiveShared(dataset, row)`, `syncSubset(dataset, mode)` — the last one is
+  the privacy-critical gate and gets the heaviest tests, in **both** D2 modes:
+  under `shared-only` nothing private escapes, no entry rides along whose row is
+  private, no row survives whose group is gone; under `everything` the subset is
+  closed over the same referential rules.
 
 **`src/storage`**
 - `exportImport.ts`: v7 migration — bump, strip dead `visibility` /
@@ -359,6 +391,10 @@ browser contexts through invite → publish → propagate → revoke.
 
 ## 6. Later phases (sketch only)
 
+- **Phase 1b — opt-in full sync.** The `everything` mode from D2 wired to a
+  setting. The work is not the gate (phase 1 builds that) but the return path:
+  LWW-merging your own records back into `state.dataset`, and deleting every
+  private record from the server when the setting goes off again.
 - **Phase 2 — invite chaining.** An invite records who created it; when a new
   account joins a group you co-own, you get a *suggestion*, never a grant. The
   suggestion carries a display name, not an email.
@@ -375,5 +411,5 @@ Global discovery, search, matching, or recommendation — scenario 6. Nothing he
 is designed toward it. A public directory of people has consent, safety and
 abuse problems that are a product in their own right, not a follow-up commit.
 
-Also not in phase 1: per-entry publishing, multi-device sync of private data,
-E2EE (pending D3/Q4), and per-person hold-backs (pending Q3).
+Also not in phase 1: per-entry publishing, the `everything` sync mode's return
+path (Phase 1b), E2EE, and per-person hold-backs.

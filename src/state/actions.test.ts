@@ -2,16 +2,22 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, test } from "vitest";
 import {
   addOnboardingPlaceEntry,
+  addRow,
+  addSubGroup,
   completeIdentityStep,
   moveRow,
   reorderGroup,
   replaceDataset,
   selectRow,
+  setGroupShareByDefault,
+  setRowShared,
   startDraft,
   updateDraft,
   updateOnboardingPlaceEntry,
 } from "./actions";
-import { appStore } from "./store";
+import { appStore, mergedDataset } from "./store";
+import { serializeDataset } from "../storage/exportImport";
+import { SCHEMA_VERSION } from "../model/types";
 import { emptyDataset } from "../model/dataset";
 import { DAY_MS } from "../model/fuzzyDate";
 import type { TimelineDataset } from "../model/types";
@@ -315,5 +321,81 @@ describe("onboarding: updateOnboardingPlaceEntry", () => {
     updateOnboardingPlaceEntry("no-such-entry", { label: "Ghost", startMs: Date.UTC(2000, 0, 1) });
 
     expect(appStore.getState().dataset.entries).toHaveLength(before);
+  });
+});
+
+describe("sharing defaults (schema v7)", () => {
+  beforeEach(() => {
+    replaceDataset(fixture());
+  });
+
+  test("a new timeline is private", () => {
+    const id = addRow("g1", "Hobbies");
+    expect(appStore.getState().dataset.rows.find((row) => row.id === id)?.shared).toBeUndefined();
+  });
+
+  test("a new timeline in a shareByDefault group starts shared", () => {
+    setGroupShareByDefault("g1", true);
+    const id = addRow("g1", "Hobbies");
+    expect(appStore.getState().dataset.rows.find((row) => row.id === id)?.shared).toBe(true);
+  });
+
+  test("the override is inherited by a sub-group's starter timeline", () => {
+    setGroupShareByDefault("g1", true);
+    addSubGroup("g1", "Finn");
+    const finn = appStore.getState().dataset.groups.find((group) => group.label === "Finn")!;
+    const starter = appStore.getState().dataset.rows.find((row) => row.groupId === finn.id)!;
+    expect(starter.shared).toBe(true);
+  });
+
+  // shareByDefault decides what the NEXT timeline starts as. Reaching back and
+  // publishing the ones already there would turn one toggle into a bulk share
+  // of everything in the group, which is the opposite of private-by-default.
+  test("turning on shareByDefault does not publish the timelines already there", () => {
+    setGroupShareByDefault("g1", true);
+    expect(appStore.getState().dataset.rows.find((row) => row.id === "r1")?.shared).toBeUndefined();
+  });
+
+  test("un-publishing clears the flag rather than storing false", () => {
+    setRowShared("r1", true);
+    expect(appStore.getState().dataset.rows.find((row) => row.id === "r1")?.shared).toBe(true);
+    setRowShared("r1", false);
+    expect(appStore.getState().dataset.rows.find((row) => row.id === "r1")?.shared).toBeUndefined();
+  });
+});
+
+describe("mirrors stay out of the user's own data", () => {
+  const mirror = {
+    ownerAccountId: "acct-dad",
+    ownerName: "Dad",
+    role: "reader" as const,
+    dataset: {
+      schemaVersion: SCHEMA_VERSION,
+      groups: [{ id: "shared:acct-dad:g1", label: "Dad", collapsed: false }],
+      rows: [{ id: "shared:acct-dad:r1", groupId: "shared:acct-dad:g1", label: "His jobs" }],
+      entries: [],
+    },
+  };
+
+  beforeEach(() => {
+    replaceDataset(fixture());
+    appStore.setState({ sharing: { ...appStore.getState().sharing, mirrors: [mirror] } });
+  });
+
+  test("a mirror is drawn — it is merged into the view", () => {
+    expect(mergedDataset(appStore.getState()).rows.map((row) => row.label)).toContain("His jobs");
+  });
+
+  // The privacy guarantee that makes §D8 worth the indirection: an export
+  // serialises `state.dataset`, so someone else's timelines cannot be in it.
+  test("a mirror is not in the export", () => {
+    const exported = serializeDataset(appStore.getState().dataset);
+    expect(exported).not.toContain("His jobs");
+    expect(exported).not.toContain("acct-dad");
+  });
+
+  test("dropping the mirror leaves the user's own data untouched", () => {
+    appStore.setState({ sharing: { ...appStore.getState().sharing, mirrors: [] } });
+    expect(mergedDataset(appStore.getState()).rows.map((row) => row.label)).toEqual(["Job"]);
   });
 });

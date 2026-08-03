@@ -5,12 +5,18 @@
 
 import type { TimelineDataset } from "../model/types";
 import type { FamousPerson } from "../publicData/famous/types";
+import type { Mirror } from "../sharing/mirror";
 import { validateImport } from "./exportImport";
 
 const DB_NAME = "chronicle";
 const STORE_NAME = "datasets";
 const DATASET_KEY = "main";
 const OVERLAYS_KEY = "overlays";
+// Other people's shared timelines, cached so they are on screen before the
+// network answers. Deliberately a SEPARATE key from `main`: it is somebody
+// else's personal data, it must never reach an export, and revoking access has
+// to be a delete that cannot possibly take the user's own records with it.
+const MIRRORS_KEY = "mirrors";
 
 // Which optional public data (world events + famous people) the user has added.
 // Persisted next to the dataset so the overlay survives a reload. Famous people
@@ -93,4 +99,38 @@ export async function saveOverlays(overlays: StoredOverlays): Promise<void> {
   } finally {
     db.close();
   }
+}
+
+export async function loadMirrors(): Promise<Mirror[]> {
+  const db = await openDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(MIRRORS_KEY);
+      request.onsuccess = () => resolve((request.result as Mirror[] | undefined) ?? []);
+      request.onerror = () => reject(request.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+export async function saveMirrors(mirrors: Mirror[]): Promise<void> {
+  const db = await openDatabase();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readwrite");
+      transaction.objectStore(STORE_NAME).put(mirrors, MIRRORS_KEY);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+// Signing out drops every mirror. Leaving another person's timelines cached on
+// a device nobody is signed in to would be the one way this feature could leak
+// their data to whoever picks the phone up next.
+export async function clearMirrors(): Promise<void> {
+  await saveMirrors([]);
 }
