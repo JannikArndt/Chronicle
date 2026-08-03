@@ -12,7 +12,6 @@ import type { AppState } from "./store";
 import type { FamousPerson } from "../publicData/famous/types";
 import type {
   Group,
-  Person,
   Precision,
   TimelineDataset,
   TimelineEntry,
@@ -246,27 +245,25 @@ export function deleteEntryWithCascade(entryId: string): void {
   clearSelection();
 }
 
-// ---------- rows / groups / persons ----------
+// ---------- rows / groups ----------
 
 export interface IdentitySetupResult {
-  personId: string;
   groupId: string;
   placesRowId: string;
 }
 
 // Onboarding step 1 (docs/superpowers/specs/2026-07-22-onboarding-assistant-design.md):
-// creates the user's own Person + Group and their first row, all in one save.
+// creates the user's own group and their first timeline, all in one save. The
+// group gets its birth date later, from the step after this one.
 export function completeIdentityStep(name: string): IdentitySetupResult {
   let result!: IdentitySetupResult;
   updateDataset((dataset) => {
-    const person: Person = { id: newId("person"), label: name };
-    dataset.people.push(person);
-    const group: Group = { id: newId("group"), label: name, personId: person.id, collapsed: false };
+    const group: Group = { id: newId("group"), label: name, collapsed: false };
     dataset.groups.push(group);
-    dataset.selfPersonId = person.id;
+    dataset.selfGroupId = group.id;
     const row: TimelineRow = { id: newId("row"), groupId: group.id, color: "#8ba66f", icon: "🏠", label: "Places lived" };
     dataset.rows.push(row);
-    result = { personId: person.id, groupId: group.id, placesRowId: row.id };
+    result = { groupId: group.id, placesRowId: row.id };
     return dataset;
   });
   return result;
@@ -339,46 +336,45 @@ export function updateOnboardingPlaceEntry(entryId: string, place: OnboardingPla
   });
 }
 
-export function addGroup(label: string, asPerson: boolean): void {
+// A birth date is what makes a group a person, so it is offered here rather
+// than asked for as a separate "is this a person?" question.
+export function addGroup(label: string, birthDate?: number): void {
   updateDataset((dataset) => {
-    let personId: string | undefined;
-    if (asPerson) {
-      const person: Person = { id: newId("person"), label };
-      dataset.people.push(person);
-      personId = person.id;
-    }
-    const group: Group = { id: newId("group"), label, personId, collapsed: false };
-    dataset.groups.push(group);
+    dataset.groups.push({ id: newId("group"), label, birthDate, collapsed: false });
     return dataset;
   });
 }
 
-export function addPersonToGroup(groupId: string, label: string): void {
+// Nest a group inside another — "Finn" inside "Family". Only one level deep is
+// drawn, so a group that is already nested cannot take children.
+export function addSubGroup(parentGroupId: string, label: string, birthDate?: number): void {
   updateDataset((dataset) => {
-    const group = dataset.groups.find((g) => g.id === groupId);
-    // §2 asymmetry: a person can only be added inside a personId-less group.
-    if (!group || group.personId) return dataset;
-    const person: Person = { id: newId("person"), label };
-    dataset.people.push(person);
-    // A person needs at least one row to be visible; start with a generic one.
-    dataset.rows.push({
-      id: newId("row"),
-      groupId,
-      personId: person.id,
-      color: "#7a8ba6",
-      icon: "📌",
-      label: "General",
+    const parent = dataset.groups.find((g) => g.id === parentGroupId);
+    if (!parent || parent.parentGroupId !== undefined) return dataset;
+    const id = newId("group");
+    // Insert directly after the parent's existing children so siblings stay
+    // together; array order is what the layout draws.
+    const lastChildIndex = lastIndexWhere(dataset.groups, (g) => g.parentGroupId === parentGroupId);
+    const parentIndex = dataset.groups.findIndex((g) => g.id === parentGroupId);
+    dataset.groups.splice(Math.max(lastChildIndex, parentIndex) + 1, 0, {
+      id,
+      parentGroupId,
+      label,
+      birthDate,
+      collapsed: false,
     });
+    // A group needs at least one timeline to be visible; start with a generic one.
+    dataset.rows.push({ id: newId("row"), groupId: id, color: "#7a8ba6", icon: "📌", label: "General" });
     return dataset;
   });
 }
 
 // Returns the new row's id so a caller that has to put something on it right
 // away (the add-entry assistant) doesn't have to search for it afterwards.
-export function addRow(groupId: string, label: string, personId?: string, icon = "🏷️"): string {
+export function addRow(groupId: string, label: string, icon = "🏷️"): string {
   const id = newId("row");
   updateDataset((dataset) => {
-    dataset.rows.push({ id, groupId, personId, color: randomPastelColor(), icon, label });
+    dataset.rows.push({ id, groupId, color: randomPastelColor(), icon, label });
     return dataset;
   });
   return id;
@@ -391,7 +387,6 @@ export function addSubRow(parentRowId: string, label: string): void {
     dataset.rows.push({
       id: newId("row"),
       groupId: parent.groupId,
-      personId: parent.personId,
       color: randomPastelColor(),
       icon: "🏷️",
       label,
@@ -447,12 +442,11 @@ export function reorderGroup(groupId: string, beforeGroupId: string | null): voi
 
 // Moves a top-level row into `targetGroupId`, immediately before `beforeRowId`
 // (which must belong to the target group), or at the end of that group's rows
-// when null. Same-group reorder is the same code path. The row adopts the
-// personId of its drop position (the before-row's, or the target group's last
-// row's) so it renders exactly where the drop indicator showed — container
-// groups section their rows by personId. Known scope cut: a moved parent's
-// sub-rows keep their stored groupId (they still render under their parent,
-// since layout follows parentRowId, but their groupId goes stale).
+// when null. Same-group reorder is the same code path. `targetGroupId` may be a
+// sub-group — that is now the whole of "which person does this belong to", so
+// there is nothing else to adopt at the drop position. Known scope cut: a moved
+// parent's sub-rows keep their stored groupId (they still render under their
+// parent, since layout follows parentRowId, but their groupId goes stale).
 export function moveRow(rowId: string, targetGroupId: string, beforeRowId: string | null): void {
   if (rowId === beforeRowId) return;
   updateDataset((dataset) => {
@@ -467,17 +461,13 @@ export function moveRow(rowId: string, targetGroupId: string, beforeRowId: strin
     }
     const remainingRows = dataset.rows.filter((r) => r.id !== rowId);
     let insertIndex: number;
-    let adoptedPersonId: string | undefined;
     if (beforeRow !== undefined) {
       insertIndex = remainingRows.findIndex((r) => r.id === beforeRow.id);
-      adoptedPersonId = beforeRow.personId;
     } else {
       const lastIndexInTargetGroup = lastIndexWhere(remainingRows, (r) => r.groupId === targetGroupId);
       insertIndex = lastIndexInTargetGroup === -1 ? remainingRows.length : lastIndexInTargetGroup + 1;
-      adoptedPersonId = lastIndexInTargetGroup === -1 ? undefined : remainingRows[lastIndexInTargetGroup].personId;
     }
     movingRow.groupId = targetGroupId;
-    movingRow.personId = adoptedPersonId;
     remainingRows.splice(insertIndex, 0, movingRow);
     dataset.rows = remainingRows;
     return dataset;
@@ -502,16 +492,8 @@ export function updateGroup(groupId: string, patch: Partial<Group>): void {
 
 export function deleteGroupWithCascade(groupId: string): void {
   const cascade = collectGroupCascade(appStore.getState().dataset, groupId);
-  updateDataset((dataset) => applyDelete(dataset, cascade, groupId));
+  updateDataset((dataset) => applyDelete(dataset, cascade));
   clearSelection();
-}
-
-export function updatePerson(personId: string, patch: Partial<Person>): void {
-  updateDataset((dataset) => {
-    const person = dataset.people.find((p) => p.id === personId);
-    if (person) Object.assign(person, patch);
-    return dataset;
-  });
 }
 
 // ---------- visibility / collapse / search / filters ----------

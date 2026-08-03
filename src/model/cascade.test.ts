@@ -19,30 +19,27 @@ function makeEntry(id: string, rowId: string, parentEntryId?: string): TimelineE
   };
 }
 
-function makeRow(id: string, groupId: string, parentRowId?: string, personId?: string): TimelineRow {
-  return { id, groupId, color: "#333", label: id, parentRowId, personId };
+function makeRow(id: string, groupId: string, parentRowId?: string): TimelineRow {
+  return { id, groupId, color: "#333", label: id, parentRowId };
 }
 
-// g1 (plain group) contains person p1's row r1, r1 has sub-row r2, r2 has sub-sub-row r3.
-// g2 is person p2's own group with row r4. p1 also has a row in g2? No — p1 is
-// additionally referenced from group g3 to test shared-person survival.
+// g1 ("Family") contains the sub-group g1a ("Finn") holding row r1, which has
+// sub-row r2, which has sub-sub-row r3. g2 is a person of its own (it has a
+// birth date) with row r4. g3 is an unrelated group with row r5.
 function fixture(): TimelineDataset {
   const ds = emptyDataset();
-  ds.people = [
-    { id: "p1", label: "Finn" },
-    { id: "p2", label: "Me" },
-  ];
   ds.groups = [
     { id: "g1", label: "Family", collapsed: false },
-    { id: "g2", label: "Me", personId: "p2", collapsed: false },
+    { id: "g1a", parentGroupId: "g1", label: "Finn", collapsed: false },
+    { id: "g2", label: "Me", birthDate: Date.UTC(1988, 0, 1), collapsed: false },
     { id: "g3", label: "Friends", collapsed: false },
   ];
   ds.rows = [
-    makeRow("r1", "g1", undefined, "p1"),
-    makeRow("r2", "g1", "r1", "p1"),
-    makeRow("r3", "g1", "r2", "p1"),
+    makeRow("r1", "g1a"),
+    makeRow("r2", "g1a", "r1"),
+    makeRow("r3", "g1a", "r2"),
     makeRow("r4", "g2"),
-    makeRow("r5", "g3", undefined, "p1"),
+    makeRow("r5", "g3"),
   ];
   ds.entries = [
     makeEntry("e1", "r1"),
@@ -74,17 +71,16 @@ describe("collectEntryCascade", () => {
 });
 
 describe("collectGroupCascade", () => {
-  test("takes rows, entries, and persons only this group references", () => {
+  test("takes the group's sub-groups, and everything on them, with it", () => {
     const cascade = collectGroupCascade(fixture(), "g1");
+    expect(cascade.groupIds.sort()).toEqual(["g1", "g1a"]);
     expect(cascade.rowIds.sort()).toEqual(["r1", "r2", "r3"]);
     expect(cascade.entryIds.sort()).toEqual(["e1", "e2", "e3"]);
-    // p1 survives because g3/r5 still references it.
-    expect(cascade.personIds).toEqual([]);
   });
 
-  test("deletes a person no longer referenced anywhere else", () => {
+  test("a group with no sub-groups takes only itself", () => {
     const cascade = collectGroupCascade(fixture(), "g2");
-    expect(cascade.personIds).toEqual(["p2"]);
+    expect(cascade.groupIds).toEqual(["g2"]);
     expect(cascade.entryIds.sort()).toEqual(["e4", "e5"]);
   });
 });
@@ -101,10 +97,9 @@ describe("describeCascade", () => {
 describe("applyDelete", () => {
   test("removes exactly the collected ids", () => {
     const ds = fixture();
-    const result = applyDelete(ds, collectGroupCascade(ds, "g1"), "g1");
+    const result = applyDelete(ds, collectGroupCascade(ds, "g1"));
     expect(result.groups.map((g) => g.id)).toEqual(["g2", "g3"]);
     expect(result.rows.map((r) => r.id)).toEqual(["r4", "r5"]);
     expect(result.entries.map((e) => e.id)).toEqual(["e4", "e5"]);
-    expect(result.people.map((p) => p.id)).toEqual(["p1", "p2"]);
   });
 });

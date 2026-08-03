@@ -3,44 +3,53 @@ import { COMPACT_ROW_HEIGHT, GROUP_HEADER_HEIGHT, ROW_GAP, ROW_HEIGHT, SUB_ROW_G
 import { emptyDataset } from "../model/dataset";
 import type { TimelineDataset } from "../model/types";
 
-// "Me" is a personId group with rows r1 (r1 has sub-row r1s).
-// "Family" is a plain group containing person Finn with row r2.
+// "Me" is a person (it has a birth date) holding rows r1 (r1 has sub-row r1s).
+// "Family" is a plain group containing the sub-group Finn with row r2.
 function fixture(): TimelineDataset {
   const ds = emptyDataset();
-  ds.people = [
-    { id: "p-me", label: "Me" },
-    { id: "p-finn", label: "Finn" },
-  ];
   ds.groups = [
-    { id: "g-me", label: "Me", personId: "p-me", collapsed: false },
+    { id: "g-me", label: "Me", birthDate: Date.UTC(1988, 0, 1), collapsed: false },
     { id: "g-family", label: "Family", collapsed: false },
+    { id: "g-finn", parentGroupId: "g-family", label: "Finn", collapsed: false },
   ];
   ds.rows = [
     { id: "r1", groupId: "g-me", color: "#333", label: "Job" },
     { id: "r1s", groupId: "g-me", color: "#333", label: "Projects", parentRowId: "r1" },
-    { id: "r2", groupId: "g-family", personId: "p-finn", color: "#333", label: "School" },
+    { id: "r2", groupId: "g-finn", color: "#333", label: "School" },
   ];
   return ds;
 }
 
 describe("computeLayout", () => {
-  test("orders group header, rows, sub-rows, then next group with person header", () => {
+  test("orders group header, rows, sub-rows, then next group with sub-group header", () => {
     const { items } = computeLayout(fixture(), new Set());
     expect(items.map((i) => `${i.kind}:${i.id}`)).toEqual([
       "group:g-me",
       "row:r1",
       "row:r1s",
       "group:g-family",
-      "person:p-finn",
+      "subgroup:g-finn",
       "row:r2",
     ]);
   });
 
-  test("personId groups get no nested person header", () => {
+  test("a sub-group is drawn once, under its parent — never again at top level", () => {
     const { items } = computeLayout(fixture(), new Set());
-    const personItems = items.filter((i) => i.kind === "person");
-    expect(personItems).toHaveLength(1);
-    expect(personItems[0].id).toBe("p-finn");
+    const subGroupItems = items.filter((i) => i.kind === "subgroup");
+    expect(subGroupItems).toHaveLength(1);
+    expect(subGroupItems[0].id).toBe("g-finn");
+    expect(subGroupItems[0].parentGroup?.id).toBe("g-family");
+  });
+
+  test("collapsing a sub-group hides only its own rows", () => {
+    const { items } = computeLayout(fixture(), new Set(["g-finn"]));
+    expect(items.map((i) => `${i.kind}:${i.id}`)).toEqual([
+      "group:g-me",
+      "row:r1",
+      "row:r1s",
+      "group:g-family",
+      "subgroup:g-finn",
+    ]);
   });
 
   test("sub-rows sit closer to their parent than the normal row gap", () => {

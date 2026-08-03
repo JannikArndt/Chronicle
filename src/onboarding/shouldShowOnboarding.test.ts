@@ -7,8 +7,8 @@ describe("shouldShowOnboarding", () => {
     expect(shouldShowOnboarding(emptyDataset())).toBe(true);
   });
 
-  test("false once selfPersonId is set", () => {
-    const dataset = { ...emptyDataset(), selfPersonId: "person-1" };
+  test("false once selfGroupId is set", () => {
+    const dataset = { ...emptyDataset(), selfGroupId: "group-1" };
     expect(shouldShowOnboarding(dataset)).toBe(false);
   });
 

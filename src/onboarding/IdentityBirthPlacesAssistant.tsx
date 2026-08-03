@@ -14,24 +14,23 @@ import { PlacesTable } from "./PlacesTable";
 import type { PlaceAnswer } from "./PlacesTable";
 import { formatSuggestionText } from "./nominatim";
 import { useAssistantFlow } from "./useAssistantFlow";
-import { addOnboardingPlaceEntry, completeIdentityStep, updateGroup, updatePerson } from "../state/actions";
+import { addOnboardingPlaceEntry, completeIdentityStep, updateGroup } from "../state/actions";
 import { parseDateInput } from "../model/parseDateInput";
 import { appStore } from "../state/store";
 
 // Manually re-opening the assistant (e.g. from the rail's "+" menu, for
-// testing) on a dataset that already has a selfPersonId must resume that
+// testing) on a dataset that already has a selfGroupId must resume that
 // identity rather than call completeIdentityStep again — otherwise commitName
-// would create a second Person/Group/"Places lived" row and reassign
-// selfPersonId, orphaning the original (the same class of bug the Back-across-
+// would create a second group and "Places lived" row and reassign
+// selfGroupId, orphaning the original (the same class of bug the Back-across-
 // commit-boundary fix above guards against, but on fresh mount instead).
-function findExistingSetup(): { personId: string; groupId: string; placesRowId: string } | null {
+function findExistingSetup(): { groupId: string; placesRowId: string } | null {
   const dataset = appStore.getState().dataset;
-  if (!dataset.selfPersonId) return null;
-  const group = dataset.groups.find((g) => g.personId === dataset.selfPersonId);
+  const group = dataset.groups.find((g) => g.id === dataset.selfGroupId);
   if (!group) return null;
   const placesRow = dataset.rows.find((r) => r.groupId === group.id && r.label === "Places lived");
   if (!placesRow) return null;
-  return { personId: dataset.selfPersonId, groupId: group.id, placesRowId: placesRow.id };
+  return { groupId: group.id, placesRowId: placesRow.id };
 }
 
 type Phase =
@@ -47,18 +46,16 @@ interface IdentityBirthPlacesAssistantProps {
 
 export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlacesAssistantProps) {
   const flow = useAssistantFlow<Phase>({ kind: "name" });
-  const [setup, setSetup] = useState<{ personId: string; groupId: string; placesRowId: string } | null>(
-    findExistingSetup,
-  );
+  const [setup, setSetup] = useState<{ groupId: string; placesRowId: string } | null>(findExistingSetup);
   const [name, setName] = useState(() => {
     const dataset = appStore.getState().dataset;
-    const person = setup && dataset.people.find((p) => p.id === setup.personId);
-    return person?.label ?? "";
+    const group = setup && dataset.groups.find((g) => g.id === setup.groupId);
+    return group?.label ?? "";
   });
   const [birthDateMs, setBirthDateMs] = useState<number | undefined>(() => {
     const dataset = appStore.getState().dataset;
-    const person = setup && dataset.people.find((p) => p.id === setup.personId);
-    return person?.birthDate;
+    const group = setup && dataset.groups.find((g) => g.id === setup.groupId);
+    return group?.birthDate;
   });
   const [placeText, setPlaceText] = useState("");
   const [untilText, setUntilText] = useState("");
@@ -70,21 +67,19 @@ export function IdentityBirthPlacesAssistant({ onFinished }: IdentityBirthPlaces
     if (trimmed === "") return;
     if (setup) {
       // Resubmitting after Back-ing to "name": relabel the already-committed
-      // person/group instead of calling completeIdentityStep again, which
-      // would create a second Person + Group + "Places lived" row and orphan
-      // the first one.
-      updatePerson(setup.personId, { label: trimmed });
+      // group instead of calling completeIdentityStep again, which would create
+      // a second group and "Places lived" row and orphan the first one.
       updateGroup(setup.groupId, { label: trimmed });
     } else {
       const result = completeIdentityStep(trimmed);
-      setSetup({ personId: result.personId, groupId: result.groupId, placesRowId: result.placesRowId });
+      setSetup({ groupId: result.groupId, placesRowId: result.placesRowId });
     }
     flow.advance({ kind: "birthYear" });
   };
 
   const commitBirthDate = () => {
     if (birthDateMs === undefined) return;
-    if (setup) updatePerson(setup.personId, { birthDate: birthDateMs });
+    if (setup) updateGroup(setup.groupId, { birthDate: birthDateMs });
     flow.advance({ kind: "place" });
   };
 

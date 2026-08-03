@@ -74,11 +74,10 @@ describe("selection", () => {
   });
 });
 
-// Three groups, three rows: r1 and r2 in g1, r3 (belonging to person p1) in
-// g2, g3 empty. Array order is display order — that's what these actions move.
+// Three groups, three rows: r1 and r2 in g1, r3 in g2, g3 empty.
+// Array order is display order — that's what these actions move.
 function dragFixture(): TimelineDataset {
   const ds = emptyDataset();
-  ds.people = [{ id: "p1", label: "Alex" }];
   ds.groups = [
     { id: "g1", label: "Me", collapsed: false },
     { id: "g2", label: "Family", collapsed: false },
@@ -87,7 +86,7 @@ function dragFixture(): TimelineDataset {
   ds.rows = [
     { id: "r1", groupId: "g1", color: "#333", label: "Job" },
     { id: "r2", groupId: "g1", color: "#333", label: "Home" },
-    { id: "r3", groupId: "g2", personId: "p1", color: "#333", label: "School" },
+    { id: "r3", groupId: "g2", color: "#333", label: "School" },
   ];
   return ds;
 }
@@ -171,14 +170,14 @@ describe("rail drag-and-drop: moveRow", () => {
   test("moves a row into an empty group", () => {
     moveRow("r1", "g3", null);
     expect(rowById("r1")?.groupId).toBe("g3");
-    expect(rowById("r1")?.personId).toBeUndefined();
   });
 
-  test("adopts the personId of the drop position", () => {
-    moveRow("r1", "g2", "r3"); // before a person's row → joins that person's section
-    expect(rowById("r1")?.personId).toBe("p1");
-    moveRow("r2", "g2", null); // end of the group — last row belongs to p1
-    expect(rowById("r2")?.personId).toBe("p1");
+  test("moves a row into a sub-group, which is how it changes person", () => {
+    const ds = dragFixture();
+    ds.groups.push({ id: "g2a", parentGroupId: "g2", label: "Alex", collapsed: false });
+    replaceDataset(ds);
+    moveRow("r1", "g2a", null);
+    expect(rowById("r1")?.groupId).toBe("g2a");
   });
 
   test("dropping a row onto itself is a no-op", () => {
@@ -213,18 +212,15 @@ describe("rail drag-and-drop: moveRow", () => {
 });
 
 describe("onboarding: completeIdentityStep", () => {
-  test("creates a self person, group, and a Places lived row", () => {
+  test("creates the self group and a Places lived row", () => {
     replaceDataset(emptyDataset());
     const result = completeIdentityStep("Jannik");
     const state = appStore.getState();
 
-    expect(state.dataset.selfPersonId).toBe(result.personId);
-
-    const person = state.dataset.people.find((p) => p.id === result.personId);
-    expect(person?.label).toBe("Jannik");
+    expect(state.dataset.selfGroupId).toBe(result.groupId);
 
     const group = state.dataset.groups.find((g) => g.id === result.groupId);
-    expect(group?.personId).toBe(result.personId);
+    expect(group?.label).toBe("Jannik");
 
     const row = state.dataset.rows.find((r) => r.id === result.placesRowId);
     expect(row?.label).toBe("Places lived");

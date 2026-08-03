@@ -64,7 +64,6 @@ export function buildFamousDataset(
   const keptRowIds = new Set(remainingRowKeys(person, removedRowKeys));
   const raw: TimelineDataset = {
     schemaVersion: 1,
-    people: [],
     groups: person.biography.groups.map((group) => ({
       ...group,
       label: aligned ? `${group.label}${ALIGNED_LABEL_SUFFIX}` : group.label,

@@ -3,9 +3,9 @@
 // export/import must work on iOS Safari. Personal data never touches the
 // repo or filesystem except through a user-initiated export.
 
-import { SCHEMA_VERSION } from "../model/types";
 import type { TimelineDataset } from "../model/types";
 import type { FamousPerson } from "../publicData/famous/types";
+import { validateImport } from "./exportImport";
 
 const DB_NAME = "chronicle";
 const STORE_NAME = "datasets";
@@ -37,9 +37,15 @@ export async function loadDataset(): Promise<TimelineDataset | null> {
   try {
     return await new Promise((resolve, reject) => {
       const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(DATASET_KEY);
+      // The stored dataset goes through the same upgrade path as an imported
+      // file. It used to be dropped outright unless its schemaVersion matched
+      // exactly, which meant every schema bump silently discarded whatever the
+      // browser was holding — the one copy of the user's data.
       request.onsuccess = () => {
         const stored = request.result as TimelineDataset | undefined;
-        resolve(stored && stored.schemaVersion === SCHEMA_VERSION ? stored : null);
+        if (stored === undefined) return resolve(null);
+        const upgraded = validateImport(stored);
+        resolve(upgraded.ok ? upgraded.dataset : null);
       };
       request.onerror = () => reject(request.error);
     });

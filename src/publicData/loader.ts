@@ -30,17 +30,8 @@ export function loadPublicCatalog(): PublicCatalogItem[] {
     const fileName = path.split("/").pop()!;
     if (fileName === "schema.json") continue;
     const fileStem = fileName.replace(/\.json$/, "");
-    const dataset = namespaceDataset(withPublicDefaults(module.default), fileStem);
+    const dataset = namespaceDataset(module.default, fileStem);
     items.push({ key: fileStem, label: dataset.groups[0]?.label ?? fileStem, dataset });
   }
   return items.sort((a, b) => a.label.localeCompare(b.label));
-}
-
-// Public files omit `people`; fill the gap so the rest of the app sees a
-// complete TimelineDataset.
-function withPublicDefaults(raw: TimelineDataset): TimelineDataset {
-  return {
-    ...raw,
-    people: raw.people ?? [],
-  };
 }

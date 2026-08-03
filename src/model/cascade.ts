@@ -4,9 +4,11 @@
 import type { TimelineDataset } from "./types";
 
 export interface Cascade {
+  // Empty except when a group is being deleted, where it holds that group and
+  // every sub-group under it — a person nested in "Family" cannot outlive it.
+  groupIds: string[];
   rowIds: string[];
   entryIds: string[];
-  personIds: string[];
 }
 
 function descendantRowIds(dataset: TimelineDataset, rootRowIds: string[]): string[] {
@@ -39,34 +41,19 @@ function descendantEntryIds(dataset: TimelineDataset, rootEntryIds: string[]): s
 export function collectRowCascade(dataset: TimelineDataset, rowId: string): Cascade {
   const rowIds = descendantRowIds(dataset, [rowId]);
   const directEntryIds = dataset.entries.filter((e) => rowIds.includes(e.rowId)).map((e) => e.id);
-  return { rowIds, entryIds: descendantEntryIds(dataset, directEntryIds), personIds: [] };
+  return { groupIds: [], rowIds, entryIds: descendantEntryIds(dataset, directEntryIds) };
 }
 
 export function collectEntryCascade(dataset: TimelineDataset, entryId: string): Cascade {
-  return { rowIds: [], entryIds: descendantEntryIds(dataset, [entryId]), personIds: [] };
+  return { groupIds: [], rowIds: [], entryIds: descendantEntryIds(dataset, [entryId]) };
 }
 
 export function collectGroupCascade(dataset: TimelineDataset, groupId: string): Cascade {
-  const group = dataset.groups.find((g) => g.id === groupId);
-  const directRowIds = dataset.rows.filter((row) => row.groupId === groupId).map((row) => row.id);
+  const groupIds = [groupId, ...dataset.groups.filter((g) => g.parentGroupId === groupId).map((g) => g.id)];
+  const directRowIds = dataset.rows.filter((row) => groupIds.includes(row.groupId)).map((row) => row.id);
   const rowIds = descendantRowIds(dataset, directRowIds);
   const directEntryIds = dataset.entries.filter((e) => rowIds.includes(e.rowId)).map((e) => e.id);
-  const entryIds = descendantEntryIds(dataset, directEntryIds);
-
-  // Persons are deleted only if nothing OUTSIDE this cascade still references
-  // them — a person can appear in several plain groups (§2).
-  const candidatePersonIds = new Set<string>();
-  if (group?.personId) candidatePersonIds.add(group.personId);
-  for (const row of dataset.rows) {
-    if (rowIds.includes(row.id) && row.personId) candidatePersonIds.add(row.personId);
-  }
-  const personIds = [...candidatePersonIds].filter((personId) => {
-    const referencedByOtherGroup = dataset.groups.some((g) => g.id !== groupId && g.personId === personId);
-    const referencedByOtherRow = dataset.rows.some((r) => !rowIds.includes(r.id) && r.personId === personId);
-    return !referencedByOtherGroup && !referencedByOtherRow;
-  });
-
-  return { rowIds, entryIds, personIds };
+  return { groupIds, rowIds, entryIds: descendantEntryIds(dataset, directEntryIds) };
 }
 
 export function describeCascade(cascade: Cascade): string {
@@ -76,17 +63,18 @@ export function describeCascade(cascade: Cascade): string {
   // The first row id is the row being deleted itself, not a sub-row.
   const subRowCount = Math.max(0, cascade.rowIds.length - (cascade.rowIds.length > 0 ? 1 : 0));
   if (subRowCount > 0) parts.push(count(subRowCount, "sub-row", "sub-rows"));
-  if (cascade.personIds.length > 0) parts.push(count(cascade.personIds.length, "person", "persons"));
+  // The first group id is the group being deleted itself, not a sub-group.
+  const subGroupCount = Math.max(0, cascade.groupIds.length - 1);
+  if (subGroupCount > 0) parts.push(count(subGroupCount, "sub-group", "sub-groups"));
   if (parts.length === 1) return `This deletes ${parts[0]}.`;
   return `This deletes ${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}.`;
 }
 
-export function applyDelete(dataset: TimelineDataset, cascade: Cascade, groupId?: string): TimelineDataset {
+export function applyDelete(dataset: TimelineDataset, cascade: Cascade): TimelineDataset {
   return {
     ...dataset,
-    groups: dataset.groups.filter((g) => g.id !== groupId),
+    groups: dataset.groups.filter((g) => !cascade.groupIds.includes(g.id)),
     rows: dataset.rows.filter((r) => !cascade.rowIds.includes(r.id)),
     entries: dataset.entries.filter((e) => !cascade.entryIds.includes(e.id)),
-    people: dataset.people.filter((p) => !cascade.personIds.includes(p.id)),
   };
 }

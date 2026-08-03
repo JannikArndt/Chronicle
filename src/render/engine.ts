@@ -14,6 +14,7 @@ import { computeTicks, snapForScale } from "./timeAxis";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import { faviconUrl } from "../model/favicon";
 import type { Precision, TimelineDataset, TimelineEntry, TimelineRow } from "../model/types";
+import { birthDateForRow } from "../model/dataset";
 
 const FAVICON_SIZE_PX = 12;
 const FAVICON_GAP_PX = 4;
@@ -205,7 +206,6 @@ export class TimelineEngine {
     this.scale = { startMs: now - 30 * YEAR_MS, msPerPx: (35 * YEAR_MS) / Math.max(canvas.clientWidth, 600) };
     const emptySet: TimelineDataset = {
       schemaVersion: 1,
-      people: [],
       groups: [],
       rows: [],
       entries: [],
@@ -572,7 +572,7 @@ export class TimelineEngine {
         ctx.fillRect(0, item.y, this.width, item.height - 6);
         continue;
       }
-      if (item.kind === "person") continue;
+      if (item.kind === "subgroup") continue;
       if (item.row && !item.hidden) this.drawRow(item, nowMs, emphasis, relatedIds);
     }
 
@@ -580,11 +580,6 @@ export class TimelineEngine {
     if (this.input.draft) this.drawDraft(this.input.draft, visible, nowMs);
   }
 
-  private personOf(row: TimelineRow) {
-    const group = this.input.dataset.groups.find((g) => g.id === row.groupId);
-    const personId = row.personId ?? group?.personId;
-    return personId ? this.input.dataset.people.find((p) => p.id === personId) : undefined;
-  }
 
   private drawRow(
     item: LayoutItem,
@@ -601,10 +596,10 @@ export class TimelineEngine {
       ctx.fillRect(0, item.y - 2, this.width, item.height + 4);
     }
 
-    // Inactive band before the person's birth (§5).
-    const person = this.personOf(row);
-    if (person?.birthDate !== undefined) {
-      const birthX = msToX(this.scale, person.birthDate);
+    // Inactive band before the birth of whoever this timeline belongs to (§5).
+    const birthDate = birthDateForRow(this.input.dataset, row);
+    if (birthDate !== undefined) {
+      const birthX = msToX(this.scale, birthDate);
       if (birthX > 0) {
         ctx.fillStyle = this.getHatchPattern();
         ctx.fillRect(0, item.y + 4, Math.min(birthX, this.width), item.height - 8);

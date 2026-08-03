@@ -127,16 +127,19 @@ export function RowPane({
         {movingToGroup && (
           <SheetMenuPicker
             title="Move to group"
+            // A sub-group is named under its parent ("Family › Finn"), because
+            // on its own "Finn" doesn't say where in the list you'd find it.
             options={ownGroups.map((group) => ({
               id: group.id,
-              label: group.label,
+              label:
+                group.parentGroupId === undefined
+                  ? group.label
+                  : `${ownGroups.find((g) => g.id === group.parentGroupId)?.label ?? "—"} › ${group.label}`,
               current: group.id === row.groupId,
             }))}
-            // Not `updateRow({ groupId })`: a row also carries the person it
-            // belongs to, and rewriting only the group leaves that person
-            // pointing into a group they are not in. `moveRow` with no
-            // before-row appends to the end of the target group and adopts the
-            // person of the row it lands behind, exactly as the desktop drag does.
+            // `moveRow`, not `updateRow({ groupId })`: moving is also a
+            // reposition, and the row has to land at the end of the target
+            // group's rows rather than keep its old index in the array.
             onPick={(groupId) => moveRow(row.id, groupId, null)}
             onDismiss={onCloseGroupPicker}
           />

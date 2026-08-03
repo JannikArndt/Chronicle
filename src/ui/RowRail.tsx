@@ -9,8 +9,8 @@ import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
 import {
   addGroup,
-  addPersonToGroup,
   addRow,
+  addSubGroup,
   addSubRow,
   deleteGroupWithCascade,
   deleteRowWithCascade,
@@ -24,11 +24,11 @@ import {
   toggleGroupCollapsed,
   toggleRowCollapsed,
   toggleRowHidden,
-  updatePerson,
+  updateGroup,
   updateRow,
 } from "../state/actions";
 import { isPublicId, useAppState, userBirthMs } from "../state/store";
-import type { Person } from "../model/types";
+import type { Group } from "../model/types";
 import { importDatasetWithConfirmation } from "./importFlow";
 import { WorldEventsPicker } from "./WorldEventsPicker";
 import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
@@ -39,19 +39,18 @@ import type { FamousPerson } from "../publicData/famous/types";
 const EMOJI_QUICK_PICKS = ["💼", "🏠", "❤️", "🎓", "✈️", "🎨", "⚽", "🐕"];
 
 type PopoverState =
-  | { kind: "add-menu"; groupId: string; personId?: string; top: number }
-  | { kind: "person-edit"; personId: string; groupId?: string; top: number }
+  | { kind: "add-menu"; groupId: string; top: number }
+  | { kind: "group-edit"; groupId: string; top: number }
   | { kind: "row-edit"; rowId: string; top: number }
   | { kind: "add-sub-row"; rowId: string; top: number }
   | { kind: "add-group"; top: number }
-  | { kind: "add-person"; top: number }
   | { kind: "rail-add-menu"; top: number }
   | null;
 
 // Popovers anchored to the rail footer's "+" button open upward from the
 // bottom of the rail rather than downward from a click point.
 function isFooterPopover(kind: NonNullable<PopoverState>["kind"]): boolean {
-  return kind === "add-group" || kind === "add-person" || kind === "rail-add-menu";
+  return kind === "add-group" || kind === "rail-add-menu";
 }
 
 // ---------- drag-and-drop (reorder groups, move rows) ----------
@@ -178,7 +177,7 @@ function applyDrop(descriptor: DragDescriptor, drop: DropTarget): void {
 // rects because the engine translates the rail via direct style mutation
 // every frame — layout.y alone would miss that offset.
 interface RailElementInfo {
-  kind: "group" | "person" | "row";
+  kind: "group" | "subgroup" | "row";
   id: string;
   isSubRow: boolean;
   rect: DOMRect;
@@ -246,6 +245,8 @@ function computeGroupDropSlots(elements: RailElementInfo[], draggedGroupId: stri
 // empty or collapsed group is the header itself, so dropping onto a group
 // header means "end of that group" (the plan's rule). Sub-rows are never
 // anchors (they follow their parent) but do extend the group's bottom.
+// A sub-group header opens a group of its own: dropping a row under "Finn"
+// files it in Finn, which is now the whole of "whose timeline is this".
 function computeRowDropSlots(elements: RailElementInfo[], draggedRowId: string): DropSlot[] {
   const slots: DropSlot[] = [];
   let currentGroupId: string | null = null; // null while inside a public group
@@ -259,7 +260,7 @@ function computeRowDropSlots(elements: RailElementInfo[], draggedRowId: string):
     }
   };
   for (const element of elements) {
-    if (element.kind === "group") {
+    if (element.kind === "group" || element.kind === "subgroup") {
       closeCurrentGroup();
       currentGroupId = isPublicId(element.id) ? null : element.id;
       currentGroupBottom = element.rect.bottom;
@@ -327,7 +328,6 @@ interface RowRailProps {
 
 export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }: RowRailProps) {
   const dataset = useAppState((s) => s.dataset);
-  const publicDatasets = useAppState((s) => s.publicDatasets);
   const hiddenRowIds = useAppState((s) => s.hiddenRowIds);
   const selectedRowId = useAppState((s) => s.selectedRowId);
   const [popover, setPopover] = useState<PopoverState>(null);
@@ -340,9 +340,6 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [hoveredTopRowId, setHoveredTopRowId] = useState<string | null>(null);
   const dragController = useRailDragController(railContentRef);
-
-  const allPeople = [...dataset.people, ...publicDatasets.flatMap((d) => d.people)];
-  const personById = new Map(allPeople.map((p) => [p.id, p]));
 
   const closePopover = () => setPopover(null);
 
@@ -370,7 +367,6 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
             <RailItem
               key={`${item.kind}:${item.id}`}
               item={item}
-              personById={personById}
               hiddenRowIds={hiddenRowIds}
               parentRowIds={parentRowIds}
               selectedRowId={selectedRowId}
@@ -396,7 +392,7 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
         </div>
       </div>
       <div className="rail-footer">
-        {dataset.selfPersonId === undefined && (
+        {dataset.selfGroupId === undefined && (
           <button type="button" className="small-button" onClick={onStartOnboarding}>
             ✨ Set up your timeline
           </button>
@@ -404,7 +400,7 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
         <button
           type="button"
           className="rail-add-button"
-          title="Add group, person, or import…"
+          title="Add group or import…"
           onClick={() => setPopover({ kind: "rail-add-menu", top: 0 })}
         >
           ＋
@@ -417,9 +413,9 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
   );
 }
 
-function computedAge(person: Person): string | null {
-  if (person.birthDate === undefined) return null;
-  const years = (Date.now() - person.birthDate) / (365.25 * 86_400_000);
+function computedAge(group: Group): string | null {
+  if (group.birthDate === undefined) return null;
+  const years = (Date.now() - group.birthDate) / (365.25 * 86_400_000);
   return years >= 0 ? `${Math.floor(years)}` : null;
 }
 
@@ -431,7 +427,6 @@ function lifeSpanRange(birthDate: number): { startMs: number; endMs: number } {
 
 interface RailItemProps {
   item: LayoutItem;
-  personById: Map<string, Person>;
   hiddenRowIds: string[];
   parentRowIds: Set<string>;
   selectedRowId?: string;
@@ -447,7 +442,6 @@ interface RailItemProps {
 
 function RailItem({
   item,
-  personById,
   hiddenRowIds,
   parentRowIds,
   selectedRowId,
@@ -472,17 +466,20 @@ function RailItem({
   const key = `${item.kind}:${item.id}`;
   const hoverReveal = (visible: boolean) => `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`;
 
-  if (item.kind === "group" && item.group) {
+  // One block for a group and for a sub-group: since Person was folded into
+  // Group they differ only in header size, in being draggable, and in whether
+  // they can hold children of their own.
+  if ((item.kind === "group" || item.kind === "subgroup") && item.group) {
     const group = item.group;
-    const person = group.personId ? personById.get(group.personId) : undefined;
-    const age = person ? computedAge(person) : null;
+    const isSubGroup = item.kind === "subgroup";
+    const age = computedAge(group);
     const visible = hoveredKey === key;
-    const famous = parseFamousGroupId(group.id);
+    const famous = isSubGroup ? null : parseFamousGroupId(group.id);
     return (
       <div
-        className="rail-group"
+        className={isSubGroup ? "rail-subgroup" : "rail-group"}
         style={style}
-        data-rail-kind="group"
+        data-rail-kind={item.kind}
         data-rail-id={group.id}
         onMouseEnter={() => onHoverEnter(key, null)}
         onMouseLeave={onHoverLeave}
@@ -490,7 +487,7 @@ function RailItem({
         <button type="button" className="collapse-button" onClick={() => toggleGroupCollapsed(group.id)}>
           {group.collapsed ? "▸" : "▾"}
         </button>
-        <span className="rail-group-label" title={group.label}>
+        <span className={isSubGroup ? "rail-subgroup-label" : "rail-group-label"} title={group.label}>
           {group.label}
           {age !== null && <span className="age-badge">{age}</span>}
         </span>
@@ -505,7 +502,7 @@ function RailItem({
               🎂
             </button>
           )}
-          {readOnly && (
+          {readOnly && !isSubGroup && (
             <button
               type="button"
               className={`${hoverReveal(visible)} remove-overlay`}
@@ -515,13 +512,13 @@ function RailItem({
               ✕
             </button>
           )}
-          {person && person.birthDate !== undefined && (
+          {group.birthDate !== undefined && (
             <button
               type="button"
               className={hoverReveal(visible)}
               title="Zoom to life span"
               onClick={() => {
-                const { startMs, endMs } = lifeSpanRange(person.birthDate!);
+                const { startMs, endMs } = lifeSpanRange(group.birthDate!);
                 engineRef.current?.zoomToRange(startMs, endMs);
               }}
             >
@@ -530,77 +527,18 @@ function RailItem({
           )}
           {!readOnly && (
             <>
-              <RailDragHandle
-                className={hoverReveal(visible)}
-                dragController={dragController}
-                descriptor={{ kind: "group", groupId: group.id }}
-              />
-              {person && (
-                <button
-                  type="button"
+              {!isSubGroup && (
+                <RailDragHandle
                   className={hoverReveal(visible)}
-                  title="Edit person"
-                  onClick={(e) =>
-                    openPopover({ kind: "person-edit", personId: person.id, groupId: group.id, top: topOf(e) })
-                  }
-                >
-                  ⚙
-                </button>
+                  dragController={dragController}
+                  descriptor={{ kind: "group", groupId: group.id }}
+                />
               )}
               <button
                 type="button"
                 className={hoverReveal(visible)}
-                title="Add…"
-                onClick={(e) => openPopover({ kind: "add-menu", groupId: group.id, top: topOf(e) })}
-              >
-                ＋
-              </button>
-            </>
-          )}
-        </span>
-      </div>
-    );
-  }
-
-  if (item.kind === "person" && item.person) {
-    const person = item.person;
-    const age = computedAge(person);
-    const readOnlyPerson = isPublicId(person.id);
-    const visible = hoveredKey === key;
-    return (
-      <div
-        className="rail-person"
-        style={style}
-        data-rail-kind="person"
-        data-rail-id={person.id}
-        onMouseEnter={() => onHoverEnter(key, null)}
-        onMouseLeave={onHoverLeave}
-      >
-        <span className="rail-person-label" title={person.label}>
-          {person.label}
-          {age !== null && <span className="age-badge">{age}</span>}
-        </span>
-        <span className="rail-actions">
-          {person.birthDate !== undefined && (
-            <button
-              type="button"
-              className={hoverReveal(visible)}
-              title="Zoom to life span"
-              onClick={() => {
-                const { startMs, endMs } = lifeSpanRange(person.birthDate!);
-                engineRef.current?.zoomToRange(startMs, endMs);
-              }}
-            >
-              ⇔
-            </button>
-          )}
-          {!readOnlyPerson && (
-            <>
-              <button
-                type="button"
-                className={hoverReveal(visible)}
-                title="Edit person"
-                onClick={(e) => openPopover({ kind: "person-edit", personId: person.id, top: topOf(e) })}
+                title="Edit group"
+                onClick={(e) => openPopover({ kind: "group-edit", groupId: group.id, top: topOf(e) })}
               >
                 ⚙
               </button>
@@ -608,9 +546,7 @@ function RailItem({
                 type="button"
                 className={hoverReveal(visible)}
                 title="Add…"
-                onClick={(e) =>
-                  openPopover({ kind: "add-menu", groupId: item.group!.id, personId: person.id, top: topOf(e) })
-                }
+                onClick={(e) => openPopover({ kind: "add-menu", groupId: group.id, top: topOf(e) })}
               >
                 ＋
               </button>
@@ -756,13 +692,8 @@ function Popover({
           <RailAddMenu open={open} close={close} onStartOnboarding={onStartOnboarding} />
         )}
         {popover.kind === "add-group" && <AddGroupForm close={close} />}
-        {popover.kind === "add-person" && <AddPersonForm close={close} />}
-        {popover.kind === "add-menu" && (
-          <AddMenu groupId={popover.groupId} personId={popover.personId} close={close} />
-        )}
-        {popover.kind === "person-edit" && (
-          <PersonEditor personId={popover.personId} groupId={popover.groupId} close={close} />
-        )}
+        {popover.kind === "add-menu" && <AddMenu groupId={popover.groupId} close={close} />}
+        {popover.kind === "group-edit" && <GroupEditor groupId={popover.groupId} close={close} />}
         {popover.kind === "row-edit" && <RowEditor rowId={popover.rowId} close={close} />}
         {popover.kind === "add-sub-row" && <SubRowForm rowId={popover.rowId} close={close} />}
       </div>
@@ -793,9 +724,6 @@ function RailAddMenu({
     <div className="popover-form">
       <button type="button" className="menu-item" onClick={() => open({ kind: "add-group", top: 0 })}>
         ＋ Group
-      </button>
-      <button type="button" className="menu-item" onClick={() => open({ kind: "add-person", top: 0 })}>
-        ＋ Person
       </button>
       <button type="button" className="menu-item" onClick={handleImport}>
         ＋ Import
@@ -1060,40 +988,13 @@ function WikidataDebugPanel({ debug, onClose }: { debug: WikidataDebug; onClose:
   );
 }
 
-function AddPersonForm({ close }: { close: () => void }) {
-  const [label, setLabel] = useState("");
-  const submit = () => {
-    addGroup(label.trim(), true);
-    close();
-  };
-  return (
-    <div className="popover-form">
-      <div className="popover-title">New person</div>
-      <input
-        type="text"
-        autoFocus
-        placeholder="Name"
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
-      />
-      <button
-        type="button"
-        className="small-button"
-        disabled={label.trim() === ""}
-        onClick={submit}
-      >
-        Add
-      </button>
-    </div>
-  );
-}
-
+// There is no separate "new person" form any more: a person is a group with a
+// birth date, so the date field is the whole difference and it is offered here.
 function AddGroupForm({ close }: { close: () => void }) {
   const [label, setLabel] = useState("");
-  const [asPerson, setAsPerson] = useState(false);
+  const [birthDate, setBirthDate] = useState("");
   const submit = () => {
-    addGroup(label.trim(), asPerson);
+    addGroup(label.trim(), birthDate === "" ? undefined : Date.parse(`${birthDate}T00:00:00Z`));
     close();
   };
   return (
@@ -1107,10 +1008,8 @@ function AddGroupForm({ close }: { close: () => void }) {
         onChange={(e) => setLabel(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
       />
-      <label className="checkbox-line">
-        <input type="checkbox" checked={asPerson} onChange={(e) => setAsPerson(e.target.checked)} />
-        This group is a person
-      </label>
+      <label className="field-label">Birth date — if this group is a person</label>
+      <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
       <button
         type="button"
         className="small-button"
@@ -1123,26 +1022,26 @@ function AddGroupForm({ close }: { close: () => void }) {
   );
 }
 
-function AddMenu({ groupId, personId, close }: { groupId: string; personId?: string; close: () => void }) {
+function AddMenu({ groupId, close }: { groupId: string; close: () => void }) {
   const dataset = useAppState((s) => s.dataset);
   const group = dataset.groups.find((g) => g.id === groupId);
-  const [mode, setMode] = useState<"menu" | "person" | "row">("menu");
+  const [mode, setMode] = useState<"menu" | "subgroup" | "row">("menu");
   const [label, setLabel] = useState("");
-  // A person can only be added inside a personId-less group (§2 asymmetry).
-  const canAddPerson = group !== undefined && group.personId === undefined && personId === undefined;
+  // Only one level of nesting is drawn, so a sub-group can't take children.
+  const canAddSubGroup = group !== undefined && group.parentGroupId === undefined;
 
   const submit = () => {
-    if (mode === "person") addPersonToGroup(groupId, label.trim());
-    else addRow(groupId, label.trim(), personId);
+    if (mode === "subgroup") addSubGroup(groupId, label.trim());
+    else addRow(groupId, label.trim());
     close();
   };
 
   if (mode === "menu") {
     return (
       <div className="popover-form">
-        {canAddPerson && (
-          <button type="button" className="menu-item" onClick={() => setMode("person")}>
-            🧑 Person
+        {canAddSubGroup && (
+          <button type="button" className="menu-item" onClick={() => setMode("subgroup")}>
+            🧑 Person or sub-group
           </button>
         )}
         <button type="button" className="menu-item" onClick={() => setMode("row")}>
@@ -1167,11 +1066,11 @@ function AddMenu({ groupId, personId, close }: { groupId: string; personId?: str
 
   return (
     <div className="popover-form">
-      <div className="popover-title">{mode === "person" ? "New person" : "New timeline row"}</div>
+      <div className="popover-title">{mode === "subgroup" ? "New sub-group" : "New timeline row"}</div>
       <input
         type="text"
         autoFocus
-        placeholder={mode === "person" ? "Name" : "Label (e.g. Job, Residence)"}
+        placeholder={mode === "subgroup" ? "Name" : "Label (e.g. Job, Residence)"}
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
@@ -1188,54 +1087,44 @@ function AddMenu({ groupId, personId, close }: { groupId: string; personId?: str
   );
 }
 
-function PersonEditor({
-  personId,
-  groupId,
-  close,
-}: {
-  personId: string;
-  groupId?: string;
-  close: () => void;
-}) {
+function GroupEditor({ groupId, close }: { groupId: string; close: () => void }) {
   const dataset = useAppState((s) => s.dataset);
-  const person = dataset.people.find((p) => p.id === personId);
-  if (!person) return null;
+  const group = dataset.groups.find((g) => g.id === groupId);
+  if (!group) return null;
   const birthValue =
-    person.birthDate !== undefined ? new Date(person.birthDate).toISOString().slice(0, 10) : "";
+    group.birthDate !== undefined ? new Date(group.birthDate).toISOString().slice(0, 10) : "";
   return (
     <div className="popover-form">
-      <div className="popover-title">Person</div>
+      <div className="popover-title">Group</div>
       <input
         type="text"
-        value={person.label}
-        onChange={(e) => updatePerson(personId, { label: e.target.value })}
+        value={group.label}
+        onChange={(e) => updateGroup(groupId, { label: e.target.value })}
       />
-      <label className="field-label">Birth date</label>
+      <label className="field-label">Birth date — if this group is a person</label>
       <input
         type="date"
         value={birthValue}
         onChange={(e) => {
           const value = e.target.value;
-          updatePerson(personId, {
+          updateGroup(groupId, {
             birthDate: value === "" ? undefined : Date.parse(`${value}T00:00:00Z`),
           });
         }}
       />
-      {groupId !== undefined && (
-        <button
-          type="button"
-          className="danger-button"
-          onClick={() => {
-            const cascade = collectGroupCascade(dataset, groupId);
-            if (window.confirm(`Delete “${person.label}”? ${describeCascade(cascade)}`)) {
-              deleteGroupWithCascade(groupId);
-              close();
-            }
-          }}
-        >
-          🗑 Delete
-        </button>
-      )}
+      <button
+        type="button"
+        className="danger-button"
+        onClick={() => {
+          const cascade = collectGroupCascade(dataset, groupId);
+          if (window.confirm(`Delete “${group.label}”? ${describeCascade(cascade)}`)) {
+            deleteGroupWithCascade(groupId);
+            close();
+          }
+        }}
+      >
+        🗑 Delete
+      </button>
       <button type="button" className="small-button" onClick={close}>
         Done
       </button>

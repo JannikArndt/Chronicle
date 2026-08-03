@@ -11,14 +11,16 @@ export function serializeDataset(dataset: TimelineDataset): string {
 
 export type ImportResult = { ok: true; dataset: TimelineDataset } | { ok: false; error: string };
 
-const ARRAY_FIELDS = ["people", "groups", "rows", "entries"] as const;
+// `people` is not here: v6 removed it, so an export written today has no such
+// array and requiring one would reject the app's own output.
+const ARRAY_FIELDS = ["groups", "rows", "entries"] as const;
 
 // Oldest export shape this importer still reads. v1/v2/v3/v4 files are
 // structurally valid as-is: v2 only added the optional selfPersonId, v3
 // dropped the (now-ignored) `entities`/`linkedEntityIds` fields, and v4
-// dropped `visibility`/`defaultVisibility`. v5 removed the Category concept
-// and moved each row's color and icon onto the row itself — the only migration
-// with an actual data step (folding category.color/icon onto the row, below).
+// dropped `visibility`/`defaultVisibility`. Two versions carry a real data
+// step: v5 folded each category's color and icon onto the row, and v6 folded
+// the whole Person entity into Group (both below).
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
 
 export function validateImport(raw: unknown): ImportResult {
@@ -48,11 +50,11 @@ export function validateImport(raw: unknown): ImportResult {
   // v1→v4 need no data migration: their diffs are either an optional new field
   // (selfPersonId) or removed fields the app no longer reads
   // (`entities`/`linkedEntityIds`, `visibility`/`defaultVisibility`), so
-  // leftover copies are simply ignored. v5 is the exception — it folds each
-  // row's category color onto the row so the removed `categories` array doesn't
-  // take the row's color with it.
+  // leftover copies are simply ignored. v5 and v6 are the exceptions: each
+  // removed an entity that carried data the rest of the model still needs.
   if (schemaVersion < SCHEMA_VERSION) {
     if (Array.isArray(candidate.categories)) foldCategoryColorsIntoRows(candidate);
+    if (Array.isArray(candidate.people)) foldPeopleIntoGroups(candidate);
     candidate.schemaVersion = SCHEMA_VERSION;
   }
   return { ok: true, dataset: candidate as unknown as TimelineDataset };
@@ -73,6 +75,75 @@ function foldCategoryColorsIntoRows(candidate: Record<string, unknown>): void {
     delete row.categoryId;
   }
   delete candidate.categories;
+}
+
+// v6 migration: Person is gone — a person was only ever a group with a birth
+// date. A group that WAS a person keeps its id and gains the date; a person
+// nested inside a container group becomes a sub-group of it, and the rows that
+// named that person are re-filed into it.
+//
+// A person nobody references is dropped: it had no timelines, so nothing about
+// the picture changes.
+function foldPeopleIntoGroups(candidate: Record<string, unknown>): void {
+  const people = candidate.people as Array<Record<string, unknown>>;
+  const personById = new Map(people.map((person) => [person.id as string, person]));
+  const groups = candidate.groups as Array<Record<string, unknown>>;
+  const rows = candidate.rows as Array<Record<string, unknown>>;
+
+  // Which group each person turned into, so selfPersonId can be translated.
+  const groupIdForPerson = new Map<string, string>();
+
+  for (const group of groups) {
+    const person = personById.get(group.personId as string);
+    if (person) {
+      if (person.birthDate !== undefined) group.birthDate = person.birthDate;
+      groupIdForPerson.set(person.id as string, group.id as string);
+    }
+    delete group.personId;
+  }
+
+  // Sub-groups are inserted directly after their parent so the exported JSON
+  // still reads top-down in the order the app draws it.
+  const nested: Array<Record<string, unknown>> = [];
+  const subGroupIdByRowKey = new Map<string, string>();
+  for (const group of groups) {
+    nested.push(group);
+    const personIdsHere = [
+      ...new Set(
+        rows
+          .filter((row) => row.groupId === group.id && typeof row.personId === "string")
+          .map((row) => row.personId as string),
+      ),
+    ];
+    for (const personId of personIdsHere) {
+      const person = personById.get(personId);
+      if (!person) continue;
+      // The old model let one person appear in several container groups, which
+      // now means several sub-groups — only the first may reuse the person's id.
+      const subGroupId = groupIdForPerson.has(personId) ? `${personId}-in-${String(group.id)}` : personId;
+      if (!groupIdForPerson.has(personId)) groupIdForPerson.set(personId, subGroupId);
+      subGroupIdByRowKey.set(`${String(group.id)}::${personId}`, subGroupId);
+      nested.push({
+        id: subGroupId,
+        parentGroupId: group.id,
+        label: person.label,
+        ...(person.birthDate !== undefined ? { birthDate: person.birthDate } : {}),
+        collapsed: false,
+      });
+    }
+  }
+  candidate.groups = nested;
+
+  for (const row of rows) {
+    const subGroupId = subGroupIdByRowKey.get(`${String(row.groupId)}::${String(row.personId)}`);
+    if (subGroupId !== undefined) row.groupId = subGroupId;
+    delete row.personId;
+  }
+
+  const selfGroupId = groupIdForPerson.get(candidate.selfPersonId as string);
+  if (selfGroupId !== undefined) candidate.selfGroupId = selfGroupId;
+  delete candidate.selfPersonId;
+  delete candidate.people;
 }
 
 export function parseImportFile(text: string): ImportResult {

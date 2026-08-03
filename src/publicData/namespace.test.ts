@@ -43,7 +43,7 @@ describe("namespaceDataset", () => {
     const ds = namespaceDataset(fixture(), "x");
     expect(ds.rows[0].parentRowId).toBeUndefined();
     expect(ds.entries[0].parentEntryId).toBeUndefined();
-    expect(ds.groups[0].personId).toBeUndefined();
+    expect(ds.groups[0].parentGroupId).toBeUndefined();
   });
 
   test("does not mutate the input", () => {

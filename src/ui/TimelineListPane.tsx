@@ -30,10 +30,10 @@ export function TimelineListPane({
             </div>
           );
         }
-        if (item.kind === "person") {
+        if (item.kind === "subgroup") {
           return (
             <div key={item.id} className="sheet-subsection">
-              {item.person?.label}
+              {item.group?.label}
             </div>
           );
         }

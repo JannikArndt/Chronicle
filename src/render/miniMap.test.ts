@@ -31,7 +31,6 @@ function datasetWithRows(rowCount: number, entriesPerRow = 1): TimelineDataset {
   );
   return {
     schemaVersion: 5,
-    people: [],
     groups: [{ id: "group-1", label: "Life", collapsed: false }],
     rows,
     entries,

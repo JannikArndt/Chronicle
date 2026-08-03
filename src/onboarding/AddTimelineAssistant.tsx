@@ -55,7 +55,7 @@ export function AddTimelineAssistant({ onFinished, onShowTimeline }: AddTimeline
   const openTable = () => {
     const group = ownGroup();
     if (!group) return;
-    const created = addRow(group.id, label.trim(), group.personId, icon);
+    const created = addRow(group.id, label.trim(), icon);
     updateRow(created, { color });
     setRowId(created);
     flow.advance("entries");
@@ -172,8 +172,8 @@ export function AddTimelineAssistant({ onFinished, onShowTimeline }: AddTimeline
 // read-only, so they are never a destination.
 function ownGroup() {
   const { dataset } = appStore.getState();
-  const selfGroup = dataset.groups.find((group) => group.personId === dataset.selfPersonId);
-  return selfGroup ?? dataset.groups.find((candidate) => !isPublicId(candidate.id));
+  const own = dataset.groups.find((group) => group.id === dataset.selfGroupId);
+  return own ?? dataset.groups.find((candidate) => !isPublicId(candidate.id));
 }
 
 interface EntryRow {
