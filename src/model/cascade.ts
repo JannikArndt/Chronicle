@@ -60,9 +60,17 @@ export function describeCascade(cascade: Cascade): string {
   const parts: string[] = [];
   const count = (n: number, singular: string, plural: string) => `${n} ${n === 1 ? singular : plural}`;
   parts.push(count(cascade.entryIds.length, "entry", "entries"));
-  // The first row id is the row being deleted itself, not a sub-row.
-  const subRowCount = Math.max(0, cascade.rowIds.length - (cascade.rowIds.length > 0 ? 1 : 0));
-  if (subRowCount > 0) parts.push(count(subRowCount, "sub-row", "sub-rows"));
+  // Deleting a group takes whole timelines with it, and none of them is the
+  // thing named in the prompt — so all of them are counted, as timelines.
+  // Deleting a row is the other case: the first row id IS the named row, and
+  // the rest are its sub-rows.
+  const deletesAGroup = cascade.groupIds.length > 0;
+  if (deletesAGroup) {
+    if (cascade.rowIds.length > 0) parts.push(count(cascade.rowIds.length, "timeline", "timelines"));
+  } else {
+    const subRowCount = Math.max(0, cascade.rowIds.length - 1);
+    if (subRowCount > 0) parts.push(count(subRowCount, "sub-row", "sub-rows"));
+  }
   // The first group id is the group being deleted itself, not a sub-group.
   const subGroupCount = Math.max(0, cascade.groupIds.length - 1);
   if (subGroupCount > 0) parts.push(count(subGroupCount, "sub-group", "sub-groups"));
