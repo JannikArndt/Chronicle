@@ -65,9 +65,15 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   with a `ResizeObserver` and its height fed to the engine as `axisTop`, so the axis
   starts *below* the floating controls instead of behind them. `BottomSheet.tsx` is
   the shared primitive (hand-rolled Pointer Events, anchors + `sheetSnap.ts` for
-  velocity-aware snapping). There is exactly **one** sheet: `TimelineSheet.tsx`,
-  holding three panes — `TimelineListPane` (the rail's replacement) →
-  `RowPane` (one timeline) → `EntryPane` (the `DetailPanel`'s replacement).
+  velocity-aware snapping). There is exactly **one** navigational sheet:
+  `TimelineSheet.tsx`, holding three panes — `TimelineListPane` (the rail's
+  replacement) → `RowPane` (one timeline) → `EntryPane` (the `DetailPanel`'s
+  replacement). The add flows get the *same* primitive through
+  `AssistantSheet.tsx` rather than a modal overlay, so they drag, snap and flick
+  away identically and the canvas stays live behind them; its scrim is invisible
+  and only takes taps while the sheet is raised, where a tap parks it at peek.
+  Onboarding is the one thing that still takes the whole screen
+  (`.assistant-overlay`) — it is the only thing happening.
   `MiniMap.tsx` is a second canvas painting `src/render/miniMap.ts` (pure, tested) —
   one lane per row, plus the current viewport window on *both* axes; tapping or
   dragging it calls `engine.centerOnMs()` and `engine.centerOnLayoutY()`, and it
@@ -171,13 +177,19 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
   retargets the native click and every button inside the sheet goes dead;
   capturing never means the page pulls to refresh instead of the sheet moving.
   Below the top anchor the list gets `.sheet-list-locked` so a drag can't be eaten
-  by an inner scroll.
-- **Every input on a mobile surface is ≥16px** — iOS Safari zooms the page the
-  moment a smaller field takes focus, and an autofocused one means the app *opens*
-  zoomed. The rule lives in the `@media (max-width: 640px)` block in `styles.css`
-  and must name any later, more specific selector that would otherwise win. Never
-  "fix" this with `maximum-scale=1`: that takes pinch-zoom away from everyone who
-  needs it.
+  by an inner scroll. Anything inside a sheet that drags on its own axis —
+  today only `DateRangeEditor`'s lane — marks itself `data-owns-gestures`, which
+  `beginGesture` treats exactly like a text field: the sheet never starts a drag
+  there. Without it a few degrees of vertical wobble promoted the sheet's pending
+  drag, captured the pointer, and killed the lane's drag mid-gesture.
+- **Every input on a mobile surface is ≥16px, and the rule that says so is the
+  last block in `styles.css`** — iOS Safari zooms the page the moment a smaller
+  field takes focus, and an autofocused one means the app *opens* zoomed. It used
+  to sit mid-file and name each selector that might outrank it; that failed,
+  because a media query adds no specificity and `.assistant-input-area input {
+  font-size: 15px }` further down won on source order alone. Being last is the
+  whole mechanism — never move it, and never "fix" a zoom with
+  `maximum-scale=1`: that takes pinch-zoom away from everyone who needs it.
 - **The date editor's lane range is recomputed on discrete changes only** — a typed
   date or the ongoing toggle — never mid-drag. Deriving it on render moves the lane
   under the finger on every frame. The regression it guards: switching to ongoing

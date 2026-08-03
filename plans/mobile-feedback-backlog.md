@@ -35,6 +35,27 @@ Agreed redesign:
   disappears, because the toggle no longer exists outside edit mode.
 → `DateRangeEditor.tsx`, `dateLaneRange.ts`, `parseDateInput.ts`
 
+**A2-a `[x]` "still ongoing" was set in the accent colour**, which reads as an
+active state rather than as a value. It is `--color-text-muted` now: dimmed
+because it is a default, not because it is switched on.
+→ `styles.css` (`.date-block-value-ongoing`)
+
+**A2-b `[x]` Dragging a handle died the moment the finger drifted vertically** —
+the sheet promoted its pending drag, captured the pointer, and the lane never saw
+another event. The lane marks itself `data-owns-gestures`; `BottomSheet` treats
+that like a text field and never starts a drag there.
+→ `BottomSheet.tsx` (`beginGesture`), `DateRangeEditor.tsx`
+
+**A2-c `[?]` The lane has no orientation.** You can drag roughly two years either
+way with nothing saying so, and nothing naming which handle is which. Partly
+addressed: the lane now prints its two edge dates beneath it and labels the `now`
+marker, so the scale is readable. What is still unsolved is *which end is which*
+while dragging — neither of us has a design for it yet. Candidates, none built:
+show the dragged value in a bubble above the handle; caption each handle
+"Started"/"Ended" under the lane; or move each date block directly above the
+handle it controls (which the file header already claims happens, and doesn't).
+→ `DateRangeEditor.tsx`
+
 **A3 `[x]` "Connected" is a bad section with a bad name.**
 It shows three read-only chips: the entry's **group**, its **row**, its
 **person** — i.e. *where this entry lives*, nothing more. There is no
@@ -68,6 +89,11 @@ colour and icon are pick-rows further down the pane.
 with this timeline and a start year derived from the entries above it: the
 highest existing end year, or today if the last entry is ongoing.
 Depends on E3 (assistant in a sheet) to avoid a full-screen jump from here.
+
+**B4-a `[x]` Moving a timeline left the pane's header naming the old group.**
+It named the row's *person* first and only fell back to the group, and moving a
+row changes the group, never the person. Group first now.
+→ `TimelineSheet.tsx` (`ownerLabel`)
 
 **B4 `[x]` "Group · moving soon" — decide or delete.**
 It is a placeholder I added: a row belongs to a group, moving it between groups
@@ -106,6 +132,14 @@ only and needs `y0/y1` from the canvas's `scrollY` + visible height against the
 layout's total height.
 → `src/render/miniMap.ts` (`viewportWindow`), `MiniMap.tsx`, `engine.ts`
 
+**C1-a `[x]` …and then the window couldn't be dragged vertically at all.**
+Following y on every `pointermove` made a sideways scrub jerk up and down (the
+strip is ~60px standing in for the whole stack), so the first fix refused
+vertical movement except on `pointerdown` — which read as "this axis is dead".
+Now the drag engages vertically once the finger passes 6px on that axis, and
+follows for the rest of the gesture.
+→ `MiniMap.tsx` (`VERTICAL_ENGAGE_PX`)
+
 ---
 
 ## D. Search
@@ -126,7 +160,13 @@ was just created** so you see what you made.
 → `AddEntryAssistant.tsx` (`commitAndFinish`, done step)
 
 **E2 `[x]` Present the add flow in a sheet, not full screen.**
-→ `styles.css` (`.assistant-overlay`), `MobileShell.tsx`
+First attempt only *looked* like a sheet: a modal overlay with a dimmed backdrop,
+bottom-aligned. It didn't drag, didn't snap, and swallowed every gesture, so the
+canvas froze exactly when you most wanted to look at it. It uses the real
+`BottomSheet` now, through `AssistantSheet.tsx` — same drag, same snap, same
+flick-to-dismiss — with an invisible scrim that takes taps only while the sheet
+is raised and parks it at peek when tapped.
+→ `AssistantSheet.tsx`, `MobileShell.tsx`, `styles.css` (`.sheet-assistant`)
 
 **E3 `[x]` Guided creation of whole *timelines*, not just entries.**
 The plural is the product direction. "Bands I played in", "Places I lived",
@@ -147,6 +187,12 @@ is the model to follow rather than reinvent.
 first car was probably at 18", lists of universities). Preferably as bundled
 `public-data/`, which keeps the no-backend promise — but out of scope until the
 flow itself exists.
+
+**E3-a `[x]` The table zoomed iOS Safari.** Not the table's fault: the ≥16px
+input floor was losing on source order to `.assistant-input-area input {
+font-size: 15px }`. The floor is the last block in `styles.css` now, which is
+what makes it hold. See the invariant in `CLAUDE.md`.
+→ `styles.css`
 
 ---
 
