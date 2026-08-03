@@ -62,8 +62,11 @@ what's true across the whole codebase.
 
 ## v1 scope cuts (deliberate — do not "fix" unasked)
 
-- No publish/subscribe sharing; `visibility` exists on entries only to avoid a
-  future migration. No Gist sync — it's a marked, honest gap (PAT flow unsolved
+- No publish/subscribe sharing; there is no `visibility` field on the model
+  today — it existed in schema v1–v3 and was removed in v4 (see
+  `src/storage/exportImport.ts`), so reintroducing it needs a real schema
+  bump and migration, not a dormant field waking up. No Gist sync — it's a
+  marked, honest gap (PAT flow unsolved
   for non-technical users). No keyboard-only/screen-reader path. Only one level
   of group nesting is *drawn* — the model no longer forbids more, but
   `computeLayout` draws a group, then its sub-groups, and stops.
