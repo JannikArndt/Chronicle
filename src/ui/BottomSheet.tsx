@@ -186,7 +186,12 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(funct
     const target = event.target as HTMLElement;
     // A text field (in-place title editing) has to behave like a text field,
     // including its own caret placement and selection drag.
-    if (target.closest("input, textarea")) return;
+    //
+    // `data-owns-gestures` is the same escape hatch for anything else that
+    // drags: the date lane's handles are dragged sideways, and a few degrees of
+    // vertical wobble used to promote the sheet's pending drag, which captured
+    // the pointer and cut the lane's drag dead mid-gesture.
+    if (target.closest("input, textarea, [data-owns-gestures]")) return;
     if (!pending) event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       pointerId: event.pointerId,

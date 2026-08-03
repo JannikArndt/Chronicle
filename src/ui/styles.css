@@ -1568,10 +1568,11 @@ textarea {
   color: var(--color-danger);
 }
 
-/* "still ongoing" as a value reads as a state, not a date — so it is set in the
-   accent colour rather than the plain text one. */
+/* "still ongoing" is a value like any other date, not an active state — the
+   accent colour claimed something was switched on. It is dimmed instead,
+   because unlike the other value it is a default rather than a choice. */
 .date-block-value-ongoing {
-  color: var(--color-accent);
+  color: var(--color-text-muted);
 }
 
 /* The shortcut that fills the end field with "still ongoing". Only visible
@@ -1639,6 +1640,25 @@ textarea {
   bottom: 4px;
   width: 1px;
   background: var(--color-text-faint);
+}
+
+.date-lane-now-label {
+  position: absolute;
+  top: -1px;
+  left: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-faint);
+}
+
+/* The lane's two ends, so its scale is readable rather than guessed at. */
+.date-lane-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-text-faint);
 }
 
 /* 32px of hit target around a 14px dot: the dot is what you see, the padding is
@@ -1763,16 +1783,8 @@ textarea {
    dynamically for in-place editing. Never fix this with maximum-scale=1: that
    takes pinch-zoom away from everyone who needs it. */
 @media (max-width: 640px) {
-  input,
-  textarea,
-  select,
-  /* Listed explicitly because these later, more specific rules would otherwise
-     win and set 15px — and the onboarding assistant autofocuses one on mount,
-     so the app would open already zoomed in. */
-  .assistant-input-area input,
-  .birth-date-segment input {
-    font-size: max(16px, 1em);
-  }
+  /* The ≥16px rule that used to live here now sits at the very end of this
+     file — see the comment there for why its position is load-bearing. */
 
   /* DetailPanel is desktop-only now — the entry inspector sheet replaced it
      on mobile — so nothing here re-styles it. */
@@ -2106,22 +2118,51 @@ textarea {
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
 
-  /* Adding one entry is not a first-run rite: it gets a sheet, with the canvas
-     still visible above it, so you can see what you are adding to. Onboarding
-     keeps the full screen — it is the only thing happening. */
-  .assistant-overlay-sheet {
-    align-items: end;
-    background: var(--color-overlay-backdrop);
-  }
+  /* Adding one entry is not a first-run rite: it lives in a real sheet
+     (AssistantSheet), not in this overlay. Onboarding keeps the full screen —
+     it is the only thing happening. */
+}
 
-  .assistant-overlay-sheet .assistant-shell {
-    height: auto;
-    max-height: 86dvh;
-    border-radius: 18px 18px 0 0;
-    border-top: 1px solid var(--color-border);
-    background: var(--color-surface);
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.24);
-  }
+/* ---------- the add flows, as a sheet ---------- */
+
+/* Above the timeline sheet (65) it is opened from, and above the scrim. */
+.sheet-assistant {
+  z-index: 70;
+}
+
+/* "Outside the sheet": tapping it parks the flow at its peek anchor. It only
+   accepts taps while the sheet is raised — AssistantSheet toggles that — so a
+   parked flow leaves the canvas as pannable as it was before. It is deliberately
+   invisible: dimming the canvas is what made the old overlay feel modal. */
+.assistant-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 66;
+  pointer-events: none;
+  background: none;
+}
+
+/* Inside a sheet the assistant is content, not a card: the sheet already
+   provides the surface, the corners and the shadow. */
+.sheet-assistant .assistant-shell {
+  width: 100%;
+  max-width: none;
+  height: auto;
+  padding: 4px 2px 8px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+/* One scroller per screen. These tables cap their own height when the assistant
+   is a card on its own; inside the sheet the sheet's list is the scroller, and a
+   second one nested in it steals the drag that should move the sheet. */
+.sheet-assistant .entry-table,
+.sheet-assistant .places-table {
+  max-height: none;
+  overflow: visible;
 }
 
 /* ---------- add-entry assistant (mobile) ---------- */
@@ -2283,4 +2324,23 @@ textarea {
 .preview-axis {
   display: flex;
   justify-content: space-between;
+}
+
+/* ---------- the 16px floor (must stay last in this file) ---------- */
+
+/* iOS Safari zooms the whole page the moment a field smaller than 16px takes
+   focus, and an autofocused one means the app *opens* zoomed. Media queries add
+   no specificity, so an equally specific rule further down the file beats this
+   one on source order alone — which is exactly what `.assistant-input-area
+   input { font-size: 15px }` was quietly doing to the new-timeline table. Being
+   last is what makes the floor hold; keep this block at the end of the file
+   rather than naming every selector that might one day outrank it.
+   Never "fix" this with maximum-scale=1: that takes pinch-zoom away from
+   everyone who needs it. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
 }

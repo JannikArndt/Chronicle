@@ -35,6 +35,17 @@ const ONGOING_TEXT = "still ongoing";
 // entry commits an end date to it.
 const END_ONGOING_DRAG_PX = 10;
 
+// What one end of the lane says. A year alone is enough for the wide ranges the
+// lane usually shows, and stays readable at the size these labels are set in;
+// short entries get a month too, or both ends would read the same year.
+function laneEdgeLabel(ms: number): string {
+  return new Date(ms).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
 interface DateRangeEditorProps {
   start: FuzzyDate;
   end: FuzzyDate | undefined;
@@ -145,6 +156,10 @@ export function DateRangeEditor({ start, end, disabled, onChange }: DateRangeEdi
       <div
         ref={laneRef}
         className="date-lane"
+        // The lane drags sideways inside a sheet that drags upwards. Without
+        // this the sheet promoted the first few degrees of vertical wobble into
+        // its own drag, captured the pointer, and the handle stopped dead.
+        data-owns-gestures="true"
         onPointerDown={beginDrag}
         onPointerMove={(event) => {
           const handle = draggingRef.current;
@@ -164,13 +179,23 @@ export function DateRangeEditor({ start, end, disabled, onChange }: DateRangeEdi
             width: `${Math.max(endFraction - startFraction, 0) * 100}%`,
           }}
         />
-        <div className="date-lane-now" style={{ left: `${laneFraction(nowMs, range) * 100}%` }} />
+        <div className="date-lane-now" style={{ left: `${laneFraction(nowMs, range) * 100}%` }}>
+          <span className="date-lane-now-label">now</span>
+        </div>
         <div className="date-handle" style={{ left: `${startFraction * 100}%` }} aria-label="Start" />
         <div
           className={`date-handle ${end ? "" : "date-handle-ongoing"}`}
           style={{ left: `${endFraction * 100}%` }}
           aria-label="End"
         />
+      </div>
+
+      {/* The lane has no axis of its own, so without these two it is impossible
+          to tell how much time a centimetre of thumb is worth — the range is
+          derived from the entry and changes with it. */}
+      <div className="date-lane-scale">
+        <span>{laneEdgeLabel(range.startMs)}</span>
+        <span>{laneEdgeLabel(range.endMs)}</span>
       </div>
 
       <div className="hint">Drag a handle, or tap a date to type it.</div>

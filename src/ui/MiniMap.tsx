@@ -33,6 +33,10 @@ const MIN_WINDOW_WIDTH_PX = 8;
 const MIN_WINDOW_HEIGHT_PX = 10;
 const MIN_BAR_WIDTH_PX = 1.5;
 
+// How far the finger must travel up or down before the drag starts moving the
+// viewport window vertically as well as sideways.
+const VERTICAL_ENGAGE_PX = 6;
+
 // Round year gaps to choose between, coarse enough that labels never collide.
 const YEAR_MS = 365.25 * 86_400_000;
 const TICK_YEAR_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500];
@@ -179,11 +183,14 @@ export function MiniMap({ layout, engineRef, view }: MiniMapProps) {
     return () => observer.disconnect();
   }, [lanes, range, view, colors]);
 
-  // `alsoVertical` is true only where the finger lands, never while it moves.
-  // The strip is a map of both axes, but it is 60-odd pixels tall standing in
-  // for the whole stack of timelines, so one wobbly pixel of a sideways drag is
-  // worth tens of pixels of canvas — following y continuously reads as the
-  // timeline jerking up and down while you scrub through time.
+  // The window moves on both axes, but not from the first pixel of vertical
+  // movement. The strip is 60-odd pixels tall standing in for the whole stack of
+  // timelines, so one wobbly pixel is worth tens of pixels of canvas: following
+  // y unconditionally made a sideways scrub jerk up and down. Past the threshold
+  // the gesture is deliberate, and from there y follows for the rest of it.
+  const verticalEngagedRef = useRef(false);
+  const pressClientYRef = useRef(0);
+
   const flyTo = (event: ReactPointerEvent<HTMLCanvasElement>, alsoVertical: boolean) => {
     const bounds = event.currentTarget.getBoundingClientRect();
     const drawableWidth = bounds.width - SIDE_INSET_PX * 2;
@@ -206,10 +213,16 @@ export function MiniMap({ layout, engineRef, view }: MiniMapProps) {
       style={{ height }}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
+        pressClientYRef.current = event.clientY;
+        verticalEngagedRef.current = false;
         flyTo(event, true);
       }}
       onPointerMove={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) flyTo(event, false);
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        if (Math.abs(event.clientY - pressClientYRef.current) >= VERTICAL_ENGAGE_PX) {
+          verticalEngagedRef.current = true;
+        }
+        flyTo(event, verticalEngagedRef.current);
       }}
     />
   );
