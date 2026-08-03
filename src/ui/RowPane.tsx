@@ -7,8 +7,9 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { moveRow, updateRow } from "../state/actions";
-import { isPublicId, mergedDataset, useAppState } from "../state/store";
+import { moveRow, setRowShared, updateRow } from "../state/actions";
+import { describePublishImpact } from "../model/sharing";
+import { isForeignId, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { EditableLine } from "./EditableLine";
 import { nextEntryStartMs } from "./nextEntryStart";
 import { SheetMenuPicker } from "./SheetMenu";
@@ -39,11 +40,12 @@ export function RowPane({
 }) {
   const state = useAppState((s) => s);
   const [picker, setPicker] = useState<OpenPicker>("none");
+  const signedIn = useAppState((s) => s.sharing.session !== undefined);
   const merged = mergedDataset(state);
   const row = merged.rows.find((candidate) => candidate.id === rowId);
   if (!row) return null;
 
-  const readOnly = isPublicId(row.id);
+  const readOnly = isForeignId(row.id);
   const entries = merged.entries
     .filter((entry) => entry.rowId === row.id)
     .sort((a, b) => a.start.ms - b.start.ms);
@@ -145,6 +147,22 @@ export function RowPane({
           />
         )}
       </div>
+
+      {/* The publish switch, same rule as the desktop rail: private until
+          someone says otherwise, and legible without hovering (there is no
+          hovering here anyway). Hidden entirely when signed out. */}
+      {!readOnly && signedIn && (
+        <button
+          type="button"
+          className="sheet-row"
+          onClick={() => setRowShared(row.id, row.shared !== true)}
+        >
+          <span>{row.shared === true ? "🔗 Shared" : "🔒 Private"}</span>
+          <span className="hint">
+            {row.shared === true ? "Tap to make private" : describePublishImpact(state.dataset, row.id)}
+          </span>
+        </button>
+      )}
 
       <div className="sheet-section">Entries · {entries.length}</div>
       {entries.length === 0 && <div className="sheet-empty">Nothing on this timeline yet.</div>}

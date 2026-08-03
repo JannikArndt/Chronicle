@@ -23,12 +23,14 @@ import {
   setFamousAlignment,
   toggleGroupCollapsed,
   toggleRowCollapsed,
+  setRowShared,
   toggleRowHidden,
   updateGroup,
   updateRow,
 } from "../state/actions";
-import { isPublicId, useAppState, userBirthMs } from "../state/store";
-import type { Group } from "../model/types";
+import { isForeignId, useAppState, userBirthMs } from "../state/store";
+import type { Group, TimelineRow } from "../model/types";
+import { describePublishImpact } from "../model/sharing";
 import { importDatasetWithConfirmation } from "./importFlow";
 import { WorldEventsPicker } from "./WorldEventsPicker";
 import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
@@ -227,7 +229,7 @@ function computeGroupDropSlots(elements: RailElementInfo[], draggedGroupId: stri
   let lastPrivateBottom: number | null = null;
   for (const element of elements) {
     if (element.kind === "group") {
-      insidePrivateGroup = !isPublicId(element.id);
+      insidePrivateGroup = !isForeignId(element.id);
       if (insidePrivateGroup && element.id !== draggedGroupId) {
         slots.push({ drop: { kind: "group", beforeGroupId: element.id }, clientY: element.rect.top });
       }
@@ -262,7 +264,7 @@ function computeRowDropSlots(elements: RailElementInfo[], draggedRowId: string):
   for (const element of elements) {
     if (element.kind === "group" || element.kind === "subgroup") {
       closeCurrentGroup();
-      currentGroupId = isPublicId(element.id) ? null : element.id;
+      currentGroupId = isForeignId(element.id) ? null : element.id;
       currentGroupBottom = element.rect.bottom;
       continue;
     }
@@ -455,7 +457,7 @@ function RailItem({
   dragController,
 }: RailItemProps) {
   const style = { top: item.y, height: item.height };
-  const readOnly = isPublicId(item.id);
+  const readOnly = isForeignId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
   const collapsedRowIds = useAppState((s) => s.collapsedRowIds);
@@ -606,8 +608,9 @@ function RailItem({
           <span className="label-full">{row.label}</span>
           <span className="label-initial">{row.label.slice(0, 1)}</span>
         </span>
-        {!isPublicId(row.id) && (
+        {!isForeignId(row.id) && (
           <span className="rail-actions">
+            <ShareToggle row={row} visible={visible} />
             {/* Sub-rows are not draggable (plan scope cut) — no handle. */}
             {!item.isSubRow && (
               <RailDragHandle
@@ -1228,4 +1231,39 @@ function toHexColor(color: string): string {
   ctx.fillStyle = color;
   const normalized = ctx.fillStyle;
   return /^#[0-9a-f]{6}$/i.test(normalized) ? normalized : "#888888";
+}
+
+// Publishing is per-timeline (schema v7), and this is the switch. Unlike every
+// other rail action it does NOT hover-reveal once it is on: "who can see this"
+// has to be legible at a glance rather than discoverable by hovering, and a
+// share control that hides itself is how someone forgets what they published.
+//
+// Absent entirely when signed out, so a local-only Chronicle looks exactly as
+// it did before sharing existed.
+function ShareToggle({ row, visible }: { row: TimelineRow; visible: boolean }) {
+  const signedIn = useAppState((s) => s.sharing.session !== undefined);
+  const dataset = useAppState((s) => s.dataset);
+  if (!signedIn) return null;
+
+  const shared = row.shared === true;
+  const impact = describePublishImpact(dataset, row.id);
+  return (
+    <button
+      type="button"
+      className={
+        shared ? "icon-button share-toggle-on" : `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`
+      }
+      title={
+        shared
+          ? `Shared with the people you have invited. Click to make it private again.\n\nSharing is not recallable — anyone who could already see it may have kept a copy.`
+          : `Private. Click to share it with the people you have invited.\n\n${impact}`
+      }
+      onClick={(e) => {
+        e.stopPropagation();
+        setRowShared(row.id, !shared);
+      }}
+    >
+      {shared ? "🔗" : "🔒"}
+    </button>
+  );
 }

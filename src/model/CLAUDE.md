@@ -1,7 +1,8 @@
 # src/model — data logic
 
 Pure data logic, no DOM. `types.ts` (schema, `SCHEMA_VERSION`), `fuzzyDate.ts`
-(precision fuzz + fade ramps), `cascade.ts` (delete cascades).
+(precision fuzz + fade ramps), `cascade.ts` (delete cascades), `sharing.ts`
+(what may leave the device).
 
 Every row is concurrent — entries on the same row may freely overlap, with no
 insert-time conflict check (the exclusive-row concept was removed).
@@ -19,3 +20,8 @@ which is what stops a moved timeline keeping a stale owner. Full term list in
 - **UTC everywhere**: every stored `ms` is a UTC instant; parsing, formatting,
   and ticks all use `Date.UTC`/`getUTC*`. Never introduce local-time methods.
   This is enforced across `model`, `storage`, `render`, and `ui` — not just here.
+- **`sharing.ts` is the privacy gate.** `syncSubset` is the only path by which
+  data reaches a server, so it fails closed (private unless something says
+  otherwise) and strips every reference pointing outside the subset. It is the
+  most heavily tested function here; treat a change to it as a security change.
+  Publishing is per-row: entries have no flag of their own and follow their row.

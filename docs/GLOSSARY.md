@@ -89,6 +89,51 @@ silent wipe of the one copy of your data.
 
 ---
 
+## Sharing (who else can see it)
+
+**Shared** *(also: **published**)* — a timeline you have explicitly made visible
+to the people you've invited. New timelines are **private**; publishing is always
+a deliberate act. Stored as `shared` on the row — deliberately *not* the
+`visibility` field v1–v3 had and v4 removed, so an old export can never be
+mistaken for a publish instruction.
+→ `types.ts` (`TimelineRow.shared`), `src/model/sharing.ts`
+
+**Share by default** — a group-level override saying that timelines created
+*under here* start shared. Inherited by sub-groups. It changes what the **next**
+timeline starts as and never reaches back to publish the ones already there.
+→ `types.ts` (`Group.shareByDefault`)
+
+**Grant** — one person's read access to one group or one timeline. Lives on the
+server only, never in the dataset: an export is a file people pass around, and
+other people's identities have no business in it.
+
+**Invite** — a link carrying an unguessable token, which you send however you
+like. Chronicle sends no email. Redeeming it turns it into a grant, or into
+co-ownership if it was a "can edit" invite.
+→ `src/ui/InviteLanding.tsx`
+
+**Mirror** — someone else's shared timelines, as they arrive on your device. A
+read-only dataset merged into the view alongside public data, with every id
+prefixed `shared:<account>:`. **Never merged into your own dataset** — which is
+what keeps them out of your export and makes revoking a delete of one object.
+→ `src/sharing/mirror.ts`
+
+**Sync subset** — the set of records eligible to leave your device. The privacy
+gate: every push goes through it, and it fails closed.
+→ `src/model/sharing.ts` (`syncSubset`)
+
+**HLC** *(hybrid logical clock)* — the timestamp on a synced record. Wall-clock
+time plus a counter plus the writer's account id, so two phones with drifting
+clocks still agree on which edit came last.
+→ `src/sharing/hlc.ts`
+
+**Tombstone** — the record left behind by a delete, so that a delete arriving
+before a concurrent older edit isn't undone by it. Kept server-side; readers
+just stop seeing the thing.
+→ `src/sharing/lww.ts`
+
+---
+
 ## Time (how vague a date is allowed to be)
 
 **FuzzyDate** — a date that knows how sure it is: an instant in **ms** plus a

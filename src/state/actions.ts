@@ -5,11 +5,12 @@
 import { applyDelete, collectEntryCascade, collectGroupCascade, collectRowCascade } from "../model/cascade";
 import { emptyDataset, newId } from "../model/dataset";
 import { defaultSharedFor } from "../model/sharing";
-import { notifyDatasetChanged } from "../sharing/sync";
+import { initializeSharing, notifyDatasetChanged } from "../sharing/sync";
 import { loadDataset, loadOverlays, saveDataset, saveOverlays } from "../storage/db";
 import { loadPublicCatalog } from "../publicData/loader";
 import { buildFamousDataset, parseFamousGroupId, remainingRowKeys } from "../publicData/famous/alignToAge";
-import { appStore, userBirthMs } from "./store";
+import { isMirrorId } from "../sharing/mirror";
+import { appStore, isForeignId, userBirthMs } from "./store";
 import type { AppState } from "./store";
 import type { FamousPerson } from "../publicData/famous/types";
 import type {
@@ -63,6 +64,10 @@ export async function initializeApp(): Promise<void> {
     loaded: true,
   });
   rebuildPublicDatasets(appStore.getState());
+  // Sharing comes last and never blocks the first paint. With no backend
+  // configured — a fresh clone, or any build without the Supabase env vars —
+  // this sets `configured: false` and returns without touching the network.
+  void initializeSharing();
 }
 
 // ---------- optional public data (world events + famous people) ----------
@@ -544,20 +549,29 @@ export function deleteGroupWithCascade(groupId: string): void {
 
 export function toggleGroupCollapsed(groupId: string): void {
   const state = appStore.getState();
-  const isPublic = groupId.startsWith("pub:");
-  if (!isPublic) {
+  if (!isForeignId(groupId)) {
     updateGroup(groupId, {
       collapsed: !state.dataset.groups.find((g) => g.id === groupId)?.collapsed,
     });
     return;
   }
-  // Public data is read-only; collapse state for it lives in memory only.
-  appStore.setState({
-    publicDatasets: state.publicDatasets.map((dataset) => ({
-      ...dataset,
-      groups: dataset.groups.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)),
-    })),
+  const toggle = (dataset: TimelineDataset): TimelineDataset => ({
+    ...dataset,
+    groups: dataset.groups.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)),
   });
+  // Someone else's shared data is read-only for the same reason public data is,
+  // so its collapse state lives in memory only — and is lost on the next pull,
+  // the same known gap public data has.
+  if (isMirrorId(groupId)) {
+    appStore.setState({
+      sharing: {
+        ...state.sharing,
+        mirrors: state.sharing.mirrors.map((mirror) => ({ ...mirror, dataset: toggle(mirror.dataset) })),
+      },
+    });
+    return;
+  }
+  appStore.setState({ publicDatasets: state.publicDatasets.map(toggle) });
 }
 
 export function toggleRowHidden(rowId: string): void {
