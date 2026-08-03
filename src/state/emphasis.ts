@@ -7,7 +7,7 @@ import type { Filters } from "./store";
 export function hasActiveFilters(search: string, filters: Filters): boolean {
   return (
     search.trim() !== "" ||
-    filters.personIds.length > 0 ||
+    filters.groupIds.length > 0 ||
     filters.timeRange !== undefined
   );
 }
@@ -33,9 +33,14 @@ export function computeEmphasis(
       if (!inTitle && !inDescription && !inSubtitle && !inPlace) return false;
     }
     const row = rowById.get(entry.rowId);
-    if (filters.personIds.length > 0) {
-      const personId = row?.personId ?? (row ? groupById.get(row.groupId)?.personId : undefined);
-      if (!personId || !filters.personIds.includes(personId)) return false;
+    if (filters.groupIds.length > 0) {
+      // A filter on "Family" must also keep the timelines of the people inside
+      // it, so a row matches on its own group or on that group's parent.
+      const group = row ? groupById.get(row.groupId) : undefined;
+      const matchesGroup =
+        (group !== undefined && filters.groupIds.includes(group.id)) ||
+        (group?.parentGroupId !== undefined && filters.groupIds.includes(group.parentGroupId));
+      if (!matchesGroup) return false;
     }
     if (filters.timeRange) {
       const endMs = entry.end?.ms ?? Number.POSITIVE_INFINITY;

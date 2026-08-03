@@ -12,17 +12,15 @@ export function namespaceDataset(dataset: TimelineDataset, fileStem: string): Ti
 
   return {
     schemaVersion: dataset.schemaVersion,
-    people: dataset.people.map((person) => ({ ...person, id: ns(person.id) })),
     groups: dataset.groups.map((group) => ({
       ...group,
       id: ns(group.id),
-      personId: nsOptional(group.personId),
+      parentGroupId: nsOptional(group.parentGroupId),
     })),
     rows: dataset.rows.map((row) => ({
       ...row,
       id: ns(row.id),
       groupId: ns(row.groupId),
-      personId: nsOptional(row.personId),
       parentRowId: nsOptional(row.parentRowId),
     })),
     entries: dataset.entries.map((entry) => ({

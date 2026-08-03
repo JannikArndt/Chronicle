@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/JannikArndt/Timeline/public-data/schema.json",
   "title": "Chronicle public dataset",
-  "description": "A TimelineDataset restricted to what public data needs: no people/personId (public data is ownerless). Ids only need to be unique within this file — the app namespaces them on load.",
+  "description": "A TimelineDataset restricted to what public data needs: no birth dates or nesting (public data is ownerless). Ids only need to be unique within this file — the app namespaces them on load.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "groups", "rows", "entries"],

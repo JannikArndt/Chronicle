@@ -5,7 +5,7 @@
 // A date like "2020-05-14" always means 2020-05-14T00:00:00Z regardless of the
 // viewer's local timezone, so a dataset renders identically on every device.
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export type Precision = "exact" | "day" | "month" | "year" | "circa";
 
@@ -15,33 +15,29 @@ export interface FuzzyDate {
   fuzzDays?: number; // optional explicit override of the default fuzziness for this precision
 }
 
-export interface Person {
-  id: string;
-  label: string;
-  // ms, UTC. If set: time before this on any of their rows renders "inactive",
-  // and their group/sub-group header shows a live computed age.
-  birthDate?: number;
-}
-
+// A group is a labelled bundle of timelines — and, when it has a birth date,
+// also a person. There used to be a separate `Person` referenced by both Group
+// and TimelineRow; a person turned out to be nothing but a group with an age,
+// and the two-entity version cost an asymmetry ("a group either IS a person or
+// CONTAINS persons, never both") that every consumer had to special-case.
 export interface Group {
   id: string;
-  label: string;
-  // If set, this ENTIRE group IS that person (e.g. "Me") — do not also nest a
-  // person sub-header for it. If unset, the group may contain zero or more
-  // person sub-groups (e.g. "Family" -> "Finn"), each of which is the future
+  // Groups nest: "Family" contains "Finn". A nested group is the future
   // attachment point for importing/subscribing to someone else's shared "Me"
-  // timeline export (ENGINEERING_PROMPT.md §7).
-  personId?: string;
+  // timeline export (ENGINEERING_PROMPT.md §7). Only one level deep is drawn.
+  parentGroupId?: string;
+  label: string;
+  // ms, UTC. What makes a group a *person*. Time before it renders "inactive"
+  // on this group's timelines and on those of its sub-groups, and the header
+  // shows a live computed age.
+  birthDate?: number;
   collapsed: boolean;
 }
 
 export interface TimelineRow {
   id: string;
+  // The innermost group this timeline sits in — "Finn", not "Family".
   groupId: string;
-  // Set when this row belongs to a person nested inside a personId-less group
-  // (e.g. Finn's "Residence" row inside "Family"). Unset when the row belongs
-  // directly to a personId group (that group's personId applies).
-  personId?: string;
   color?: string; // any CSS color for this row's bars — a native color picker, not a fixed palette
   icon?: string; // any emoji, shown before the row label in the rail and inspector — free-text input
   label: string;
@@ -74,12 +70,11 @@ export interface TimelineEntry {
 
 export interface TimelineDataset {
   schemaVersion: number;
-  people: Person[];
   groups: Group[];
   rows: TimelineRow[];
   entries: TimelineEntry[];
-  // The Person who is "you" — set once the identity onboarding step completes.
-  // Unambiguous even though a Group.personId alone could belong to someone
-  // else's solo group (e.g. a partner you've added).
-  selfPersonId?: string;
+  // The group that is "you" — set once the identity onboarding step completes.
+  // Needed because a birth date alone doesn't say *whose*: a partner you added
+  // has one too.
+  selfGroupId?: string;
 }

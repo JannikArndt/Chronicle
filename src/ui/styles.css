@@ -261,7 +261,7 @@ textarea {
 }
 
 .rail-group,
-.rail-person,
+.rail-subgroup,
 .rail-row {
   position: absolute;
   left: 0;
@@ -280,7 +280,7 @@ textarea {
   background: var(--color-bg-subtle);
 }
 
-.rail-person {
+.rail-subgroup {
   font-weight: 600;
   font-size: 12px;
   color: var(--color-text-secondary);
@@ -308,7 +308,7 @@ textarea {
 }
 
 .rail-group-label,
-.rail-person-label,
+.rail-subgroup-label,
 .rail-row-label {
   flex: 1;
   min-width: 0;

@@ -13,7 +13,7 @@ export function SearchBar() {
   const publicDatasets = useAppState((s) => s.publicDatasets);
   const [expanded, setExpanded] = useState(false);
 
-  const people = [...dataset.people, ...publicDatasets.flatMap((d) => d.people)];
+  const groups = [...dataset.groups, ...publicDatasets.flatMap((d) => d.groups)];
 
   const toggle = (list: string[], id: string): string[] =>
     list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
@@ -23,7 +23,7 @@ export function SearchBar() {
       <div className="search-line">
         <input
           type="search"
-          placeholder="Search titles, descriptions, people, places…"
+          placeholder="Search titles, descriptions, groups, places…"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -33,17 +33,17 @@ export function SearchBar() {
       </div>
       {expanded && (
         <div className="filter-panel">
-          {people.length > 0 && (
+          {groups.length > 0 && (
             <div className="filter-group">
-              {people.map((person) => (
+              {groups.map((group) => (
                 <button
-                  key={person.id}
+                  key={group.id}
                   type="button"
-                  className={`pill ${filters.personIds.includes(person.id) ? "pill-active" : ""}`}
-                  onClick={() => setFilters({ ...filters, personIds: toggle(filters.personIds, person.id) })}
+                  className={`pill ${filters.groupIds.includes(group.id) ? "pill-active" : ""}`}
+                  onClick={() => setFilters({ ...filters, groupIds: toggle(filters.groupIds, group.id) })}
                 >
-                  <span className="pill-icon">🧑</span>
-                  <span className="pill-label">{person.label}</span>
+                  <span className="pill-icon">{group.birthDate === undefined ? "📁" : "🧑"}</span>
+                  <span className="pill-label">{group.label}</span>
                 </button>
               ))}
             </div>

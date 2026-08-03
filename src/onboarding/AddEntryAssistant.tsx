@@ -367,7 +367,7 @@ export function AddEntryAssistant({
   }
 
   function ageCaption(year: number): string {
-    const birthMs = selfPerson()?.birthDate;
+    const birthMs = selfGroup()?.birthDate;
     if (birthMs === undefined) return "";
     const age = year - new Date(birthMs).getUTCFullYear();
     if (age < 0) return "before you were born";
@@ -375,15 +375,15 @@ export function AddEntryAssistant({
   }
 
   function firstYearOnTheAxis(lastYear: number): number {
-    const birthMs = selfPerson()?.birthDate;
+    const birthMs = selfGroup()?.birthDate;
     if (birthMs === undefined) return lastYear - FALLBACK_LIFETIME_YEARS;
     return new Date(birthMs).getUTCFullYear();
   }
 }
 
-function selfPerson() {
+function selfGroup() {
   const { dataset } = appStore.getState();
-  return dataset.people.find((person) => person.id === dataset.selfPersonId);
+  return dataset.groups.find((group) => group.id === dataset.selfGroupId);
 }
 
 // Turns the answers into the entry that will be written. Kept separate from the
@@ -419,10 +419,10 @@ function resolveRowId(choice: RowChoice | null, category: EntryCategory | null):
   if (choice?.kind === "existing") return choice.rowId;
   if (choice?.kind !== "new" || !category) return undefined;
   const { dataset } = appStore.getState();
-  const selfGroup = dataset.groups.find((group) => group.personId === dataset.selfPersonId);
-  const group = selfGroup ?? dataset.groups.find((candidate) => !isPublicId(candidate.id));
+  const own = dataset.groups.find((group) => group.id === dataset.selfGroupId);
+  const group = own ?? dataset.groups.find((candidate) => !isPublicId(candidate.id));
   if (!group) return undefined;
-  return addRow(group.id, category.newRowLabel, group.personId, category.icon);
+  return addRow(group.id, category.newRowLabel, category.icon);
 }
 
 function YearSlider({

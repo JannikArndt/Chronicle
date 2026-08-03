@@ -1,11 +1,11 @@
-// Vertical layout: groups → person sub-groups → rows → sub-rows (§2, §5).
+// Vertical layout: groups → sub-groups → rows → sub-rows (§2, §5).
 // Pure function of the merged dataset; both the canvas and the DOM rail render
 // from the same LayoutItem list so they can never drift apart.
 
-import type { Group, Person, TimelineDataset, TimelineRow } from "../model/types";
+import type { Group, TimelineDataset, TimelineRow } from "../model/types";
 
 export const GROUP_HEADER_HEIGHT = 32;
-export const PERSON_HEADER_HEIGHT = 26;
+export const SUB_GROUP_HEADER_HEIGHT = 26;
 export const ROW_HEIGHT = 40;
 export const ROW_GAP = 10;
 export const SUB_ROW_GAP = 4; // sub-timelines hug their parent (§5)
@@ -16,7 +16,9 @@ export const COMPACT_ROW_HEIGHT = 20;
 export const COMPACT_ROW_GAP = 2;
 
 export interface LayoutItem {
-  kind: "group" | "person" | "row";
+  // "subgroup" is a group nested in another one — the smaller header that used
+  // to be a person. It carries a `group` like any other group item.
+  kind: "group" | "subgroup" | "row";
   id: string;
   y: number;
   height: number;
@@ -27,7 +29,8 @@ export interface LayoutItem {
   // in the rail. The bar carries its row's own label (there is no rail label).
   compact: boolean;
   group?: Group;
-  person?: Person;
+  // For a "subgroup" item: the top-level group it sits under.
+  parentGroup?: Group;
   row?: TimelineRow;
 }
 
@@ -44,8 +47,6 @@ export function computeLayout(
 ): Layout {
   const items: LayoutItem[] = [];
   let y = 0;
-
-  const personById = new Map(dataset.people.map((p) => [p.id, p]));
 
   // `compact` is inherited: once a collapsed row is crossed, everything below it
   // renders compact. The collapsed row itself stays full height (it's the header).
@@ -70,7 +71,16 @@ export function computeLayout(
     }
   };
 
+  const isCollapsed = (group: Group): boolean => collapsedGroupIds.has(group.id) || group.collapsed;
+
+  // A group's own top-level rows, in dataset order. Sub-rows are pushed by
+  // pushRowTree from their parent, never listed here.
+  const topRowsOf = (groupId: string) =>
+    dataset.rows.filter((r) => r.groupId === groupId && r.parentRowId === undefined);
+
   for (const group of dataset.groups) {
+    // Sub-groups are drawn by their parent, in place, so skip them here.
+    if (group.parentGroupId !== undefined) continue;
     items.push({
       kind: "group",
       id: group.id,
@@ -83,34 +93,26 @@ export function computeLayout(
       group,
     });
     y += GROUP_HEADER_HEIGHT;
-    const collapsed = collapsedGroupIds.has(group.id) || group.collapsed;
-    if (!collapsed) {
-      const groupRows = dataset.rows.filter((r) => r.groupId === group.id && r.parentRowId === undefined);
-      if (group.personId) {
-        // The group IS this person (§2) — rows attach directly, no sub-header.
-        for (const row of groupRows) pushRowTree(row, 0, false);
-      } else {
-        const directRows = groupRows.filter((r) => r.personId === undefined);
-        for (const row of directRows) pushRowTree(row, 0, false);
-        const personIdsInOrder = [...new Set(groupRows.map((r) => r.personId).filter((id): id is string => !!id))];
-        for (const personId of personIdsInOrder) {
-          const person = personById.get(personId);
-          if (!person) continue;
-          items.push({
-            kind: "person",
-            id: personId,
-            y,
-            height: PERSON_HEADER_HEIGHT,
-            depth: 0,
-            isSubRow: false,
-            hidden: false,
-            compact: false,
-            person,
-            group,
-          });
-          y += PERSON_HEADER_HEIGHT;
-          for (const row of groupRows.filter((r) => r.personId === personId)) pushRowTree(row, 0, false);
-        }
+    if (!isCollapsed(group)) {
+      // Rows filed directly in the group come before its sub-groups, so
+      // "Family"'s own shared timelines sit above each family member's.
+      for (const row of topRowsOf(group.id)) pushRowTree(row, 0, false);
+      for (const subGroup of dataset.groups.filter((g) => g.parentGroupId === group.id)) {
+        items.push({
+          kind: "subgroup",
+          id: subGroup.id,
+          y,
+          height: SUB_GROUP_HEADER_HEIGHT,
+          depth: 0,
+          isSubRow: false,
+          hidden: false,
+          compact: false,
+          group: subGroup,
+          parentGroup: group,
+        });
+        y += SUB_GROUP_HEADER_HEIGHT;
+        if (isCollapsed(subGroup)) continue;
+        for (const row of topRowsOf(subGroup.id)) pushRowTree(row, 0, false);
       }
     }
     y += GROUP_GAP;

@@ -23,8 +23,8 @@ const userBirthMs = Date.UTC(1990, 5, 15);
 
 function seedUserWithBirthDate(): void {
   const dataset = emptyDataset();
-  dataset.people = [{ id: "me", label: "Me", birthDate: userBirthMs }];
-  dataset.selfPersonId = "me";
+  dataset.groups = [{ id: "me", label: "Me", birthDate: userBirthMs, collapsed: false }];
+  dataset.selfGroupId = "me";
   appStore.setState({
     dataset,
     publicDatasets: [],

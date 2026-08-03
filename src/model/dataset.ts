@@ -1,10 +1,9 @@
 import { SCHEMA_VERSION } from "./types";
-import type { Group, Person, TimelineDataset, TimelineEntry, TimelineRow } from "./types";
+import type { Group, TimelineDataset, TimelineEntry, TimelineRow } from "./types";
 
 export function emptyDataset(): TimelineDataset {
   return {
     schemaVersion: SCHEMA_VERSION,
-    people: [],
     groups: [],
     rows: [],
     entries: [],
@@ -23,7 +22,6 @@ export function newId(prefix: string): string {
 export function mergeDatasets(base: TimelineDataset, ...extra: TimelineDataset[]): TimelineDataset {
   const merged = structuredClone(base);
   for (const dataset of extra) {
-    merged.people.push(...dataset.people);
     merged.groups.push(...dataset.groups);
     merged.rows.push(...dataset.rows);
     merged.entries.push(...dataset.entries);
@@ -47,14 +45,21 @@ export function childEntries(dataset: TimelineDataset, entryId: string): Timelin
   return dataset.entries.filter((entry) => entry.parentEntryId === entryId);
 }
 
-// A row's person comes from the row itself (person nested in a plain group)
-// or from its group being that person (§2 asymmetry).
-export function personForRow(dataset: TimelineDataset, row: TimelineRow): Person | undefined {
-  const group = dataset.groups.find((g) => g.id === row.groupId);
-  const personId = row.personId ?? group?.personId;
-  return personId ? dataset.people.find((p) => p.id === personId) : undefined;
-}
-
 export function groupOfRow(dataset: TimelineDataset, row: TimelineRow): Group | undefined {
   return dataset.groups.find((g) => g.id === row.groupId);
+}
+
+// Whose life this timeline belongs to, as a birth date — its own group's, or
+// the group it is nested in ("Finn" inside "Family" carries the date; a row
+// filed directly under a container group inherits nothing).
+export function birthDateForRow(dataset: TimelineDataset, row: TimelineRow): number | undefined {
+  const group = groupOfRow(dataset, row);
+  if (group === undefined) return undefined;
+  if (group.birthDate !== undefined) return group.birthDate;
+  const parent = group.parentGroupId;
+  return parent === undefined ? undefined : dataset.groups.find((g) => g.id === parent)?.birthDate;
+}
+
+export function subGroupsOf(dataset: TimelineDataset, groupId: string): Group[] {
+  return dataset.groups.filter((group) => group.parentGroupId === groupId);
 }

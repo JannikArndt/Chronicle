@@ -12,7 +12,7 @@ export interface TimeRangeFilter {
 }
 
 export interface Filters {
-  personIds: string[];
+  groupIds: string[];
   timeRange?: TimeRangeFilter;
 }
 
@@ -49,7 +49,7 @@ const initialState: AppState = {
   dataset: emptyDataset(),
   publicDatasets: [],
   search: "",
-  filters: { personIds: [] },
+  filters: { groupIds: [] },
   hiddenRowIds: [],
   collapsedRowIds: [],
   activeWorldKeys: [],
@@ -101,6 +101,6 @@ export function isPublicId(id: string): boolean {
 // age". Undefined until identity onboarding sets it — the picker hides the
 // alignment option in that case.
 export function userBirthMs(state: AppState): number | undefined {
-  const self = state.dataset.people.find((person) => person.id === state.dataset.selfPersonId);
+  const self = state.dataset.groups.find((group) => group.id === state.dataset.selfGroupId);
   return self?.birthDate;
 }

@@ -94,14 +94,10 @@ export function TimelineSheet({
   const row = merged.rows.find(
     (candidate) => candidate.id === (entry ? entry.rowId : settingsRowId),
   );
-  // Where this timeline sits: its group, falling back to the person it names.
-  // The person came first here once, which made the line stale the moment a
-  // timeline was moved to another group — moving changes the group, never the
-  // person, so the header went on naming where the row used to live.
-  const ownerLabel = row
-    ? (merged.groups.find((group) => group.id === row.groupId)?.label ??
-      merged.people.find((person) => person.id === row.personId)?.label)
-    : undefined;
+  // Where this timeline sits. Its group is now the whole answer — a row used
+  // to also carry a person, and preferring that person made the line stale the
+  // moment the timeline was moved.
+  const ownerLabel = row ? merged.groups.find((group) => group.id === row.groupId)?.label : undefined;
 
   // Which way the panes slide. Derived by comparing against the last pane shown
   // rather than by keeping a history: there is only ever one way in and one way
