@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { updateRow } from "../state/actions";
+import { moveRow, updateRow } from "../state/actions";
 import { isPublicId, mergedDataset, useAppState } from "../state/store";
 import { EditableLine } from "./EditableLine";
 import { nextEntryStartMs } from "./nextEntryStart";
@@ -132,7 +132,12 @@ export function RowPane({
               label: group.label,
               current: group.id === row.groupId,
             }))}
-            onPick={(groupId) => updateRow(row.id, { groupId })}
+            // Not `updateRow({ groupId })`: a row also carries the person it
+            // belongs to, and rewriting only the group leaves that person
+            // pointing into a group they are not in. `moveRow` with no
+            // before-row appends to the end of the target group and adopts the
+            // person of the row it lands behind, exactly as the desktop drag does.
+            onPick={(groupId) => moveRow(row.id, groupId, null)}
             onDismiss={onCloseGroupPicker}
           />
         )}
