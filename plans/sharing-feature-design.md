@@ -1,6 +1,7 @@
 # Sharing — design doc
 
-Status: **Phase 0 signed off (§4). Phase 1 in build.**
+Status: **Phase 0 signed off (§4). Phase 1 built — see §5 for what landed and
+what is still outstanding.** Phases 1b, 2, 3 and 4 not started.
 
 This is the design for the feature the root `CLAUDE.md` has been deferring under
 "No publish/subscribe sharing… No Gist sync — it's a marked, honest gap." It is
@@ -290,40 +291,50 @@ through the sync layer instead of into `state.dataset`.
 
 ---
 
-## 3. Server schema and RLS (sketch)
+## 3. Server schema and RLS
+
+Built in `supabase/migrations/0001_sharing.sql`.
 
 ```sql
-accounts       (id uuid pk → auth.users, display_name text)
+accounts       (id uuid pk → auth.users, display_name text, sync_mode text)
 
-shared_groups  (id text pk, owner_account uuid, parent_group_id text,
-                share_by_default bool, payload jsonb,      -- label, birthDate
-                updated_at text, updated_by uuid, deleted_at text)
+shared_records (owner_account uuid, kind text, id text,   -- pk: all three
+                parent_id text,       -- group→parentGroupId, row→groupId, entry→rowId
+                shared boolean,
+                payload jsonb,        -- the ONLY content-bearing column (§D3)
+                clock text, updated_by uuid, deleted boolean)
 
-group_owners   (group_id text, account_id uuid, primary key (group_id, account_id))
-
-shared_rows    (id text pk, group_id text, parent_row_id text,
-                shared bool not null default false,
-                payload jsonb,                              -- label, color, icon
-                updated_at text, updated_by uuid, deleted_at text)
-
-shared_entries (id text pk, row_id text, payload jsonb,     -- everything else
-                updated_at text, updated_by uuid, deleted_at text)
-
-grants         (id uuid pk, subject_type text check (in ('group','row')),
-                subject_id text, grantee uuid, granted_by uuid, created_at timestamptz)
-
-invites        (token text pk, subject_type text, subject_id text,
-                role text check (in ('reader','owner')),
-                created_by uuid, expires_at timestamptz,
+group_owners   (owner_account uuid, group_id text, account_id uuid)
+grants         (id uuid pk, owner_account uuid, subject_kind text,
+                subject_id text, grantee uuid, created_at timestamptz)
+invites        (token text pk, owner_account uuid, subject_kind text,
+                subject_id text, role text, expires_at timestamptz,
                 redeemed_at timestamptz, redeemed_by uuid)
 ```
 
-Read policy on `shared_rows`, in words: *visible if I own its group, or if the
-row is `shared` and I hold a grant on the row, on its group, or on that group's
-parent.* Entries inherit via an `exists` on their row. Writes require ownership.
-Realtime subscriptions are filtered by the same policies.
+**Deviation from the sketch this doc was signed off with:** one `shared_records`
+table rather than three. The wire format is uniform, so three tables meant three
+copies of one policy for no gain.
 
-`payload` is the only content-bearing column anywhere — see D3.
+Read policy in words: *a row is visible if I own its group, or it is `shared`
+and I hold a grant on it, on its group, or on that group's parent. A group is
+visible if it is the container of a visible row, or is published and granted.
+An entry inherits its row.* Writes require ownership or co-ownership.
+
+Group nesting is walked exactly **one level**, not recursively — `addSubGroup`
+refuses to nest deeper and only one level is drawn, so a recursive CTE would be
+machinery for a tree that cannot exist.
+
+`redeem_invite` is a `SECURITY DEFINER` function because the invitee must not be
+able to read the `invites` table — that would let anyone enumerate tokens. It is
+deliberately silent about *why* a token failed: "expired" and "never existed"
+look identical from outside.
+
+> ⚠️ **The SQL has never been run against a live Postgres.** The same visibility
+> rule is re-implemented in TypeScript in `src/sharing/fakeBackend.ts` and is
+> exercised end to end by the test suite, but `supabase db push` plus a manual
+> two-account check is still outstanding, and is the biggest open risk in the
+> feature.
 
 ---
 
@@ -384,8 +395,34 @@ Model → storage → sync → UI, tests alongside, per the per-directory conven
 - A "Shared with me" section, visually distinct and read-only unless co-owned.
 - Colours via `--color-*` only; `PillSelector` over dropdowns; no Save buttons.
 
-**Verification**: `npm test` and `npm run build` green; an E2E pass driving two
-browser contexts through invite → publish → propagate → revoke.
+### What landed
+
+All of the above, plus `supabase/migrations/0001_sharing.sql` and a
+`SharingBackend` interface with an in-process `fakeBackend` that re-implements
+the SQL visibility rule — so `src/sharing/flow.test.ts` drives the whole family
+scenario (publish → invite → propagate → edit → un-publish → revoke) without a
+live project. 341 tests, typecheck and build clean.
+
+Two behaviours worth recording because they were discovered while testing, not
+designed up front, and both turned out to be the ones you want:
+
+- **Un-publishing the last shared timeline in a group also removes the group.**
+  The group was only ever on the server as the container of a published row, so
+  once nothing in it is shared its name has no business still being there.
+- **A mirror that rebuilds to nothing is dropped, not kept as an empty shell.**
+  The rail draws a header per group, so an emptied mirror would otherwise render
+  as a phantom section carrying someone's name — at exactly the moment their
+  name should leave the screen.
+
+### Still outstanding for phase 1
+
+1. **Run the SQL against a live Postgres** and do a manual two-account check.
+   Nothing has validated the policies against the real engine.
+2. **Configure SMTP** for magic links; the built-in Supabase sender is
+   rate-limited and dev-only.
+3. **E2E pass** driving two browser contexts through the full cycle.
+4. **A mobile home for sign-in and invites** — only the publish switch made it
+   into the mobile shell.
 
 ---
 
