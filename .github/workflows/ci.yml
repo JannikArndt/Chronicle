@@ -1,0 +1,23 @@
+# Tests and typecheck on every pull request.
+#
+# deploy.yml also runs `npm test`, but only on push to main — which gates the
+# *deploy*, not the PR. README.md and CLAUDE.md both claimed a bad contributed
+# public-data file "fails PRs"; until this workflow existed, it didn't.
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
