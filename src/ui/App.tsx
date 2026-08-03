@@ -9,6 +9,8 @@ import {
 import { appStore, mergedDataset, useAppState } from "../state/store";
 import { CanvasHost } from "./CanvasHost";
 import { DataMenu } from "./DataMenu";
+import { InviteLanding, readInviteToken } from "./InviteLanding";
+import { SharingMenu } from "./SharingMenu";
 import { DetailPanel } from "./DetailPanel";
 import { MobileShell } from "./MobileShell";
 import { RowRail } from "./RowRail";
@@ -24,10 +26,19 @@ export function App() {
   const railContentRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<TimelineEngine | null>(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  // Read once, on the first render, and cleared from the address bar below —
+  // an invite token is a capability and should not sit in the URL, in the
+  // back-button history, or in whatever the browser syncs between devices.
+  const [inviteToken, setInviteToken] = useState(() => readInviteToken(window.location.hash));
 
   useEffect(() => {
     void initializeApp();
   }, []);
+
+  useEffect(() => {
+    if (inviteToken === null) return;
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, [inviteToken]);
 
   useEffect(() => {
     if (loaded && shouldShowOnboarding(state.dataset)) setOnboardingOpen(true);
@@ -45,7 +56,7 @@ export function App() {
         new Set(state.collapsedRowIds),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.dataset, state.publicDatasets, state.hiddenRowIds, state.collapsedRowIds],
+    [state.dataset, state.publicDatasets, state.sharing.mirrors, state.hiddenRowIds, state.collapsedRowIds],
   );
 
   // Global keyboard handling (§6) — all ignored while typing in a field.
@@ -122,6 +133,7 @@ export function App() {
           <header className="top-bar">
             <span className="app-title">Chronicle</span>
             <SearchBar />
+            <SharingMenu />
             <DataMenu />
           </header>
           <div className="main-area">
@@ -141,6 +153,7 @@ export function App() {
           </div>
         </div>
       )}
+      {inviteToken !== null && <InviteLanding token={inviteToken} onDone={() => setInviteToken(null)} />}
       {onboardingOpen && (
         <div className="assistant-overlay">
           <IdentityBirthPlacesAssistant onFinished={() => setOnboardingOpen(false)} />

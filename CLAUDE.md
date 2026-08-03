@@ -26,6 +26,8 @@ what's true across the whole codebase.
 - `src/render/` — the framework-agnostic canvas engine.
 - `src/state/` — the observable store and all mutations.
 - `src/publicData/` — read-only shared datasets loaded from `public-data/*.json`.
+- `src/sharing/` — publish/subscribe sync against Supabase (phase 1: invite +
+  read-only sharing). `supabase/migrations/` holds the SQL.
 - `src/storage/` — IndexedDB and export/import, including schema upgrades.
 - `src/ui/` — the React shell: desktop rail/panels and the mobile shell.
 - `src/onboarding/` — conversational onboarding and the entry/timeline add-flows.
@@ -39,9 +41,13 @@ what's true across the whole codebase.
   block; the canvas engine mirrors the same variables via `getComputedStyle`. A new
   rule with a hardcoded hex color renders correctly in light mode and wrong (or
   invisible) in dark mode — always reuse or extend the variable set instead.
-- **Privacy**: personal data exists only in IndexedDB and user-initiated exports.
-  Nothing personal may ever be written to the repo/filesystem; only `public-data/`
-  is repo-tracked data.
+- **Privacy**: personal data lives in IndexedDB, in user-initiated exports, and —
+  since sharing — in whatever the user has *explicitly published*, and nowhere
+  else. Nothing personal may ever be written to the repo/filesystem; only
+  `public-data/` is repo-tracked data. Signed out, the app makes no network
+  calls at all. Everything that leaves the device goes through `syncSubset` in
+  `src/model/sharing.ts`, and other people's data never enters `state.dataset`
+  (see `src/sharing/CLAUDE.md`).
 - **No dropdowns under ~7 options** — use `PillSelector`. No Save/Cancel buttons —
   autosave per field change. No browse/edit mode toggle, no modal create screen.
 
@@ -62,11 +68,13 @@ what's true across the whole codebase.
 
 ## v1 scope cuts (deliberate — do not "fix" unasked)
 
-- No publish/subscribe sharing; there is no `visibility` field on the model
-  today — it existed in schema v1–v3 and was removed in v4 (see
-  `src/storage/exportImport.ts`), so reintroducing it needs a real schema
-  bump and migration, not a dormant field waking up. No Gist sync — it's a
-  marked, honest gap (PAT flow unsolved
+- Publish/subscribe sharing **exists now** (schema v7, `src/sharing/`) — phase 1
+  only: invite links, per-timeline publishing, one-way propagation to readers,
+  co-owned groups. Not built: opt-in full-account sync, invite chaining, live
+  co-editing, public profiles via QR. The publish flag is `shared`/
+  `shareByDefault`, deliberately *not* the `visibility` name that v1–v3 used and
+  v4 removed; the v7 migration deletes the dead keys and never converts them.
+  No Gist sync — still a marked, honest gap (PAT flow unsolved
   for non-technical users). No keyboard-only/screen-reader path. Only one level
   of group nesting is *drawn* — the model no longer forbids more, but
   `computeLayout` draws a group, then its sub-groups, and stops.

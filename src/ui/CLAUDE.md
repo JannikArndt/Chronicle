@@ -8,6 +8,11 @@ properties defined on `:root` in `styles.css` with a `@media
 new rule; add or reuse a variable instead, or the dark theme silently breaks
 for that element.
 
+Sharing lives in `SharingMenu.tsx` (top bar: sign in, invite links, who can see
+what) and `InviteLanding.tsx` (the `#/invite/<token>` route). The per-timeline
+publish switch is `ShareToggle` in `RowRail.tsx` and a row in `RowPane.tsx` on
+mobile. All of it is absent when the build has no Supabase project configured.
+
 🌟 Famous people picking is private to `RowRail.tsx` (see pre-release TODOs in
 `src/publicData/CLAUDE.md`, since the debug panel and collapse-state issues
 live there). 🌍 World events is done — `WorldEventsPicker.tsx`.
@@ -97,6 +102,14 @@ is desktop-only now.
 - **No dropdowns under ~7 options** — use `PillSelector`. No Save/Cancel
   buttons — autosave per field change. No browse/edit mode toggle, no modal
   create screen.
+- **The share toggle stays visible while it is on**, unlike every other
+  hover-revealed rail action. "Who can see this" has to be legible at a glance;
+  a share control that hides itself is how someone forgets what they published.
+- **Read-only checks use `isForeignId`, not `isPublicId`.** Mirrored timelines
+  from other people are read-only for the same reason bundled public data is
+  (the co-owned case is checked against the mirror's `role` instead). Using
+  `isPublicId` for a new read-only check makes someone else's data editable, and
+  the edit then goes nowhere.
 
 ## Still open / untested
 
@@ -116,3 +129,8 @@ is desktop-only now.
   extraction one — creating a group on a phone has no designed home) and 🌟
   Famous people (still private to `RowRail.tsx`; worth extracting together
   with gating its 🐞 debug panel — see `src/publicData/CLAUDE.md`).
+- **Sharing is desktop-only apart from the publish switch.** `SharingMenu` sits
+  in the desktop top bar, which the mobile shell does not have, so there is no
+  way to sign in, create an invite or revoke one on a phone. That is a real gap
+  for a product whose scenarios are mostly phone-shaped (two people editing side
+  by side, QR codes) — it needs a home in the mobile shell before phase 3 or 4.

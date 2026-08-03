@@ -6,11 +6,11 @@
 
 import type { TimelineEntry } from "../model/types";
 import { updateEntry } from "../state/actions";
-import { isPublicId } from "../state/store";
+import { isForeignId } from "../state/store";
 import { DateRangeEditor } from "./DateRangeEditor";
 
 export function EntryPane({ entry }: { entry: TimelineEntry }) {
-  const readOnly = isPublicId(entry.id);
+  const readOnly = isForeignId(entry.id);
   const change = (patch: Partial<TimelineEntry>) => updateEntry(entry.id, patch);
 
   return (

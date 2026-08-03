@@ -26,7 +26,7 @@ import {
   toggleRowHidden,
   updateEntry,
 } from "../state/actions";
-import { isPublicId, mergedDataset, useAppState } from "../state/store";
+import { isForeignId, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { BottomSheet } from "./BottomSheet";
 import { centerOnEntry } from "./centerOnEntry";
 import type { BottomSheetHandle } from "./BottomSheet";
@@ -157,8 +157,8 @@ export function TimelineSheet({
   const menuItems = buildMenuItems({
     pane,
     entryIsDraft: state.draft?.id === entry?.id,
-    entryIsReadOnly: entry ? isPublicId(entry.id) : false,
-    rowIsReadOnly: row ? isPublicId(row.id) : true,
+    entryIsReadOnly: entry ? isForeignId(entry.id) : false,
+    rowIsReadOnly: row ? isForeignId(row.id) : true,
     rowIsVisible: row ? !state.hiddenRowIds.includes(row.id) : false,
     canMoveGroups: state.dataset.groups.filter((group) => !isPublicId(group.id)).length > 1,
     onToggleRowHidden: () => row && toggleRowHidden(row.id),
@@ -239,7 +239,7 @@ function PaneTitle({
   const isDraft = useAppState((s) => s.draft?.id) === entry?.id && entry !== undefined;
 
   if (pane === "entry" && entry) {
-    const readOnly = isPublicId(entry.id);
+    const readOnly = isForeignId(entry.id);
     return (
       <>
         <EditableLine

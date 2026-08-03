@@ -7,7 +7,7 @@ import { faviconUrl } from "../model/favicon";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import type { Place, TimelineEntry } from "../model/types";
 import { clearSelection, deleteEntryWithCascade, updateEntry } from "../state/actions";
-import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
+import { appStore, isForeignId, mergedDataset, useAppState } from "../state/store";
 import { DateField } from "./DateField";
 import { PlaceAutocompleteInput } from "../onboarding/PlaceAutocompleteInput";
 import { formatSuggestionText } from "../onboarding/nominatim";
@@ -33,7 +33,7 @@ export function DetailPanel() {
   if (!entry) return null;
 
   const isDraft = state.draft?.id === entry.id;
-  const readOnly = isPublicId(entry.id);
+  const readOnly = isForeignId(entry.id);
   const row = merged.rows.find((r) => r.id === entry.rowId);
   const change = (patch: Partial<TimelineEntry>) => updateEntry(entry.id, patch);
 
