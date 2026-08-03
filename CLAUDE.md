@@ -4,10 +4,6 @@ Chronicle is a personal life-timeline web app: parallel horizontal timelines on 
 shared time axis. React + TypeScript + Vite, custom Canvas renderer, IndexedDB storage,
 no backend, deployed to GitHub Pages at https://jannikarndt.github.io/Chronicle/.
 
-The full product spec is `ENGINEERING_PROMPT.md` — it is the **authority on behavior**.
-Where it says "resolved during the prototype", that decision is final; don't reinterpret
-it. `POC/` is the throwaway discovery prototype — never reuse it as source.
-
 ## Commands
 
 ```
