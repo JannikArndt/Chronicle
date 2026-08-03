@@ -6,7 +6,21 @@ A personal life-timeline web app: your life — and the lives of people around y
 world — as parallel horizontal timelines on one shared time axis. Canvas-rendered,
 no backend, statically hosted on GitHub Pages.
 
-Built from the discovery brief in [`ENGINEERING_PROMPT.md`](./ENGINEERING_PROMPT.md).
+- **Parallel timelines**: one row per person, group, or topic, all sharing one time axis
+  you pan and zoom.
+- **Fuzzy dates**: "circa 1990" or "sometime in the 90s" are first-class, not just exact
+  dates — precision fades visually the less certain a date is.
+- **A conversational setup assistant** walks a new user through their identity, birth
+  date, and places lived instead of a blank app.
+- **Public overlays**: world events, famous people (via Wikidata), and a growing set of
+  `public-data/` datasets (Olympics, World Cups, presidents, ...) merge into your view
+  read-only, alongside your private data.
+- **A dedicated mobile shell** (bottom sheets, a mini-map, touch gestures), not a
+  responsive reflow of the desktop layout.
+- **Everything local-first**: no account, no server; see the privacy section below.
+
+See [`docs/GLOSSARY.md`](./docs/GLOSSARY.md) for the core terms (`Group`,
+`TimelineRow`, `TimelineEntry`) and `CLAUDE.md` for the fuller architecture map.
 
 ## Privacy boundary (important)
 
