@@ -59,7 +59,3 @@ export function birthDateForRow(dataset: TimelineDataset, row: TimelineRow): num
   const parent = group.parentGroupId;
   return parent === undefined ? undefined : dataset.groups.find((g) => g.id === parent)?.birthDate;
 }
-
-export function subGroupsOf(dataset: TimelineDataset, groupId: string): Group[] {
-  return dataset.groups.filter((group) => group.parentGroupId === groupId);
-}

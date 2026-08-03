@@ -92,6 +92,14 @@ describe("describeCascade", () => {
     );
     expect(describeCascade(collectEntryCascade(fixture(), "e3"))).toBe("This deletes 1 entry.");
   });
+
+  // None of g1's three rows is the thing being deleted by name, so calling two
+  // of them "sub-rows" both undercounted and mislabelled them.
+  test("counts a group's rows as whole timelines, not as sub-rows", () => {
+    expect(describeCascade(collectGroupCascade(fixture(), "g1"))).toBe(
+      "This deletes 3 entries, 3 timelines and 1 sub-group.",
+    );
+  });
 });
 
 describe("applyDelete", () => {

@@ -12,7 +12,7 @@ describe("shouldShowOnboarding", () => {
     expect(shouldShowOnboarding(dataset)).toBe(false);
   });
 
-  test("false once the user has created a group manually, even without selfPersonId", () => {
+  test("false once the user has created a group manually, even without selfGroupId", () => {
     const dataset = emptyDataset();
     dataset.groups.push({ id: "g1", label: "Someone", collapsed: false });
     expect(shouldShowOnboarding(dataset)).toBe(false);
