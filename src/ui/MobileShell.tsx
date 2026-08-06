@@ -17,6 +17,7 @@ import { triggerDownload } from "../storage/exportImport";
 import { AssistantSheet } from "./AssistantSheet";
 import { CanvasHost } from "./CanvasHost";
 import { importDatasetWithConfirmation } from "./importFlow";
+import { SharingPanel } from "./SharingPanel";
 import { WorldEventsPicker } from "./WorldEventsPicker";
 import { centerOnEntry } from "./centerOnEntry";
 import { MiniMap } from "./MiniMap";
@@ -330,6 +331,9 @@ function MobileSearchChip({ open, setOpen }: { open: boolean; setOpen: (open: bo
 
 function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOnboarding: () => void }) {
   const [showingWorldEvents, setShowingWorldEvents] = useState(false);
+  const [showingSharing, setShowingSharing] = useState(false);
+  const sharingConfigured = useAppState((s) => s.sharing.configured);
+  const signedIn = useAppState((s) => s.sharing.session !== undefined);
 
   const handleImport = () => {
     importDatasetWithConfirmation((message) => window.alert(message));
@@ -347,6 +351,24 @@ function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOn
     );
   }
 
+  // The mobile counterpart of the desktop top bar's Sharing popover — same
+  // panel, reached through this menu because the mobile shell has no top bar.
+  // A sub-view rather than its own sheet: signing in and copying an invite link
+  // are short errands, and `TimelineSheet` is the one navigational sheet.
+  if (showingSharing) {
+    return (
+      <>
+        <div className="popover-backdrop" onClick={close} />
+        <div className="mobile-menu">
+          <button type="button" className="menu-item" onClick={() => setShowingSharing(false)}>
+            ‹ Back
+          </button>
+          <SharingPanel />
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="popover-backdrop" onClick={close} />
@@ -357,6 +379,11 @@ function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOn
         <button type="button" className="menu-item" onClick={() => setShowingWorldEvents(true)}>
           🌍 World events…
         </button>
+        {sharingConfigured && (
+          <button type="button" className="menu-item" onClick={() => setShowingSharing(true)}>
+            {signedIn ? "🔗 Sharing…" : "🔗 Share with someone…"}
+          </button>
+        )}
         <button
           type="button"
           className="menu-item"

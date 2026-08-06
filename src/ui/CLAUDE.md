@@ -8,10 +8,14 @@ properties defined on `:root` in `styles.css` with a `@media
 new rule; add or reuse a variable instead, or the dark theme silently breaks
 for that element.
 
-Sharing lives in `SharingMenu.tsx` (top bar: sign in, invite links, who can see
-what) and `InviteLanding.tsx` (the `#/invite/<token>` route). The per-timeline
-publish switch is `ShareToggle` in `RowRail.tsx` and a row in `RowPane.tsx` on
-mobile. All of it is absent when the build has no Supabase project configured.
+Sharing's contents live in `SharingPanel.tsx` (sign in, invite links, who can
+see what, the disclosures) and are rendered by two frames: `SharingMenu.tsx`,
+the desktop top-bar popover, and the mobile ⋯ menu's sharing sub-view in
+`MobileShell.tsx`. One component rather than two, because the part that would
+drift is the text saying published data is server-readable and not recallable.
+`InviteLanding.tsx` is the `#/invite/<token>` route. The per-timeline publish
+switch is `ShareToggle` in `RowRail.tsx` and a row in `RowPane.tsx` on mobile.
+All of it is absent when the build has no Supabase project configured.
 
 🌟 Famous people picking is private to `RowRail.tsx` (see pre-release TODOs in
 `src/publicData/CLAUDE.md`, since the debug panel and collapse-state issues
@@ -129,8 +133,7 @@ is desktop-only now.
   extraction one — creating a group on a phone has no designed home) and 🌟
   Famous people (still private to `RowRail.tsx`; worth extracting together
   with gating its 🐞 debug panel — see `src/publicData/CLAUDE.md`).
-- **Sharing is desktop-only apart from the publish switch.** `SharingMenu` sits
-  in the desktop top bar, which the mobile shell does not have, so there is no
-  way to sign in, create an invite or revoke one on a phone. That is a real gap
-  for a product whose scenarios are mostly phone-shaped (two people editing side
-  by side, QR codes) — it needs a home in the mobile shell before phase 3 or 4.
+- **A co-owned mirror is still read-only.** `isForeignId` blocks the edit and
+  there is no write-back path, so the "Shared with you" list says editing comes
+  later rather than offering it. Don't loosen the `isForeignId` check to "fix"
+  this: the edit would land in the store and go nowhere.

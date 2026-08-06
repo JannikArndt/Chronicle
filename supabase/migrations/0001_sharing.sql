@@ -1,9 +1,13 @@
 -- Chronicle sharing, phase 1 — plans/sharing-feature-design.md §3.
 --
--- NOT YET RUN AGAINST A LIVE POSTGRES. The visibility rule is mirrored in
--- TypeScript in src/sharing/fakeBackend.ts, which the test suite exercises end
--- to end; this file is the same rule in SQL and needs a real `supabase db push`
--- plus a manual two-account check before anyone's data depends on it.
+-- Verified against a real Postgres: `npm run verify:sql` applies this file to a
+-- scratch database and runs supabase/tests/rls.test.sql, which asserts the whole
+-- family scenario with RLS on and the identity switched per statement. CI runs
+-- it on every pull request. The visibility rule is *also* mirrored in TypeScript
+-- in src/sharing/fakeBackend.ts so the app's tests need no database — that copy
+-- is a test double, this one is the security boundary, and they change together.
+--
+-- Setup instructions: supabase/README.md.
 --
 -- Design notes that matter for review:
 --   * One `shared_records` table rather than three. The wire format is uniform
@@ -64,7 +68,12 @@ create table if not exists grants (
 -- An invite is a link, not an email — Chronicle sends no mail (§D5). The token
 -- is the capability, so it is generated server-side and expires.
 create table if not exists invites (
-  token         text primary key default encode(gen_random_bytes(24), 'base64url'),
+  -- 24 random bytes → 32 base64 characters, translated to the url-safe
+  -- alphabet by hand. Postgres `encode` has no 'base64url' encoding — and
+  -- because a column default is not evaluated until the first insert, asking
+  -- for one fails at invite time rather than at migration time. 24 is a
+  -- multiple of 3, so there is no '=' padding to strip.
+  token         text primary key default translate(encode(gen_random_bytes(24), 'base64'), '+/', '-_'),
   owner_account uuid not null references accounts(id) on delete cascade,
   subject_kind  text not null check (subject_kind in ('group', 'row')),
   subject_id    text not null,
@@ -148,13 +157,52 @@ returns boolean language sql stable security definer set search_path = public as
          );
 $$;
 
+-- Co-ownership of the group an entry's row sits in. Not the same question as
+-- "can this account read the entry": a reader can, a co-owner may write.
+create or replace function owns_row_group(p_owner uuid, p_row text, p_viewer uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select p_row is not null and exists (
+    select 1 from shared_records r
+     where r.owner_account = p_owner and r.kind = 'row' and r.id = p_row
+       and is_group_owner(p_owner, r.parent_id, p_viewer)
+  );
+$$;
+
+-- May this account write this record into someone else's namespace? Only
+-- co-ownership of the group it belongs to says yes.
+create or replace function can_write_record(p_owner uuid, p_kind text, p_id text, p_parent text, p_viewer uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select case p_kind
+    when 'group' then is_group_owner(p_owner, p_id, p_viewer)
+    when 'row'   then is_group_owner(p_owner, p_parent, p_viewer)
+    when 'entry' then owns_row_group(p_owner, p_parent, p_viewer)
+    else false
+  end;
+$$;
+
 -- --------------------------------------------------------------- policies ----
+-- Dropped first so the file can be re-applied to an existing database: unlike
+-- tables, `create policy` has no `if not exists`.
 
 alter table accounts       enable row level security;
 alter table shared_records enable row level security;
 alter table group_owners   enable row level security;
 alter table grants         enable row level security;
 alter table invites        enable row level security;
+
+drop policy if exists accounts_self             on accounts;
+drop policy if exists accounts_read_names       on accounts;
+drop policy if exists records_own               on shared_records;
+drop policy if exists records_readable          on shared_records;
+drop policy if exists records_coowner_insert    on shared_records;
+drop policy if exists records_coowner_update    on shared_records;
+drop policy if exists records_coowner_delete    on shared_records;
+drop policy if exists group_owners_visible      on group_owners;
+drop policy if exists group_owners_managed      on group_owners;
+drop policy if exists grants_visible            on grants;
+drop policy if exists grants_managed            on grants;
+drop policy if exists grants_self_removal       on grants;
+drop policy if exists invites_own               on invites;
 
 create policy accounts_self on accounts
   for all using (id = auth.uid()) with check (id = auth.uid());
@@ -167,6 +215,11 @@ create policy accounts_read_names on accounts for select to authenticated using 
 create policy records_own on shared_records
   for all using (owner_account = auth.uid()) with check (owner_account = auth.uid());
 
+-- The only read path into someone else's records — including a co-owner's, who
+-- gets in through the `is_group_owner` branches inside these functions. Keeping
+-- reads to this one policy is what makes `not deleted` unconditional: a
+-- tombstone is never shipped to anybody but its owner, because "this used to
+-- exist" is itself a disclosure that something was withdrawn.
 create policy records_readable on shared_records for select to authenticated using (
   not deleted and case kind
     when 'group' then can_see_group(owner_account, id, auth.uid())
@@ -179,23 +232,19 @@ create policy records_readable on shared_records for select to authenticated usi
 -- Co-owners write into someone else's namespace: the records stay filed under
 -- the original owner_account, which is what keeps a mirror's ids stable when
 -- two people edit the same group.
-create policy records_coowner_write on shared_records for all to authenticated
-  using (
-    case kind
-      when 'group' then is_group_owner(owner_account, id, auth.uid())
-      when 'row'   then is_group_owner(owner_account, parent_id, auth.uid())
-      when 'entry' then can_read_row(owner_account, parent_id, auth.uid())
-      else false
-    end
-  )
-  with check (
-    case kind
-      when 'group' then is_group_owner(owner_account, id, auth.uid())
-      when 'row'   then is_group_owner(owner_account, parent_id, auth.uid())
-      when 'entry' then can_read_row(owner_account, parent_id, auth.uid())
-      else false
-    end
-  );
+--
+-- Deliberately three write-only policies rather than one `for all`. A `for all`
+-- policy is also a SELECT policy, and permissive policies are OR-ed: it would
+-- have re-admitted, on a laxer condition, exactly the rows `records_readable`
+-- filters out. That is not hypothetical — it was the bug here. Read-only
+-- sharing has to be read-only in the grammar of the policy, not only in intent.
+create policy records_coowner_insert on shared_records for insert to authenticated
+  with check (can_write_record(owner_account, kind, id, parent_id, auth.uid()));
+create policy records_coowner_update on shared_records for update to authenticated
+  using      (can_write_record(owner_account, kind, id, parent_id, auth.uid()))
+  with check (can_write_record(owner_account, kind, id, parent_id, auth.uid()));
+create policy records_coowner_delete on shared_records for delete to authenticated
+  using      (can_write_record(owner_account, kind, id, parent_id, auth.uid()));
 
 create policy group_owners_visible on group_owners for select to authenticated
   using (owner_account = auth.uid() or account_id = auth.uid());
@@ -261,4 +310,12 @@ create trigger on_auth_user_created after insert on auth.users
   for each row execute function handle_new_user();
 
 -- Realtime: subscribers get postgres_changes filtered by the same policies.
-alter publication supabase_realtime add table shared_records;
+-- Guarded so the whole file stays re-runnable — adding a table twice is an error.
+do $$ begin
+  if not exists (
+    select 1 from pg_publication_tables
+     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'shared_records'
+  ) then
+    alter publication supabase_realtime add table shared_records;
+  end if;
+end $$;

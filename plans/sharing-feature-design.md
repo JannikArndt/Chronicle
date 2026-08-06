@@ -330,11 +330,16 @@ able to read the `invites` table — that would let anyone enumerate tokens. It 
 deliberately silent about *why* a token failed: "expired" and "never existed"
 look identical from outside.
 
-> ⚠️ **The SQL has never been run against a live Postgres.** The same visibility
-> rule is re-implemented in TypeScript in `src/sharing/fakeBackend.ts` and is
-> exercised end to end by the test suite, but `supabase db push` plus a manual
-> two-account check is still outstanding, and is the biggest open risk in the
-> feature.
+**Verified against a real Postgres.** `npm run verify:sql` applies the migration
+to a scratch database and runs `supabase/tests/rls.test.sql` — this scenario,
+asserted with RLS on and the identity switched per statement the way PostgREST
+switches it per request — and CI runs it on every pull request. The first run
+found three bugs in SQL that had until then only been read: an invite-token
+default using an encoding Postgres does not have (`base64url`), a `for all`
+policy that was silently also a SELECT policy and leaked tombstones to readers,
+and — in the same policy — an entry branch keyed on *readability* rather than
+co-ownership, which gave every read-only grantee write access to the entries on
+a shared timeline. All three are fixed; §5 records what is still untested.
 
 ---
 
@@ -414,15 +419,35 @@ designed up front, and both turned out to be the ones you want:
   as a phantom section carrying someone's name — at exactly the moment their
   name should leave the screen.
 
+### Then landed on top
+
+- **The SQL runs, and is asserted.** `supabase/tests/` + `scripts/verify-sql.sh`
+  + a CI job; three real bugs fixed (above). The shim in `supabase/tests/shim.sql`
+  stands in for the parts of a Supabase project a bare Postgres lacks — the
+  `auth` schema, `auth.uid()`, the `anon`/`authenticated` roles — so the
+  migration runs *unmodified*, which is the only version of this check worth
+  having.
+- **Setup is a script and a document**, not tribal knowledge:
+  `scripts/setup-supabase.sh` (local Docker stack or a linked hosted project,
+  writing `.env.local`) and `supabase/README.md` (redirect URLs, SMTP, the
+  service_role warning, deploying with sharing on).
+- **Sign-in and invites reached mobile.** `SharingPanel.tsx` holds the panel;
+  the desktop top bar and the mobile ⋯ menu both render it, so the disclosure
+  text about server-readable and non-recallable sharing cannot drift between
+  the two.
+
 ### Still outstanding for phase 1
 
-1. **Run the SQL against a live Postgres** and do a manual two-account check.
-   Nothing has validated the policies against the real engine.
-2. **Configure SMTP** for magic links; the built-in Supabase sender is
-   rate-limited and dev-only.
-3. **E2E pass** driving two browser contexts through the full cycle.
-4. **A mobile home for sign-in and invites** — only the publish switch made it
-   into the mobile shell.
+1. **Configure SMTP** on a hosted project for magic links; the built-in Supabase
+   sender is rate-limited and dev-only. Locally `supabase start` catches the
+   mail, so this blocks a deployment, not development.
+2. **A manual two-account pass on a hosted project**, and an E2E script driving
+   two browser contexts through the cycle. What is unproven now is PostgREST's
+   request shape and Supabase's auth, not the policies themselves.
+3. **A write-back path for a co-owned mirror.** The server accepts a co-owner's
+   writes; the client has no route for them, so a co-owned mirror is read-only
+   and the UI says so. This is what makes scenario 1 — "my dad fills in his own
+   group" — only half true today.
 
 ---
 
