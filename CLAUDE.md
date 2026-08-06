@@ -2,15 +2,23 @@
 
 Chronicle is a personal life-timeline web app: parallel horizontal timelines on one
 shared time axis. React + TypeScript + Vite, custom Canvas renderer, IndexedDB storage,
-no backend, deployed to GitHub Pages at https://jannikarndt.github.io/Chronicle/.
+deployed to GitHub Pages at https://jannikarndt.github.io/Chronicle/. Local-first: the
+only backend is the optional Supabase project behind sharing, and without it configured
+the app makes no network calls at all.
 
 ## Commands
 
 ```
-npm run dev       # dev server
-npm test          # vitest (100+ unit tests)
-npm run build     # tsc -b && vite build  (tsc also typechecks test files)
+npm run dev            # dev server
+npm test               # vitest (300+ unit tests)
+npm run build          # tsc -b && vite build  (tsc also typechecks test files)
+npm run setup:supabase # optional: sharing backend, local Docker stack or a hosted project
+npm run verify:sql     # apply supabase/migrations to a real Postgres, assert the RLS rules
 ```
+
+`npm test` does not cover the RLS policies — there they are re-implemented in
+TypeScript so the suite needs no database. `verify:sql` runs the real SQL, and CI
+runs it on every PR. Setup and the rest: `supabase/README.md`.
 
 Deploy: push to `main` → `.github/workflows/deploy.yml` builds and publishes Pages.
 The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `base` is
@@ -27,7 +35,7 @@ what's true across the whole codebase.
 - `src/state/` — the observable store and all mutations.
 - `src/publicData/` — read-only shared datasets loaded from `public-data/*.json`.
 - `src/sharing/` — publish/subscribe sync against Supabase (phase 1: invite +
-  read-only sharing). `supabase/migrations/` holds the SQL.
+  read-only sharing). `supabase/` holds the SQL, the RLS tests and the setup guide.
 - `src/storage/` — IndexedDB and export/import, including schema upgrades.
 - `src/ui/` — the React shell: desktop rail/panels and the mobile shell.
 - `src/onboarding/` — conversational onboarding and the entry/timeline add-flows.
@@ -60,6 +68,12 @@ what's true across the whole codebase.
 - `src/publicData/schemaValidation.test.ts` Ajv-validates every `public-data/*.json`
   against `public-data/schema.json`; CI runs this, so a bad contributed file fails
   PRs.
+- **The RLS policies are tested in SQL, not in TypeScript.** `supabase/tests/rls.test.sql`
+  runs the migration against a real Postgres with the identity switched per statement;
+  `src/sharing/fakeBackend.ts` mirrors the same rule in TypeScript purely so the vitest
+  suite needs no database. Changing the visibility rule means changing both, and running
+  both — the TypeScript copy passing proves nothing about the policy that actually
+  guards the data.
 - E2E: drive the dev server with playwright-core against system Chrome
   (`channel: "chrome"`). `window.__chronicleEngine` (read `plusHits`/`entryHits` for
   canvas hit coordinates) and `window.__chronicleStore` are exposed exactly for
@@ -70,7 +84,9 @@ what's true across the whole codebase.
 
 - Publish/subscribe sharing **exists now** (schema v7, `src/sharing/`) — phase 1
   only: invite links, per-timeline publishing, one-way propagation to readers,
-  co-owned groups. Not built: opt-in full-account sync, invite chaining, live
+  co-owned groups. Co-ownership is granted and enforced server-side, but the client
+  has no write-back path for a timeline shared *with* you, so a co-owned mirror is
+  still read-only. Not built: opt-in full-account sync, invite chaining, live
   co-editing, public profiles via QR. The publish flag is `shared`/
   `shareByDefault`, deliberately *not* the `visibility` name that v1–v3 used and
   v4 removed; the v7 migration deletes the dead keys and never converts them.

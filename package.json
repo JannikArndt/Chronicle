@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "host": "tsc -b && vite build && vite preview --host",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "setup:supabase": "bash scripts/setup-supabase.sh",
+    "verify:sql": "bash scripts/verify-sql.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",

@@ -21,3 +21,28 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  # The row-level-security policies are the sharing feature's access control,
+  # and `npm test` cannot exercise them: there they are re-implemented in
+  # TypeScript (src/sharing/fakeBackend.ts) so the suite needs no database. This
+  # job runs the real SQL against a real Postgres. It caught three genuine bugs
+  # the day it was written, including a read-only grant that carried write
+  # access — so it is not ceremony.
+  sql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Matching what Supabase runs, so a green build here means something.
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm run verify:sql
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres

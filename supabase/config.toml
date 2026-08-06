@@ -1,0 +1,47 @@
+# Supabase CLI config. Needed for `supabase link` / `supabase db push`, and it
+# is what `supabase start` reads to run the stack locally in Docker.
+#
+# Nothing secret belongs in this file — it is repo-tracked. Keys live in
+# .env.local, which is git-ignored.
+
+project_id = "chronicle"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+# Match what Supabase runs in the cloud, so a local check means something.
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+# Local mail catcher: `supabase start` prints an Inbucket URL where the magic
+# links land, so sign-in can be exercised without configuring SMTP.
+[inbucket]
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+# The Vite dev server, with Chronicle's `/Chronicle/` base path.
+site_url = "http://localhost:5173/Chronicle/"
+# Magic links come back to whatever page the user was on, including the
+# `#/invite/<token>` route — so the whole path space has to be allowed.
+additional_redirect_urls = ["http://localhost:5173/Chronicle/**"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+# Magic link only: there is no password anywhere in this product.
+enable_confirmations = false
+
+[realtime]
+enabled = true

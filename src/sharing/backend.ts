@@ -35,9 +35,9 @@ export interface InviteDraft {
 export interface MirrorSnapshot {
   ownerAccountId: string;
   ownerName: string;
-  // "owner" means co-ownership: this group is mine to edit as well, so the UI
-  // offers editing and writes route back through the sync layer instead of into
-  // `state.dataset`.
+  // "owner" means co-ownership: the server's policies accept my writes into this
+  // group. The client has no write-back path for a mirror in phase 1 — the flag
+  // is carried and shown, and the editing it enables lands later.
   role: "owner" | "reader";
   records: SyncRecord[];
 }
