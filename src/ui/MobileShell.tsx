@@ -81,22 +81,24 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
   const [addTimelineOpen, setAddTimelineOpen] = useState(false);
 
   // Derived from the store, not held here: the canvas, the list and search all
-  // select entries through the same actions, and each of them must open the
-  // entry pane identically.
-  const entryOpen = useAppState((s) => s.draft !== undefined || s.selectedEntryId !== undefined);
-  const sheetOpen = sheetKeptOpen || entryOpen;
+  // select entries and events through the same actions, and each of them must
+  // open the matching pane identically.
+  const recordOpen = useAppState(
+    (s) => s.draft !== undefined || s.selectedEntryId !== undefined || s.selectedEventId !== undefined,
+  );
+  const sheetOpen = sheetKeptOpen || recordOpen;
 
   // One anchor set for one sheet — except its peek height, which has to hold
   // whatever the current pane's header is: a title for the list, a title *and*
-  // a subtitle for an entry. Changing it mid-life is safe: the sheet clamps its
-  // position into the new anchors.
+  // a subtitle for an entry or an event. Changing it mid-life is safe: the
+  // sheet clamps its position into the new anchors.
   const anchors = useMemo(
     () => [
-      entryOpen ? ENTRY_PEEK_ANCHOR_PX : PEEK_ANCHOR_PX,
+      recordOpen ? ENTRY_PEEK_ANCHOR_PX : PEEK_ANCHOR_PX,
       Math.round(viewportHeight * HALF_ANCHOR_FRACTION),
       Math.round(viewportHeight * FULL_ANCHOR_FRACTION),
     ],
-    [viewportHeight, entryOpen],
+    [viewportHeight, recordOpen],
   );
 
   // Everything docked at the top — the chips and the life strip — stacks in one

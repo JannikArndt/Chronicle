@@ -19,19 +19,30 @@ export interface Filters {
   timeRange?: TimeRangeFilter;
 }
 
+export type PickableDateField = "start" | "end" | "date";
+
 export interface AppState {
   loaded: boolean;
   dataset: TimelineDataset; // the user's private data — the only part that persists
   publicDatasets: TimelineDataset[]; // read-only, merged into the view
   selectedEntryId?: string;
+  // Events are their own selection, not a second kind of entry id: the two are
+  // edited by different panels and looked up in different arrays, and one
+  // shared field would have made every consumer guess which it was holding.
+  selectedEventId?: string;
   selectedRowId?: string;
+  // Where on the time axis the selected row was last clicked. The rail's
+  // "add an event" form opens there, so pointing at a moment and naming it is
+  // two steps rather than a date typed from memory.
+  selectedRowClickMs?: number;
   // A new entry stays a draft (not in the dataset) until it has a title (§6).
   draft?: TimelineEntry;
   search: string;
   filters: Filters;
-  // Pick-on-timeline mode: which date field of the open entry is being picked.
-  pickingField?: "start" | "end";
-  pickedDate?: { ms: number; precision: Precision; field: "start" | "end" };
+  // Pick-on-timeline mode: which date field of the open record is being picked.
+  // "date" is an event's single instant — it has no start/end to choose between.
+  pickingField?: PickableDateField;
+  pickedDate?: { ms: number; precision: Precision; field: PickableDateField };
   hiddenRowIds: string[];
   // Parent rows collapsed into a compact canvas band (in-memory: public rows
   // can't store this on their read-only dataset).

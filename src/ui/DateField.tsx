@@ -8,6 +8,7 @@ import { parseDateInput } from "../model/parseDateInput";
 import type { FuzzyDate, Precision } from "../model/types";
 import { armDatePicking, cancelDatePicking } from "../state/actions";
 import { useAppState } from "../state/store";
+import type { PickableDateField } from "../state/store";
 import { PillSelector } from "./PillSelector";
 import type { PillOption } from "./PillSelector";
 
@@ -21,7 +22,9 @@ const PRECISION_OPTIONS: PillOption<Precision>[] = [
 
 interface DateFieldProps {
   label: string;
-  field: "start" | "end";
+  // Which field pick-on-timeline should write into: an entry's start or end,
+  // or an event's single "date".
+  field: PickableDateField;
   value: FuzzyDate | undefined;
   onChange: (value: FuzzyDate | undefined) => void;
   allowOngoing?: boolean;

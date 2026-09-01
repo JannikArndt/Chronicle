@@ -1,4 +1,6 @@
-// One sheet, three panes: all timelines → one timeline → one entry.
+// One sheet, four panes: all timelines → one timeline → one entry, or one
+// event. The last two are siblings at the same depth: both are opened from a
+// timeline and both lead back to it.
 //
 // It used to be two sheets that swapped places, which lost the height you had
 // dragged to and offered no way back. Here the panes slide sideways inside a
@@ -15,30 +17,36 @@ import { useState } from "react";
 import type { MutableRefObject } from "react";
 import { collectEntryCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import { formatByPrecision } from "../model/fuzzyDate";
-import type { TimelineEntry } from "../model/types";
+import type { TimelineEntry, TimelineEvent } from "../model/types";
 import type { TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import {
   clearSelection,
   deleteEntryWithCascade,
+  deleteEvent,
   deleteRowWithCascade,
   selectEntry,
+  selectEvent,
   toggleRowHidden,
   updateEntry,
+  updateEvent,
 } from "../state/actions";
 import { isForeignId, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { BottomSheet } from "./BottomSheet";
-import { centerOnEntry } from "./centerOnEntry";
+import { centerOnEntry, centerOnEvent } from "./centerOnEntry";
 import type { BottomSheetHandle } from "./BottomSheet";
 import { EditableLine } from "./EditableLine";
 import { EntryPane } from "./EntryPane";
+import { EventPane } from "./EventPane";
 import { RowPane } from "./RowPane";
 import { SheetMenu } from "./SheetMenu";
 import type { SheetMenuItem } from "./SheetMenu";
 import { TimelineListPane } from "./TimelineListPane";
 
-type PaneName = "list" | "row" | "entry";
-const PANE_DEPTH: Record<PaneName, number> = { list: 0, row: 1, entry: 2 };
+type PaneName = "list" | "row" | "entry" | "event";
+// An event sits at the entry's depth: it is opened from a timeline and leads
+// back to one, so it slides in and out exactly the way an entry does.
+const PANE_DEPTH: Record<PaneName, number> = { list: 0, row: 1, entry: 2, event: 2 };
 
 interface TimelineSheetProps {
   layout: Layout;
@@ -85,15 +93,15 @@ export function TimelineSheet({
   const state = useAppState((s) => s);
   const merged = mergedDataset(state);
   const entry = state.draft ?? merged.entries.find((candidate) => candidate.id === state.selectedEntryId);
+  const event = merged.events.find((candidate) => candidate.id === state.selectedEventId);
 
   // Opened from the ⋯ menu, but shown inside the row pane next to the timeline
   // it will move.
   const [movingToGroup, setMovingToGroup] = useState(false);
 
-  const pane: PaneName = entry ? "entry" : settingsRowId !== null ? "row" : "list";
-  const row = merged.rows.find(
-    (candidate) => candidate.id === (entry ? entry.rowId : settingsRowId),
-  );
+  const pane: PaneName = entry ? "entry" : event ? "event" : settingsRowId !== null ? "row" : "list";
+  const openRowId = entry?.rowId ?? event?.rowId ?? settingsRowId;
+  const row = merged.rows.find((candidate) => candidate.id === openRowId);
   // Where this timeline sits. Its group is now the whole answer — a row used
   // to also carry a person, and preferring that person made the line stale the
   // moment the timeline was moved.
@@ -113,7 +121,7 @@ export function TimelineSheet({
 
   // What counts as "a different screen" — for the slide animation, and for
   // resetting the scroll position so a new pane never opens half scrolled.
-  const paneKey = `${pane}:${entry?.id ?? row?.id ?? ""}`;
+  const paneKey = `${pane}:${entry?.id ?? event?.id ?? row?.id ?? ""}`;
 
   const openRow = (rowId: string) => {
     onOpenRowSettings(rowId);
@@ -124,7 +132,8 @@ export function TimelineSheet({
   // the entry may have been tapped on the canvas, and "up" is a place, not a
   // history. Deselecting is what closes the entry pane.
   const leaveEntry = () => {
-    if (entry) onOpenRowSettings(entry.rowId);
+    const rowId = entry?.rowId ?? event?.rowId;
+    if (rowId !== undefined) onOpenRowSettings(rowId);
     clearSelection();
   };
 
@@ -134,6 +143,16 @@ export function TimelineSheet({
     if (!window.confirm(`Delete “${entry.title}”? ${describeCascade(cascade)}`)) return;
     deleteEntryWithCascade(entry.id);
     leaveEntry();
+  };
+
+  const removeEvent = () => {
+    if (!event) return;
+    // No cascade line: nothing in the model points at an event, so there is
+    // never anything else going with it.
+    if (!window.confirm(`Delete “${event.title}”?`)) return;
+    const rowId = event.rowId;
+    deleteEvent(event.id);
+    onOpenRowSettings(rowId);
   };
 
   const removeRow = () => {
@@ -147,6 +166,13 @@ export function TimelineSheet({
   // Drops the sheet out of the way and moves the canvas to the entry — the
   // point of the app is the picture, and the sheet was covering it.
   const showOnTimeline = () => {
+    if (event) {
+      // Zooms in when it has to: a pin is invisible from a whole-life view, so
+      // "show me" would otherwise land on an empty stretch of row.
+      centerOnEvent(engineRef.current, layout, event);
+      sheetHandleRef.current?.moveToAnchor(0);
+      return;
+    }
     if (!entry) return;
     centerOnEntry(engineRef.current, layout, entry, Date.now());
     // Peek, not closed: the entry stays selected and named at the bottom, so
@@ -158,6 +184,8 @@ export function TimelineSheet({
     pane,
     entryIsDraft: state.draft?.id === entry?.id,
     entryIsReadOnly: entry ? isForeignId(entry.id) : false,
+    eventIsReadOnly: event ? isForeignId(event.id) : false,
+    onRemoveEvent: removeEvent,
     rowIsReadOnly: row ? isForeignId(row.id) : true,
     rowIsVisible: row ? !state.hiddenRowIds.includes(row.id) : false,
     canMoveGroups: state.dataset.groups.filter((group) => !isPublicId(group.id)).length > 1,
@@ -186,19 +214,21 @@ export function TimelineSheet({
               <button
                 type="button"
                 className="sheet-back"
-                onClick={pane === "entry" ? leaveEntry : onCloseRowSettings}
+                onClick={pane === "entry" || pane === "event" ? leaveEntry : onCloseRowSettings}
               >
-                {pane === "entry" && row ? `‹ ${row.icon ?? "🏷️"} ${row.label}` : "‹ All timelines"}
+                {(pane === "entry" || pane === "event") && row
+                  ? `‹ ${row.icon ?? "🏷️"} ${row.label}`
+                  : "‹ All timelines"}
               </button>
             )}
-            {pane === "entry" && (
+            {(pane === "entry" || pane === "event") && (
               <button type="button" className="sheet-locate" onClick={showOnTimeline}>
                 Show on timeline
               </button>
             )}
             <SheetMenu items={menuItems} />
           </div>
-          <PaneTitle pane={pane} layout={layout} entry={entry} ownerLabel={ownerLabel} />
+          <PaneTitle pane={pane} layout={layout} entry={entry} event={event} ownerLabel={ownerLabel} />
         </div>
       }
     >
@@ -212,10 +242,12 @@ export function TimelineSheet({
             movingToGroup={movingToGroup && pane === "row"}
             onCloseGroupPicker={() => setMovingToGroup(false)}
             onOpenEntry={selectEntry}
+            onOpenEvent={selectEvent}
             onAddEntry={onAddEntry}
           />
         )}
         {pane === "entry" && entry && <EntryPane entry={entry} />}
+        {pane === "event" && event && <EventPane event={event} />}
       </div>
     </BottomSheet>
   );
@@ -227,11 +259,13 @@ function PaneTitle({
   pane,
   layout,
   entry,
+  event,
   ownerLabel,
 }: {
   pane: PaneName;
   layout: Layout;
   entry: TimelineEntry | undefined;
+  event: TimelineEvent | undefined;
   // Whose timeline this is. Not the timeline's own name — that is editable in
   // the pane itself, and printing it twice made one of the two look stale.
   ownerLabel: string | undefined;
@@ -260,6 +294,26 @@ function PaneTitle({
       </>
     );
   }
+  if (pane === "event" && event) {
+    const readOnly = isForeignId(event.id);
+    return (
+      <>
+        <EditableLine
+          className="sheet-title"
+          value={event.title}
+          placeholder="Untitled moment"
+          readOnly={readOnly}
+          onCommit={(title) => updateEvent(event.id, { title })}
+        />
+        {/* An event has no subtitle of its own, so the second line is the date
+            it happened — which is the whole of what an event is. */}
+        <span className="sheet-sub">
+          {event.icon ? `${event.icon} ` : ""}
+          {formatByPrecision(event.date)}
+        </span>
+      </>
+    );
+  }
   if (pane === "row") return <span className="sheet-sub">{ownerLabel ?? "Timeline"}</span>;
 
   const rowCount = layout.items.filter((item) => item.kind === "row").length;
@@ -273,6 +327,7 @@ function buildMenuItems({
   pane,
   entryIsDraft,
   entryIsReadOnly,
+  eventIsReadOnly,
   rowIsReadOnly,
   rowIsVisible,
   canMoveGroups,
@@ -280,10 +335,12 @@ function buildMenuItems({
   onMoveToGroup,
   onRemoveRow,
   onRemoveEntry,
+  onRemoveEvent,
 }: {
   pane: PaneName;
   entryIsDraft: boolean;
   entryIsReadOnly: boolean;
+  eventIsReadOnly: boolean;
   rowIsReadOnly: boolean;
   rowIsVisible: boolean;
   canMoveGroups: boolean;
@@ -291,12 +348,16 @@ function buildMenuItems({
   onMoveToGroup: () => void;
   onRemoveRow: () => void;
   onRemoveEntry: () => void;
+  onRemoveEvent: () => void;
 }): SheetMenuItem[] {
   // A draft has nothing to remove yet — it is not in the dataset until titled.
   if (pane === "entry") {
     return entryIsReadOnly || entryIsDraft
       ? []
       : [{ label: "Remove from timeline", onSelect: onRemoveEntry, danger: true }];
+  }
+  if (pane === "event") {
+    return eventIsReadOnly ? [] : [{ label: "Remove event", onSelect: onRemoveEvent, danger: true }];
   }
   if (pane === "row") {
     return [

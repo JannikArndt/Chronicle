@@ -5,7 +5,7 @@
 // A date like "2020-05-14" always means 2020-05-14T00:00:00Z regardless of the
 // viewer's local timezone, so a dataset renders identically on every device.
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export type Precision = "exact" | "day" | "month" | "year" | "circa";
 
@@ -80,11 +80,35 @@ export interface TimelineEntry {
   parentEntryId?: string; // links a sub-timeline entry to the parent entry it nests under
 }
 
+// A moment on a timeline: "first kiss", "finished the big project", "she was
+// born". An entry is a span, an event is a point — that single difference is
+// the whole reason this is its own entity rather than a zero-length entry:
+// a bar with no width has no label anchor, no fade edges and no "ongoing", and
+// every one of those would have had to grow an "unless it is a point" branch.
+//
+// Events belong to a row exactly the way entries do (`rowId`), follow their row
+// when it is published, and are drawn only once the view is zoomed in far
+// enough for a point in time to mean anything (src/render/events.ts).
+export interface TimelineEvent {
+  id: string;
+  rowId: string;
+  title: string;
+  // One instant, with its precision — an event dated "1998" is drawn with a
+  // year-wide fuzz band, not as a false pin on the 1st of July.
+  date: FuzzyDate;
+  icon?: string; // any emoji, drawn in front of the label — free-text input
+  description?: string;
+  place?: Place;
+}
+
 export interface TimelineDataset {
   schemaVersion: number;
   groups: Group[];
   rows: TimelineRow[];
   entries: TimelineEntry[];
+  // Moments on those rows. Added in schema v8; an older export has no such
+  // array, and the importer fills one in rather than rejecting the file.
+  events: TimelineEvent[];
   // The group that is "you" — set once the identity onboarding step completes.
   // Needed because a birth date alone doesn't say *whose*: a partner you added
   // has one too.

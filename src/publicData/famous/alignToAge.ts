@@ -76,6 +76,11 @@ export function buildFamousDataset(
         start: shiftFuzzyDate(entry.start, offsetMs),
         end: entry.end ? shiftFuzzyDate(entry.end, offsetMs) : undefined,
       })),
+    // Moments shift with the life they belong to, exactly like the spans do —
+    // "his first concert at 6" has to stay at your age 6 once aligned.
+    events: (person.biography.events ?? [])
+      .filter((event) => keptRowIds.has(event.rowId))
+      .map((event) => ({ ...event, date: shiftFuzzyDate(event.date, offsetMs) })),
   };
 
   return namespaceDataset(raw, famousKey(person.id, aligned));

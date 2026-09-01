@@ -8,12 +8,14 @@ import type { Layout, LayoutItem } from "./layout";
 import { ROW_HEIGHT } from "./layout";
 import { barGeometry, gradientStops, labelAnchorX, labelLimitX, pickBarLabel, truncateToWidth } from "./bars";
 import type { BarGeometry } from "./bars";
+import { EVENT_PIN_RADIUS_PX, eventMarkerOpacity, layoutEventMarkers } from "./events";
+import type { EventMarker } from "./events";
 import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
 import type { TimeScale } from "./timeScale";
 import { computeTicks, snapForScale } from "./timeAxis";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import { faviconUrl } from "../model/favicon";
-import type { Precision, TimelineDataset, TimelineEntry, TimelineRow } from "../model/types";
+import type { Precision, TimelineDataset, TimelineEntry, TimelineEvent, TimelineRow } from "../model/types";
 import { birthDateForRow } from "../model/dataset";
 
 const FAVICON_SIZE_PX = 12;
@@ -24,6 +26,13 @@ const LABEL_END_PADDING_PX = 6;
 
 // Minimum gap between two axis titles before the pinned one gives way.
 const AXIS_LABEL_GAP_PX = 10;
+
+// An event marker's pin head sits near the top of its row, with the label
+// beside it — above the bar labels, which are centred on the bar itself, so the
+// two never sit on the same line.
+const EVENT_PIN_TOP_OFFSET_PX = 8;
+const EVENT_LABEL_PLATE_HEIGHT_PX = 15;
+const EVENT_LABEL_PLATE_PADDING_PX = 4;
 
 export const AXIS_HEIGHT = 46;
 const PLUS_RADIUS = 11;
@@ -55,6 +64,7 @@ const FALLBACK_COLORS = {
   inactiveHatch: "rgba(120, 120, 120, 0.18)",
   plusFill: "#6d8bc7",
   bracket: "rgba(80, 76, 70, 0.55)",
+  event: "#4a4340",
 };
 
 export type ColorTable = typeof FALLBACK_COLORS;
@@ -87,11 +97,13 @@ export function readThemeColors(): ColorTable {
     inactiveHatch: read("--color-hatch", FALLBACK_COLORS.inactiveHatch),
     plusFill: read("--color-info", FALLBACK_COLORS.plusFill),
     bracket: read("--color-canvas-bracket", FALLBACK_COLORS.bracket),
+    event: read("--color-canvas-event", FALLBACK_COLORS.event),
   };
 }
 
 export interface EngineCallbacks {
   onSelectEntry: (entryId: string) => void;
+  onSelectEvent: (eventId: string) => void;
   onSelectRow: (rowId: string | undefined, clickTimeMs: number) => void;
   onRequestDraft: (rowId: string, startMs: number) => void;
   onPickDate: (ms: number, precision: Precision) => void;
@@ -117,10 +129,15 @@ export interface EngineInput {
   dataset: TimelineDataset;
   layout: Layout;
   selectedEntryId?: string;
+  selectedEventId?: string;
   selectedRowId?: string;
   draft?: TimelineEntry;
   // Entry ids that should stand out; null when no search/filter is active.
   emphasizedEntryIds: Set<string> | null;
+  // The same, for events. A separate set rather than one mixed bag: the two are
+  // looked up in different loops and an id from the wrong entity would silently
+  // dim nothing.
+  emphasizedEventIds: Set<string> | null;
   picking: boolean;
   // Pixels of canvas left empty above the axis header. The mobile shell floats
   // its chips over the canvas, and the axis has to start below them or the
@@ -138,6 +155,18 @@ interface EntryHit {
   // narrowest, and a long label must not make its entry look narrow.
   barWidth: number;
   entry: TimelineEntry;
+}
+
+interface EventHit {
+  // The box, which covers the pin and whatever label was drawn beside it.
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+  // The pin itself — two overlapping boxes are resolved by which moment the
+  // finger is actually nearest to.
+  pinX: number;
+  event: TimelineEvent;
 }
 
 interface PlusHit {
@@ -162,6 +191,7 @@ export class TimelineEngine {
   private destroyed = false;
 
   private entryHits: EntryHit[] = [];
+  private eventHits: EventHit[] = [];
   private plusHits: PlusHit[] = [];
   private pointerDown?: {
     x: number;
@@ -209,11 +239,13 @@ export class TimelineEngine {
       groups: [],
       rows: [],
       entries: [],
+      events: [],
     };
     this.input = {
       dataset: emptySet,
       layout: computeLayout(emptySet, new Set()),
       emphasizedEntryIds: null,
+      emphasizedEventIds: null,
       picking: false,
     };
     this.attachEvents();
@@ -443,6 +475,25 @@ export class TimelineEngine {
         return;
       }
     }
+    // Event markers are checked before bars: a pin is a point drawn ON TOP of
+    // whatever bar it sits over, and a target of a few pixels loses every
+    // ambiguous tap to the bar behind it otherwise.
+    const touchedEvents = this.eventHits.filter(
+      (hit) =>
+        x >= hit.x0 - TAP_SLOP_PX &&
+        x <= hit.x1 + TAP_SLOP_PX &&
+        y >= hit.y0 - TAP_SLOP_PX &&
+        y <= hit.y1 + TAP_SLOP_PX,
+    );
+    if (touchedEvents.length > 0) {
+      // Nearest pin wins, not the first: two markers whose labels overlap are
+      // resolved by which moment the finger actually landed on.
+      const nearest = touchedEvents.reduce((best, hit) =>
+        Math.abs(hit.pinX - x) < Math.abs(best.pinX - x) ? hit : best,
+      );
+      this.callbacks.onSelectEvent(nearest.event.id);
+      return;
+    }
     // Every row is concurrent, so a tap can land on several overlapping bars.
     // The narrowest wins: a short entry drawn on top of a long one is otherwise
     // impossible to select, while the long one stays reachable everywhere else.
@@ -480,6 +531,7 @@ export class TimelineEngine {
     ctx.fillRect(0, 0, this.width, this.height);
 
     this.entryHits = [];
+    this.eventHits = [];
     this.plusHits = [];
 
     const ticks = computeTicks(this.scale, this.width);
@@ -625,9 +677,128 @@ export class TimelineEngine {
       if (row.parentRowId) this.drawSubEntryBracket(entry, geom, item);
     });
 
+    // Above the bars, because a moment happened *on* this timeline — and below
+    // the plus affordances, which are the one thing that must never be covered.
+    this.drawEvents(item, relatedIds !== null);
+
     if (row.id === this.input.selectedRowId && !this.input.draft) {
       this.drawPlusAffordances(row, entries, item, nowMs);
     }
+  }
+
+  // Every event on one row, drawn as a pin with the label beside it — and only
+  // once the view is fine enough for a point in time to mean anything
+  // (src/render/events.ts owns that rule and the fade that goes with it).
+  private drawEvents(item: LayoutItem, anEntryIsSelected: boolean): void {
+    const zoomOpacity = eventMarkerOpacity(this.scale);
+    if (zoomOpacity === 0) return;
+    const row = item.row!;
+    const events = this.input.dataset.events.filter((event) => event.rowId === row.id);
+    if (events.length === 0) return;
+
+    const { ctx } = this;
+    // A compact row is a dense overview band with no room for text; the pins
+    // still mark where the moments are.
+    const labelled = !item.compact;
+    ctx.save();
+    ctx.font = "11px -apple-system, system-ui, sans-serif";
+    const markers = layoutEventMarkers(
+      events,
+      this.scale,
+      this.width,
+      labelled ? (text) => ctx.measureText(text).width : () => 0,
+    );
+    const emphasis = this.input.emphasizedEventIds;
+    for (const marker of markers) {
+      let alpha = zoomOpacity;
+      if (emphasis && !emphasis.has(marker.event.id)) alpha *= 0.22;
+      // An entry selection focuses the picture on that entry and what it is
+      // connected to; an event is never part of that, so it recedes with
+      // everything else rather than staying the brightest thing on the row.
+      if (anEntryIsSelected && marker.event.id !== this.input.selectedEventId) alpha = Math.min(alpha, 0.25);
+      this.drawEventMarker(marker, item, alpha, labelled);
+    }
+    ctx.restore();
+  }
+
+  private drawEventMarker(marker: EventMarker, item: LayoutItem, alpha: number, labelled: boolean): void {
+    const { ctx } = this;
+    const selected = marker.event.id === this.input.selectedEventId;
+    const pinY = item.y + (item.compact ? item.height / 2 : EVENT_PIN_TOP_OFFSET_PX);
+    const top = item.y + 3;
+    const bottom = item.y + item.height - 3;
+    const x = Math.round(marker.x) + 0.5;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // The precision band first, under everything: "somewhere in this window",
+    // the same claim a bar's fuzzy edge makes.
+    const bandWidth = marker.xFuzzEnd - marker.xFuzzStart;
+    if (bandWidth >= 2) {
+      ctx.fillStyle = colorWithAlpha(this.colors.event, 0.1);
+      ctx.fillRect(marker.xFuzzStart, top, bandWidth, bottom - top);
+    }
+
+    // Stem, then head. The head is outlined in the canvas background so it
+    // stays visible against a bar of any colour underneath it.
+    ctx.strokeStyle = colorWithAlpha(this.colors.event, 0.55);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.stroke();
+
+    const radius = item.compact ? EVENT_PIN_RADIUS_PX - 1 : EVENT_PIN_RADIUS_PX;
+    ctx.beginPath();
+    ctx.moveTo(x, pinY - radius);
+    ctx.lineTo(x + radius, pinY);
+    ctx.lineTo(x, pinY + radius);
+    ctx.lineTo(x - radius, pinY);
+    ctx.closePath();
+    ctx.fillStyle = this.colors.event;
+    ctx.fill();
+    ctx.strokeStyle = this.colors.background;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    if (selected) {
+      ctx.strokeStyle = this.colors.guide;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, pinY, radius + 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // The label sits on a plate of the canvas's own background: it is drawn
+    // over bars, and 11px text straight onto a coloured bar is unreadable.
+    if (labelled && marker.label !== "") {
+      const plateY = pinY - EVENT_LABEL_PLATE_HEIGHT_PX / 2;
+      ctx.fillStyle = colorWithAlpha(this.colors.background, 0.85);
+      roundRectPath(
+        ctx,
+        marker.labelX - EVENT_LABEL_PLATE_PADDING_PX,
+        plateY,
+        marker.labelWidth + EVENT_LABEL_PLATE_PADDING_PX * 2,
+        EVENT_LABEL_PLATE_HEIGHT_PX,
+        4,
+      );
+      ctx.fill();
+      ctx.fillStyle = selected ? this.colors.guide : this.colors.barText;
+      ctx.textBaseline = "middle";
+      ctx.fillText(marker.label, marker.labelX, pinY);
+    }
+    ctx.restore();
+
+    // The whole row height is the tap target, and the label widens it — a pin
+    // is 8px across, which is nothing to a thumb.
+    this.eventHits.push({
+      x0: marker.x - EVENT_PIN_RADIUS_PX,
+      x1: Math.max(marker.x + EVENT_PIN_RADIUS_PX, labelled ? marker.labelX + marker.labelWidth : 0),
+      pinX: marker.x,
+      y0: item.y - this.scrollY + this.contentTop(),
+      y1: item.y + item.height - this.scrollY + this.contentTop(),
+      event: marker.event,
+    });
   }
 
   private drawBar(

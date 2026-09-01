@@ -5,15 +5,32 @@ import { useEffect, useState } from "react";
 import { collectEntryCascade, describeCascade } from "../model/cascade";
 import { faviconUrl } from "../model/favicon";
 import { formatFuzzyDate } from "../model/fuzzyDate";
-import type { Place, TimelineEntry } from "../model/types";
-import { clearSelection, deleteEntryWithCascade, updateEntry } from "../state/actions";
+import type { Place, TimelineEntry, TimelineEvent } from "../model/types";
+import {
+  clearSelection,
+  deleteEntryWithCascade,
+  deleteEvent,
+  updateEntry,
+  updateEvent,
+} from "../state/actions";
 import { appStore, isForeignId, mergedDataset, useAppState } from "../state/store";
 import { DateField } from "./DateField";
 import { PlaceAutocompleteInput } from "../onboarding/PlaceAutocompleteInput";
 import { formatSuggestionText } from "../onboarding/nominatim";
 import type { PlaceSuggestion } from "../onboarding/nominatim";
 
+// One panel, two kinds of thing on it: the selected entry, or the selected
+// event. They are separate components rather than one with branches — an event
+// has a single date, no fades, no short title and no ongoing state, and every
+// one of those would have been an "unless this is an event" in the middle of a
+// field list.
 export function DetailPanel() {
+  const selectedEventId = useAppState((s) => s.selectedEventId);
+  if (selectedEventId !== undefined) return <EventDetail eventId={selectedEventId} />;
+  return <EntryDetail />;
+}
+
+function EntryDetail() {
   const state = useAppState((s) => s);
   const merged = mergedDataset(state);
   const entry: TimelineEntry | undefined =
@@ -23,7 +40,7 @@ export function DetailPanel() {
   // armed field together with its precision (§6).
   useEffect(() => {
     const { pickedDate } = appStore.getState();
-    if (!pickedDate || !entry) return;
+    if (!pickedDate || !entry || pickedDate.field === "date") return;
     updateEntry(entry.id, {
       [pickedDate.field]: { ms: pickedDate.ms, precision: pickedDate.precision },
     });
@@ -116,7 +133,11 @@ export function DetailPanel() {
 
       <div className="field">
         <label className="field-label">Place</label>
-        <PlaceField entry={entry} readOnly={readOnly} change={change} />
+        <PlaceField
+          place={entry.place}
+          readOnly={readOnly}
+          onChange={(place) => change({ place })}
+        />
       </div>
 
       <div className="field">
@@ -170,17 +191,114 @@ export function DetailPanel() {
   );
 }
 
-// Only one place per entry, so this toggles between a static chip (with a
+// One moment: a title, an emoji, one date, and a note. Deliberately shorter
+// than the entry panel — half of what an entry carries only makes sense for a
+// span, and offering an empty "fade out" on a point in time would be a promise
+// the renderer cannot keep.
+function EventDetail({ eventId }: { eventId: string }) {
+  const state = useAppState((s) => s);
+  const merged = mergedDataset(state);
+  const event: TimelineEvent | undefined = merged.events.find((candidate) => candidate.id === eventId);
+
+  useEffect(() => {
+    const { pickedDate } = appStore.getState();
+    if (!pickedDate || !event || pickedDate.field !== "date") return;
+    updateEvent(event.id, { date: { ms: pickedDate.ms, precision: pickedDate.precision } });
+    appStore.setState({ pickedDate: undefined });
+  }, [state.pickedDate, event]);
+
+  if (!event) return null;
+
+  const readOnly = isForeignId(event.id);
+  const row = merged.rows.find((candidate) => candidate.id === event.rowId);
+  const change = (patch: Partial<TimelineEvent>) => updateEvent(event.id, patch);
+
+  return (
+    <aside className="detail-panel">
+      <div className="detail-header">
+        <span className="detail-category">
+          {row?.icon} {row?.label}
+        </span>
+        <button type="button" className="icon-button" title="Close" onClick={clearSelection}>
+          ✕
+        </button>
+      </div>
+
+      <div className="field">
+        <label className="field-label">Event</label>
+        <div className="field-with-icon">
+          <input
+            className="emoji-input"
+            type="text"
+            value={event.icon ?? ""}
+            placeholder="🔖"
+            aria-label="Event icon"
+            disabled={readOnly}
+            onChange={(input) => change({ icon: input.target.value || undefined })}
+          />
+          <input
+            type="text"
+            value={event.title}
+            placeholder="What happened"
+            disabled={readOnly}
+            onChange={(input) => change({ title: input.target.value })}
+          />
+        </div>
+      </div>
+
+      <DateField
+        label="When"
+        field="date"
+        value={event.date}
+        disabled={readOnly}
+        onChange={(value) => value && change({ date: value })}
+      />
+
+      <div className="field">
+        <label className="field-label">Place</label>
+        <PlaceField place={event.place} readOnly={readOnly} onChange={(place) => change({ place })} />
+      </div>
+
+      <div className="field">
+        <label className="field-label">Description</label>
+        <textarea
+          rows={3}
+          value={event.description ?? ""}
+          disabled={readOnly}
+          onChange={(input) => change({ description: input.target.value || undefined })}
+        />
+      </div>
+
+      <div className="hint">Events appear on the timeline once you zoom in.</div>
+
+      {!readOnly && (
+        <button
+          type="button"
+          className="danger-button"
+          onClick={() => {
+            const detail = `Delete “${event.title}” (${formatFuzzyDate(event.date)})?`;
+            if (window.confirm(detail)) deleteEvent(event.id);
+          }}
+        >
+          Delete event…
+        </button>
+      )}
+    </aside>
+  );
+}
+
+// Only one place per record, so this toggles between a static chip (with a
 // clear button) and the search input — unlike the old multi-entity adder,
-// there's never both a chip and an input showing at once.
+// there's never both a chip and an input showing at once. Takes the place
+// itself rather than the entry, because an event has one too.
 function PlaceField({
-  entry,
+  place: current,
   readOnly,
-  change,
+  onChange,
 }: {
-  entry: TimelineEntry;
+  place: Place | undefined;
   readOnly: boolean;
-  change: (patch: Partial<TimelineEntry>) => void;
+  onChange: (place: Place | undefined) => void;
 }) {
   const [text, setText] = useState("");
   const [pendingSuggestion, setPendingSuggestion] = useState<PlaceSuggestion | null>(null);
@@ -198,25 +316,20 @@ function PlaceField({
             country: pendingSuggestion.country,
           }
         : { fullName: trimmed };
-    change({ place });
+    onChange(place);
     setText("");
     setPendingSuggestion(null);
   };
 
-  if (entry.place) {
+  if (current) {
     return (
       <div
         className="entity-chip"
-        title={[entry.place.street, entry.place.city, entry.place.country].filter(Boolean).join(", ") || undefined}
+        title={[current.street, current.city, current.country].filter(Boolean).join(", ") || undefined}
       >
-        <span className="entity-chip-text">📍 {entry.place.fullName}</span>
+        <span className="entity-chip-text">📍 {current.fullName}</span>
         {!readOnly && (
-          <button
-            type="button"
-            className="icon-button"
-            title="Clear place"
-            onClick={() => change({ place: undefined })}
-          >
+          <button type="button" className="icon-button" title="Clear place" onClick={() => onChange(undefined)}>
             ✕
           </button>
         )}

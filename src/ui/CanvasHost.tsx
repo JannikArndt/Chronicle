@@ -11,11 +11,12 @@ import {
   clearSelection,
   commitPickedDate,
   selectEntry,
+  selectEvent,
   selectRow,
   startDraft,
 } from "../state/actions";
 import { appStore, mergedDataset } from "../state/store";
-import { computeEmphasis } from "../state/emphasis";
+import { computeEmphasis, computeEventEmphasis } from "../state/emphasis";
 
 interface CanvasHostProps {
   layout: Layout;
@@ -31,13 +32,16 @@ interface CanvasHostProps {
 // have to produce it, so it is built in one place.
 function engineInputFor(layout: Layout, axisTop: number): EngineInput {
   const state = appStore.getState();
+  const merged = mergedDataset(state);
   return {
-    dataset: mergedDataset(state),
+    dataset: merged,
     layout,
     selectedEntryId: state.selectedEntryId ?? state.draft?.id,
+    selectedEventId: state.selectedEventId,
     selectedRowId: state.selectedRowId,
     draft: state.draft,
-    emphasizedEntryIds: computeEmphasis(mergedDataset(state), state.search, state.filters),
+    emphasizedEntryIds: computeEmphasis(merged, state.search, state.filters),
+    emphasizedEventIds: computeEventEmphasis(merged, state.search, state.filters),
     picking: state.pickingField !== undefined,
     axisTop,
   };
@@ -63,7 +67,10 @@ export function CanvasHost({
     const canvas = canvasRef.current!;
     const engine = new TimelineEngine(canvas, {
       onSelectEntry: selectEntry,
-      onSelectRow: (rowId) => (rowId ? selectRow(rowId) : clearSelection()),
+      onSelectEvent: selectEvent,
+      // The click time is kept with the selection: it is where the row's
+      // "add an event" form opens, so a moment is pointed at rather than typed.
+      onSelectRow: (rowId, clickTimeMs) => (rowId ? selectRow(rowId, clickTimeMs) : clearSelection()),
       onRequestDraft: startDraft,
       onPickDate: commitPickedDate,
       onViewChange: (view) => onViewChangeRef.current?.(view),

@@ -165,11 +165,16 @@ export class FakeServer {
           (record.shared && (covered("group", record.id) || grantCoversGroupChain(record.parentId)))),
     );
 
-    const visibleEntries = all.filter(
-      (record) => record.kind === "entry" && record.parentId !== undefined && visibleRowIds.has(record.parentId),
+    // Entries and events are the same question asked twice: neither carries a
+    // flag, both are visible exactly when their row is.
+    const visibleOnRows = all.filter(
+      (record) =>
+        (record.kind === "entry" || record.kind === "event") &&
+        record.parentId !== undefined &&
+        visibleRowIds.has(record.parentId),
     );
 
-    return [...visibleGroups, ...visibleRows, ...visibleEntries];
+    return [...visibleGroups, ...visibleRows, ...visibleOnRows];
   }
 }
 

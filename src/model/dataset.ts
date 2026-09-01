@@ -1,5 +1,5 @@
 import { SCHEMA_VERSION } from "./types";
-import type { Group, TimelineDataset, TimelineEntry, TimelineRow } from "./types";
+import type { Group, TimelineDataset, TimelineEntry, TimelineEvent, TimelineRow } from "./types";
 
 export function emptyDataset(): TimelineDataset {
   return {
@@ -7,6 +7,7 @@ export function emptyDataset(): TimelineDataset {
     groups: [],
     rows: [],
     entries: [],
+    events: [],
   };
 }
 
@@ -25,6 +26,10 @@ export function mergeDatasets(base: TimelineDataset, ...extra: TimelineDataset[]
     merged.groups.push(...dataset.groups);
     merged.rows.push(...dataset.rows);
     merged.entries.push(...dataset.entries);
+    // `?? []` because a public-data file authored before v8 simply has no
+    // events array — the JSON is typed as a dataset but is not validated by
+    // the compiler, so the absence is real at runtime.
+    merged.events.push(...(dataset.events ?? []));
   }
   return merged;
 }
@@ -35,6 +40,10 @@ export function rowsOfGroup(dataset: TimelineDataset, groupId: string): Timeline
 
 export function entriesOfRow(dataset: TimelineDataset, rowId: string): TimelineEntry[] {
   return dataset.entries.filter((entry) => entry.rowId === rowId);
+}
+
+export function eventsOfRow(dataset: TimelineDataset, rowId: string): TimelineEvent[] {
+  return dataset.events.filter((event) => event.rowId === rowId);
 }
 
 export function childRows(dataset: TimelineDataset, rowId: string): TimelineRow[] {
