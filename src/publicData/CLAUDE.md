@@ -24,11 +24,18 @@ but must be revisited before a real release:
   Put it behind a dev flag or delete it.
 - **Cache Wikidata biographies** — every add re-runs the SPARQL query; no
   caching.
-- **Row-collapse state is in-memory** (`collapsedRowIds` in `src/ui/`) and
-  resets on reload, unlike overlay selections which persist. Decide whether to
-  persist it. It's also lost when toggling 🎂 alignment, since the key flips
-  between `pub:famous-x:` and `pub:famous-x-aligned:` — key collapse on the
-  base row key instead.
+- **Group-collapse state for a famous person's sub-groups is lost when
+  toggling 🎂 alignment**, since the key flips between `pub:famous-x:` and
+  `pub:famous-x-aligned:` — key collapse on the base group/row key instead.
+  (Since v9, "Career"/"Children" lanes are sub-groups — see below — so this is
+  the same pre-existing gap public/mirror group collapse always had, not a new
+  one; it used to also apply to the now-removed parent-row collapse.)
+- **Lanes render as sub-groups, since v9**: `WIKIDATA_ROWS` specs with
+  `layout: "lanes"` (Career, Children) each become a sub-group (`g-<key>`)
+  holding one row per lane, instead of a parent row with `parentRowId`
+  sub-rows (rows can no longer nest inside rows). This is a strict
+  improvement: a lanes group is now collapsible on its own, and collapsing it
+  shows a merged summary bar instead of disappearing entirely.
 - **Stage 2 not built**: company lanes don't yet nest their positions
   (Chairperson/CEO inside Tesla). The data is available (`P39` positions carry
   a `P108` employer qualifier).

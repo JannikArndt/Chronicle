@@ -27,8 +27,7 @@ export function namespaceWithPrefix(dataset: TimelineDataset, prefix: string): T
     rows: dataset.rows.map((row) => ({
       ...row,
       id: ns(row.id),
-      groupId: ns(row.groupId),
-      parentRowId: nsOptional(row.parentRowId),
+      groupId: nsOptional(row.groupId),
     })),
     entries: dataset.entries.map((entry) => ({
       ...entry,

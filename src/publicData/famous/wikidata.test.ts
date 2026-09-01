@@ -55,28 +55,29 @@ describe("bindingsToPerson", () => {
     expect(person.birthMs).toBe(Date.UTC(1879, 2, 14));
   });
 
-  it("keeps flat rows (places, works) as plain rows with entries", () => {
+  it("keeps flat rows (places, works) as plain rows directly in the top group", () => {
     const person = bindingsToPerson("Q937", "Albert Einstein", "physicist", bindings);
     const places = person.biography.rows.find((r) => r.label === "Places lived")!;
-    expect(places.parentRowId).toBeUndefined();
+    expect(places.groupId).toBe("g");
     expect(person.biography.entries.filter((e) => e.rowId === places.id)).toHaveLength(2);
   });
 
-  it("splits overlapping jobs into sub-rows under a Career parent", () => {
+  it("splits overlapping jobs into rows under a Career sub-group", () => {
     const person = bindingsToPerson("Q937", "Albert Einstein", "physicist", bindings);
-    const career = person.biography.rows.find((r) => r.label === "Career" && r.parentRowId === undefined)!;
-    const laneRows = person.biography.rows.filter((r) => r.parentRowId === career.id);
+    const career = person.biography.groups.find((g) => g.label === "Career" && g.parentGroupId === "g")!;
+    expect(career).toBeDefined();
+    const laneRows = person.biography.rows.filter((r) => r.groupId === career.id);
     expect(laneRows.map((r) => r.label)).toEqual(["Patent office", "University of Berlin"]);
-    // The parent row is just a header — the entries live on the sub-rows.
-    expect(person.biography.entries.some((e) => e.rowId === career.id)).toBe(false);
     expect(person.biography.entries.filter((e) => laneRows.some((r) => r.id === e.rowId))).toHaveLength(2);
   });
 
-  it("adds partners and children (children as their own lanes)", () => {
+  it("adds partners and children (children as their own lanes, in a Children sub-group)", () => {
     const person = bindingsToPerson("Q937", "Albert Einstein", "physicist", bindings);
     expect(person.biography.entries.some((e) => e.title === "Mileva Marić")).toBe(true);
+    const childrenGroup = person.biography.groups.find((g) => g.label === "Children" && g.parentGroupId === "g")!;
+    expect(childrenGroup).toBeDefined();
     const childRow = person.biography.rows.find((r) => r.label === "Hans Albert Einstein")!;
-    expect(childRow.parentRowId).toBeDefined();
+    expect(childRow.groupId).toBe(childrenGroup.id);
     const childEntry = person.biography.entries.find((e) => e.rowId === childRow.id)!;
     expect(childEntry.end!.ms).toBeGreaterThan(childEntry.start.ms); // capped, not open-ended
   });

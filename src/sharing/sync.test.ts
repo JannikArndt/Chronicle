@@ -47,7 +47,7 @@ describe("recordsFromSubset", () => {
     expect(row.shared).toBe(true);
     // Ids and container links are columns, never duplicated into the payload —
     // that is the line E2EE would encrypt along.
-    expect(row.payload).toEqual({ label: "Job", color: "#333", parentRowId: undefined });
+    expect(row.payload).toEqual({ label: "Job", color: "#333" });
     expect(row.payload).not.toHaveProperty("id");
     expect(row.payload).not.toHaveProperty("groupId");
   });

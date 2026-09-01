@@ -404,19 +404,21 @@ export function updateOnboardingPlaceEntry(entryId: string, place: OnboardingPla
 
 // A birth date is what makes a group a person, so it is offered here rather
 // than asked for as a separate "is this a person?" question.
-export function addGroup(label: string, birthDate?: number): void {
+export function addGroup(label: string, birthDate?: number, color?: string, icon?: string): string {
+  const id = newId("group");
   updateDataset((dataset) => {
-    dataset.groups.push({ id: newId("group"), label, birthDate, collapsed: false });
+    dataset.groups.push({ id, label, birthDate, color, icon, collapsed: false });
     return dataset;
   });
+  return id;
 }
 
-// Nest a group inside another — "Finn" inside "Family". Only one level deep is
-// drawn, so a group that is already nested cannot take children.
-export function addSubGroup(parentGroupId: string, label: string, birthDate?: number): void {
+// Nest a group inside another, at any depth — "Finn" inside "Family", or
+// "Finn's kid" inside "Finn".
+export function addSubGroup(parentGroupId: string, label: string, birthDate?: number, color?: string, icon?: string): void {
   updateDataset((dataset) => {
     const parent = dataset.groups.find((g) => g.id === parentGroupId);
-    if (!parent || parent.parentGroupId !== undefined) return dataset;
+    if (!parent) return dataset;
     const id = newId("group");
     // Insert directly after the parent's existing children so siblings stay
     // together; array order is what the layout draws.
@@ -427,6 +429,8 @@ export function addSubGroup(parentGroupId: string, label: string, birthDate?: nu
       parentGroupId,
       label,
       birthDate,
+      color,
+      icon,
       collapsed: false,
     });
     // A group needs at least one timeline to be visible; start with a generic one.
@@ -470,7 +474,9 @@ export function setDatasetAccount(accountId: string | undefined): void {
 
 // Returns the new row's id so a caller that has to put something on it right
 // away (the add-entry assistant) doesn't have to search for it afterwards.
-export function addRow(groupId: string, label: string, icon = "🏷️"): string {
+// `groupId` undefined creates a top-level timeline — a timeline needs no
+// container at all.
+export function addRow(groupId: string | undefined, label: string, icon = "🏷️"): string {
   const id = newId("row");
   updateDataset((dataset) => {
     // Private unless the group (or one of its ancestors) says otherwise. A new
@@ -480,23 +486,6 @@ export function addRow(groupId: string, label: string, icon = "🏷️"): string
     return dataset;
   });
   return id;
-}
-
-export function addSubRow(parentRowId: string, label: string): void {
-  updateDataset((dataset) => {
-    const parent = dataset.rows.find((r) => r.id === parentRowId);
-    if (!parent) return dataset;
-    dataset.rows.push({
-      id: newId("row"),
-      groupId: parent.groupId,
-      color: randomPastelColor(),
-      icon: "🏷️",
-      label,
-      parentRowId,
-      shared: defaultSharedFor(dataset, parent.groupId) ? true : undefined,
-    });
-    return dataset;
-  });
 }
 
 function randomPastelColor(): string {
@@ -518,48 +507,72 @@ export function deleteRowWithCascade(rowId: string): void {
   clearSelection();
 }
 
-// ---------- rail drag-and-drop (reorder groups, move rows) ----------
+// ---------- rail drag-and-drop (move groups and rows, at any depth) ----------
 
 // Order is array position — no explicit order field exists (deliberate: no
 // schema change for drag-and-drop).
 
-// Repositions a group immediately before `beforeGroupId`, or at the end of
-// `dataset.groups` when `beforeGroupId` is null. Unknown ids and
-// self-referential drops are no-ops.
-export function reorderGroup(groupId: string, beforeGroupId: string | null): void {
-  if (groupId === beforeGroupId) return;
+// Every group at or under `groupId`, `groupId` itself included — used to
+// refuse a drop that would nest a group inside its own descendant.
+function subtreeGroupIds(dataset: TimelineDataset, groupId: string): Set<string> {
+  const collected = new Set([groupId]);
+  let frontier = [groupId];
+  while (frontier.length > 0) {
+    const children = dataset.groups.filter((g) => g.parentGroupId !== undefined && frontier.includes(g.parentGroupId));
+    frontier = children.map((g) => g.id);
+    frontier.forEach((id) => collected.add(id));
+  }
+  return collected;
+}
+
+// Moves a group anywhere in the tree: under `targetParentGroupId` (null = the
+// root), immediately before `beforeGroupId` (a sibling already at that
+// target — null appends at the end). Self-drops, unknown ids, and drops that
+// would nest a group inside its own descendant are no-ops.
+export function moveGroup(
+  groupId: string,
+  targetParentGroupId: string | null,
+  beforeGroupId: string | null,
+): void {
+  if (groupId === beforeGroupId || groupId === targetParentGroupId) return;
   updateDataset((dataset) => {
     const movingGroup = dataset.groups.find((g) => g.id === groupId);
     if (!movingGroup) return dataset;
-    if (beforeGroupId !== null && !dataset.groups.some((g) => g.id === beforeGroupId)) return dataset;
+    if (targetParentGroupId !== null) {
+      if (!dataset.groups.some((g) => g.id === targetParentGroupId)) return dataset;
+      if (subtreeGroupIds(dataset, groupId).has(targetParentGroupId)) return dataset; // cycle guard
+    }
+    const beforeGroup = beforeGroupId === null ? undefined : dataset.groups.find((g) => g.id === beforeGroupId);
+    if (beforeGroupId !== null && (beforeGroup === undefined || beforeGroup.parentGroupId !== (targetParentGroupId ?? undefined))) {
+      return dataset;
+    }
     const remainingGroups = dataset.groups.filter((g) => g.id !== groupId);
-    const insertIndex =
-      beforeGroupId === null
-        ? remainingGroups.length
-        : remainingGroups.findIndex((g) => g.id === beforeGroupId);
+    let insertIndex: number;
+    if (beforeGroup !== undefined) {
+      insertIndex = remainingGroups.findIndex((g) => g.id === beforeGroup.id);
+    } else {
+      const lastIndexAtTarget = lastIndexWhere(remainingGroups, (g) => g.parentGroupId === (targetParentGroupId ?? undefined));
+      insertIndex = lastIndexAtTarget === -1 ? remainingGroups.length : lastIndexAtTarget + 1;
+    }
+    movingGroup.parentGroupId = targetParentGroupId ?? undefined;
     remainingGroups.splice(insertIndex, 0, movingGroup);
     dataset.groups = remainingGroups;
     return dataset;
   });
 }
 
-// Moves a top-level row into `targetGroupId`, immediately before `beforeRowId`
-// (which must belong to the target group), or at the end of that group's rows
-// when null. Same-group reorder is the same code path. `targetGroupId` may be a
-// sub-group — that is now the whole of "which person does this belong to", so
-// there is nothing else to adopt at the drop position. Known scope cut: a moved
-// parent's sub-rows keep their stored groupId (they still render under their
-// parent, since layout follows parentRowId, but their groupId goes stale).
-export function moveRow(rowId: string, targetGroupId: string, beforeRowId: string | null): void {
+// Moves a row anywhere in the tree: into `targetGroupId` (null = top-level,
+// no group at all), immediately before `beforeRowId` (a sibling already in
+// that target group — null appends at the end). Same-group reorder is the
+// same code path.
+export function moveRow(rowId: string, targetGroupId: string | null, beforeRowId: string | null): void {
   if (rowId === beforeRowId) return;
   updateDataset((dataset) => {
     const movingRow = dataset.rows.find((r) => r.id === rowId);
-    // Sub-rows are not draggable (plan scope cut) — refuse them here too so no
-    // caller can detach a sub-row from its parent's group.
-    if (!movingRow || movingRow.parentRowId !== undefined) return dataset;
-    if (!dataset.groups.some((g) => g.id === targetGroupId)) return dataset;
+    if (!movingRow) return dataset;
+    if (targetGroupId !== null && !dataset.groups.some((g) => g.id === targetGroupId)) return dataset;
     const beforeRow = beforeRowId === null ? undefined : dataset.rows.find((r) => r.id === beforeRowId);
-    if (beforeRowId !== null && (beforeRow === undefined || beforeRow.groupId !== targetGroupId)) {
+    if (beforeRowId !== null && (beforeRow === undefined || beforeRow.groupId !== (targetGroupId ?? undefined))) {
       return dataset;
     }
     const remainingRows = dataset.rows.filter((r) => r.id !== rowId);
@@ -567,14 +580,113 @@ export function moveRow(rowId: string, targetGroupId: string, beforeRowId: strin
     if (beforeRow !== undefined) {
       insertIndex = remainingRows.findIndex((r) => r.id === beforeRow.id);
     } else {
-      const lastIndexInTargetGroup = lastIndexWhere(remainingRows, (r) => r.groupId === targetGroupId);
+      const lastIndexInTargetGroup = lastIndexWhere(remainingRows, (r) => r.groupId === (targetGroupId ?? undefined));
       insertIndex = lastIndexInTargetGroup === -1 ? remainingRows.length : lastIndexInTargetGroup + 1;
     }
-    movingRow.groupId = targetGroupId;
+    movingRow.groupId = targetGroupId ?? undefined;
     remainingRows.splice(insertIndex, 0, movingRow);
     dataset.rows = remainingRows;
     return dataset;
   });
+}
+
+// ---------- rail drag-and-drop (copy groups and rows, deep) ----------
+
+// Duplicates a group and its whole subtree — nested groups, their timelines,
+// and every entry/event on those timelines — as a sibling immediately after
+// the original, with fresh ids throughout. Always private: publishing is
+// always a deliberate act, and a copy of something published is not that act.
+// Returns the new group's id.
+export function copyGroup(groupId: string): string | undefined {
+  let newGroupId: string | undefined;
+  updateDataset((dataset) => {
+    const source = dataset.groups.find((g) => g.id === groupId);
+    if (!source) return dataset;
+    const cascade = collectGroupCascade(dataset, groupId);
+    const groupIdMap = new Map(cascade.groupIds.map((id) => [id, newId("group")]));
+    const rowIdMap = new Map(cascade.rowIds.map((id) => [id, newId("row")]));
+    const entryIdMap = new Map(cascade.entryIds.map((id) => [id, newId("entry")]));
+
+    const newGroups = cascade.groupIds.map((id) => {
+      const group = dataset.groups.find((g) => g.id === id)!;
+      return {
+        ...group,
+        id: groupIdMap.get(id)!,
+        parentGroupId:
+          group.parentGroupId !== undefined ? (groupIdMap.get(group.parentGroupId) ?? group.parentGroupId) : undefined,
+        shared: undefined,
+      };
+    });
+    const newRows = cascade.rowIds.map((id) => {
+      const row = dataset.rows.find((r) => r.id === id)!;
+      return {
+        ...row,
+        id: rowIdMap.get(id)!,
+        groupId: row.groupId !== undefined ? groupIdMap.get(row.groupId) : undefined,
+        shared: undefined,
+      };
+    });
+    const newEntries = cascade.entryIds.map((id) => {
+      const entry = dataset.entries.find((e) => e.id === id)!;
+      return {
+        ...entry,
+        id: entryIdMap.get(id)!,
+        rowId: rowIdMap.get(entry.rowId) ?? entry.rowId,
+        parentEntryId: entry.parentEntryId !== undefined ? entryIdMap.get(entry.parentEntryId) : undefined,
+      };
+    });
+    const newEvents = cascade.eventIds.map((id) => {
+      const event = dataset.events.find((e) => e.id === id)!;
+      return { ...event, id: newId("event"), rowId: rowIdMap.get(event.rowId) ?? event.rowId };
+    });
+
+    newGroupId = groupIdMap.get(groupId)!;
+    // Inserted directly after the source group so the copy appears right next
+    // to what it was copied from.
+    const sourceIndex = dataset.groups.findIndex((g) => g.id === groupId);
+    dataset.groups.splice(sourceIndex + 1, 0, ...newGroups);
+    dataset.rows.push(...newRows);
+    dataset.entries.push(...newEntries);
+    dataset.events.push(...newEvents);
+    return dataset;
+  });
+  return newGroupId;
+}
+
+// Duplicates a single row (its own entries/events only — a row has no
+// sub-rows any more) as a sibling immediately after the original, with fresh
+// ids throughout. Always private, like `copyGroup`. Returns the new row's id.
+export function copyRow(rowId: string): string | undefined {
+  let newRowId: string | undefined;
+  updateDataset((dataset) => {
+    const source = dataset.rows.find((r) => r.id === rowId);
+    if (!source) return dataset;
+    const cascade = collectRowCascade(dataset, rowId);
+    const entryIdMap = new Map(cascade.entryIds.map((id) => [id, newId("entry")]));
+    const id = newId("row");
+    newRowId = id;
+
+    const newEntries = cascade.entryIds.map((entryId) => {
+      const entry = dataset.entries.find((e) => e.id === entryId)!;
+      return {
+        ...entry,
+        id: entryIdMap.get(entryId)!,
+        rowId: id,
+        parentEntryId: entry.parentEntryId !== undefined ? entryIdMap.get(entry.parentEntryId) : undefined,
+      };
+    });
+    const newEvents = cascade.eventIds.map((eventId) => {
+      const event = dataset.events.find((e) => e.id === eventId)!;
+      return { ...event, id: newId("event"), rowId: id };
+    });
+
+    const sourceIndex = dataset.rows.findIndex((r) => r.id === rowId);
+    dataset.rows.splice(sourceIndex + 1, 0, { ...source, id, shared: undefined });
+    dataset.entries.push(...newEntries);
+    dataset.events.push(...newEvents);
+    return dataset;
+  });
+  return newRowId;
 }
 
 // Array.prototype.findLastIndex needs ES2023; the build targets ES2022.
@@ -634,15 +746,6 @@ export function toggleRowHidden(rowId: string): void {
     hiddenRowIds: hiddenRowIds.includes(rowId)
       ? hiddenRowIds.filter((id) => id !== rowId)
       : [...hiddenRowIds, rowId],
-  });
-}
-
-export function toggleRowCollapsed(rowId: string): void {
-  const { collapsedRowIds } = appStore.getState();
-  appStore.setState({
-    collapsedRowIds: collapsedRowIds.includes(rowId)
-      ? collapsedRowIds.filter((id) => id !== rowId)
-      : [...collapsedRowIds, rowId],
   });
 }
 

@@ -54,3 +54,16 @@ has nothing to say there.
 - **The minimap reads `--color-*` through the engine's own `readThemeColors()`.**
   That function and its `ColorTable` are exported for exactly this reason —
   there is no third color table, just as there is no second one in `engine.ts`.
+- **A collapsed group draws one summary bar, not nothing.** `computeLayout()`
+  (since v9) emits a synthetic `"group-summary"` `LayoutItem` for a collapsed
+  group — spanning the earliest start to the latest end across every entry and
+  event anywhere in its subtree, at any depth — and `engine.ts`'s
+  `drawGroupSummary()` paints it as one flattened bar in the group's own
+  color. No per-entry detail; that's the point of collapsing. The rail skips
+  this item kind entirely (`RailItem` returns `null` for it) — there is
+  nothing to click or edit on an aggregate.
+- **Groups nest arbitrarily deep; `LayoutItem.depth` means "nesting depth of
+  the container", for both `"group"` and `"row"` items.** `groupHeaderHeight()`
+  and `groupFontSize()` in `layout.ts` step down with depth (with a floor) so
+  the rail's indentation and shrinking font size *are* the hierarchy — there
+  is no separate two-tier "group vs. sub-group" styling any more.

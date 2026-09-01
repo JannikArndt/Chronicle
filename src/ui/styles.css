@@ -47,7 +47,6 @@
   --color-canvas-gridline: #eceae5;
   --color-canvas-gridline-strong: #dedcd5;
   --color-canvas-row-selected: rgba(120, 140, 200, 0.1);
-  --color-canvas-bracket: rgba(80, 76, 70, 0.55);
   /* Event pins: ink rather than a hue, because a pin is drawn over bars of
      every colour and has to stay legible on all of them. */
   --color-canvas-event: #4a4340;
@@ -101,7 +100,6 @@
     --color-canvas-gridline: #322e27;
     --color-canvas-gridline-strong: #3e392f;
     --color-canvas-row-selected: rgba(140, 160, 220, 0.16);
-    --color-canvas-bracket: rgba(200, 195, 185, 0.5);
     --color-canvas-event: #ded9d0;
   }
 }
@@ -265,7 +263,6 @@ textarea {
 }
 
 .rail-group,
-.rail-subgroup,
 .rail-row {
   position: absolute;
   left: 0;
@@ -278,17 +275,17 @@ textarea {
   white-space: nowrap;
 }
 
+/* Groups nest arbitrarily deep now — depth alone (set inline, from
+   groupFontSize()) drives font size, and indentation is inline padding-left.
+   Only a TOP-level group (.rail-group-top) gets the shaded background; a
+   nested one reads as lighter/smaller, which is the whole of how the
+   hierarchy is legible without a second visual language per level. */
 .rail-group {
   font-weight: 700;
-  font-size: 13px;
-  background: var(--color-bg-subtle);
 }
 
-.rail-subgroup {
-  font-weight: 600;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  padding-left: 18px;
+.rail-group-top {
+  background: var(--color-bg-subtle);
 }
 
 .rail-row {
@@ -312,7 +309,6 @@ textarea {
 }
 
 .rail-group-label,
-.rail-subgroup-label,
 .rail-row-label {
   flex: 1;
   min-width: 0;
@@ -346,17 +342,6 @@ textarea {
   background: none;
   padding: 2px;
   color: var(--color-text-muted);
-}
-
-/* Collapse toggle on a parent row (in place of the show/hide checkbox). */
-.row-collapse-button {
-  border: none;
-  background: none;
-  padding: 0;
-  width: 14px;
-  color: var(--color-text-muted);
-  font-size: 11px;
-  flex: none;
 }
 
 .rail-footer {
@@ -407,6 +392,14 @@ textarea {
   border-radius: 1px;
   background: var(--color-accent);
   pointer-events: none;
+}
+
+/* Alt/Option held mid-drag: the drop duplicates instead of moving. Dashed
+   rather than solid is the one visual difference — same color, same place. */
+.rail-drop-indicator-copy {
+  background: none;
+  height: 0;
+  border-top: 2px dashed var(--color-accent);
 }
 
 /* Hover-reveal only where a real hover exists; always visible on touch (§5).

@@ -1,6 +1,7 @@
 // Search & filter share one treatment: matches stay opaque, everything else
 // dims — non-matches never disappear, so temporal context stays legible (§6).
 
+import { ancestorGroups } from "../model/dataset";
 import type { TimelineDataset, TimelineEntry, TimelineEvent } from "../model/types";
 import type { Filters } from "./store";
 
@@ -22,13 +23,13 @@ function rowPasses(
 ): boolean {
   if (filters.groupIds.length === 0) return true;
   const row = dataset.rows.find((candidate) => candidate.id === rowId);
-  const group = row ? dataset.groups.find((candidate) => candidate.id === row.groupId) : undefined;
-  // A filter on "Family" must also keep the timelines of the people inside it,
-  // so a row matches on its own group or on that group's parent.
-  return (
-    (group !== undefined && filters.groupIds.includes(group.id)) ||
-    (group?.parentGroupId !== undefined && filters.groupIds.includes(group.parentGroupId))
-  );
+  const group = row?.groupId === undefined ? undefined : dataset.groups.find((candidate) => candidate.id === row.groupId);
+  // A filter on "Family" must also keep the timelines of everyone nested
+  // inside it, at any depth — so a row matches on its own group or on any of
+  // that group's ancestors.
+  if (group === undefined) return false;
+  if (filters.groupIds.includes(group.id)) return true;
+  return ancestorGroups(dataset, group.id).some((ancestor) => filters.groupIds.includes(ancestor.id));
 }
 
 // Returns null when nothing filters (no dimming at all), otherwise the set of

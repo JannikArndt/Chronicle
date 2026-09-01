@@ -5,7 +5,7 @@
 // A date like "2020-05-14" always means 2020-05-14T00:00:00Z regardless of the
 // viewer's local timezone, so a dataset renders identically on every device.
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export type Precision = "exact" | "day" | "month" | "year" | "circa";
 
@@ -15,21 +15,24 @@ export interface FuzzyDate {
   fuzzDays?: number; // optional explicit override of the default fuzziness for this precision
 }
 
-// A group is a labelled bundle of timelines — and, when it has a birth date,
-// also a person. There used to be a separate `Person` referenced by both Group
-// and TimelineRow; a person turned out to be nothing but a group with an age,
-// and the two-entity version cost an asymmetry ("a group either IS a person or
-// CONTAINS persons, never both") that every consumer had to special-case.
+// A group is a labelled bundle of sub-groups and timelines — and, when it has a
+// birth date, also a person. There used to be a separate `Person` referenced by
+// both Group and TimelineRow; a person turned out to be nothing but a group
+// with an age, and the two-entity version cost an asymmetry ("a group either IS
+// a person or CONTAINS persons, never both") that every consumer had to
+// special-case.
 export interface Group {
   id: string;
-  // Groups nest: "Family" contains "Finn". A nested group is the future
-  // attachment point for importing/subscribing to someone else's shared "Me"
-  // timeline export (ENGINEERING_PROMPT.md §7). Only one level deep is drawn.
+  // Groups nest arbitrarily deep: "Family" contains "Finn", which can contain
+  // "Finn's kids". Undefined means top-level.
   parentGroupId?: string;
   label: string;
+  color?: string; // any CSS color — accents this group's own header
+  icon?: string; // any emoji, shown before the group's name — free-text input
   // ms, UTC. What makes a group a *person*. Time before it renders "inactive"
-  // on this group's timelines and on those of its sub-groups, and the header
-  // shows a live computed age.
+  // on this group's own timelines and those of its sub-groups, and the header
+  // shows a live computed age. (A TimelineRow can independently carry its own
+  // birthDate too — see there for why a person isn't only ever a group.)
   birthDate?: number;
   collapsed: boolean;
   // --- sharing (v7) ---
@@ -44,12 +47,18 @@ export interface Group {
 
 export interface TimelineRow {
   id: string;
-  // The innermost group this timeline sits in — "Finn", not "Family".
-  groupId: string;
+  // The group this timeline sits directly in. Undefined means top-level — a
+  // timeline needs no container at all.
+  groupId?: string;
   color?: string; // any CSS color for this row's bars — a native color picker, not a fixed palette
   icon?: string; // any emoji, shown before the row label in the rail and inspector — free-text input
   label: string;
-  parentRowId?: string; // set for a sub-timeline (e.g. "Projects at Kestrel" under "Job")
+  // ms, UTC. A timeline can independently BE a person too — not every person
+  // deserves a whole group of sub-groups and timelines; an acquaintance might
+  // get exactly one timeline, with its own birth date, age badge and pre-birth
+  // fade. If unset, birthDateForRow() falls back to the nearest ancestor
+  // group's birthDate.
+  birthDate?: number;
   // --- sharing (v7) ---
   // The publish switch for one timeline, and the finest granularity there is:
   // entries have no flag of their own, they follow their row.

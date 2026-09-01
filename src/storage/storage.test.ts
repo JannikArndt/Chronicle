@@ -215,4 +215,28 @@ describe("import validation", () => {
     expect(validateImport(ds).ok).toBe(false);
     expect(validateImport({ ...emptyDataset(), events: "nope" }).ok).toBe(false);
   });
+
+  // v9: a timeline can no longer nest inside another timeline — a v8 file's
+  // sub-row (parentRowId) becomes a normal sibling in the same group, with
+  // every entry and event (which reference the row directly) untouched.
+  test("flattens a v8 sub-row into a plain sibling row, keeping its entries", () => {
+    const legacy = {
+      schemaVersion: 8,
+      groups: [{ id: "g1", label: "Me", collapsed: false }],
+      rows: [
+        { id: "r1", groupId: "g1", label: "Job" },
+        { id: "r1-sub", groupId: "g1", label: "Projects", parentRowId: "r1" },
+      ],
+      entries: [{ id: "e1", rowId: "r1-sub", title: "Kestrel", start: { ms: 0, precision: "day" } }],
+      events: [],
+    };
+    const result = validateImport(legacy);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const sub = result.dataset.rows.find((row) => row.id === "r1-sub")!;
+    expect("parentRowId" in sub).toBe(false);
+    expect(sub.groupId).toBe("g1");
+    expect(result.dataset.entries).toHaveLength(1);
+    expect(result.dataset.entries[0].rowId).toBe("r1-sub");
+  });
 });

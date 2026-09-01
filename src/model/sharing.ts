@@ -26,9 +26,9 @@ export interface SyncSubset {
 // ancestor that states a preference wins, so setting `shareByDefault` on "My
 // family" covers every person inside it without touching them one by one.
 //
-// The `seen` guard is not decoration: only one level of nesting is *drawn*, but
-// the model stopped forbidding deeper trees in v6, and a parent cycle would
-// otherwise spin here forever.
+// The `seen` guard is not decoration: groups nest arbitrarily deep (since v9,
+// the rail draws every level too), and a parent cycle would otherwise spin
+// here forever.
 export function defaultSharedFor(dataset: TimelineDataset, groupId: string | undefined): boolean {
   const groupById = new Map(dataset.groups.map((group) => [group.id, group]));
   const seen = new Set<string>();
@@ -45,9 +45,7 @@ export function defaultSharedFor(dataset: TimelineDataset, groupId: string | und
 // outside the subset stripped so the result is internally consistent on its own.
 //
 // A dangling reference is not a cosmetic problem here: it is how a private
-// record leaks. A shared sub-timeline whose parent is private keeps its
-// `parentRowId` unless something removes it, and the viewer's client would then
-// ask the server for a row it must not see.
+// record leaks — every group reference is checked against the subset below.
 export function syncSubset(dataset: TimelineDataset, mode: SyncMode): SyncSubset {
   const groupById = new Map(dataset.groups.map((group) => [group.id, group]));
 
@@ -72,11 +70,16 @@ export function syncSubset(dataset: TimelineDataset, mode: SyncMode): SyncSubset
   for (const group of dataset.groups) {
     if (mode === "everything" || group.shared === true) includeWithAncestors(group.id);
   }
-  for (const row of eligibleRows) includeWithAncestors(row.groupId);
+  // A top-level row (no group at all) needs no ancestor walk — it is already
+  // eligible on its own `shared` flag.
+  for (const row of eligibleRows) {
+    if (row.groupId !== undefined) includeWithAncestors(row.groupId);
+  }
 
   // A row whose group is missing from the dataset entirely has nothing to be
-  // drawn under, so it stays home rather than going up as an orphan.
-  const rows = eligibleRows.filter((row) => groupIds.has(row.groupId));
+  // drawn under, so it stays home rather than going up as an orphan. A
+  // top-level row has no such requirement.
+  const rows = eligibleRows.filter((row) => row.groupId === undefined || groupIds.has(row.groupId));
   const rowIds = new Set(rows.map((row) => row.id));
   // Entries have no flag of their own — they follow their row, and that is the
   // whole of entry-level access control.
@@ -92,10 +95,7 @@ export function syncSubset(dataset: TimelineDataset, mode: SyncMode): SyncSubset
         parentGroupId:
           group.parentGroupId !== undefined && groupIds.has(group.parentGroupId) ? group.parentGroupId : undefined,
       })),
-    rows: rows.map((row) => ({
-      ...row,
-      parentRowId: row.parentRowId !== undefined && rowIds.has(row.parentRowId) ? row.parentRowId : undefined,
-    })),
+    rows: rows.map((row) => ({ ...row })),
     entries: entries.map((entry) => ({
       ...entry,
       parentEntryId:
@@ -114,32 +114,14 @@ export function describePublishImpact(dataset: TimelineDataset, rowId: string): 
   const row = dataset.rows.find((candidate) => candidate.id === rowId);
   if (row === undefined) return "";
 
-  const subRowIds = new Set<string>();
-  let frontier = [rowId];
-  while (frontier.length > 0) {
-    frontier = dataset.rows
-      .filter((candidate) => candidate.parentRowId !== undefined && frontier.includes(candidate.parentRowId))
-      .filter((candidate) => !subRowIds.has(candidate.id))
-      .map((candidate) => candidate.id);
-    frontier.forEach((id) => subRowIds.add(id));
-  }
-  // Sub-timelines are only carried along if they are published too — this
-  // switch is per-row, and silently publishing children would be the opposite
-  // of the private-by-default rule.
-  const publishedSubRows = [...subRowIds].filter(
-    (id) => dataset.rows.find((candidate) => candidate.id === id)?.shared === true,
-  );
-  const carried = (rowIdOfRecord: string): boolean =>
-    rowIdOfRecord === rowId || publishedSubRows.includes(rowIdOfRecord);
-  const entryCount = dataset.entries.filter((entry) => carried(entry.rowId)).length;
-  const eventCount = dataset.events.filter((event) => carried(event.rowId)).length;
+  const entryCount = dataset.entries.filter((entry) => entry.rowId === rowId).length;
+  const eventCount = dataset.events.filter((event) => event.rowId === rowId).length;
 
   const count = (n: number, singular: string, plural: string): string => `${n} ${n === 1 ? singular : plural}`;
   const parts = [count(entryCount, "entry", "entries")];
   if (eventCount > 0) parts.push(count(eventCount, "event", "events"));
-  if (publishedSubRows.length > 0) parts.push(count(publishedSubRows.length, "sub-timeline", "sub-timelines"));
 
-  const group = dataset.groups.find((candidate) => candidate.id === row.groupId);
+  const group = row.groupId === undefined ? undefined : dataset.groups.find((candidate) => candidate.id === row.groupId);
   const groupClause = group === undefined ? "" : ` It also shares the name “${group.label}”.`;
   const listed = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
   return `This shares ${listed}.${groupClause}`;

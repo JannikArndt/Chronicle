@@ -25,18 +25,17 @@ export function TimelineListPane({
       {layout.items.map((item) => {
         if (item.kind === "group") {
           return (
-            <div key={item.id} className="sheet-section">
+            <div
+              key={item.id}
+              className={item.depth === 0 ? "sheet-section" : "sheet-subsection"}
+              style={{ paddingLeft: item.depth * 14 }}
+            >
               {item.group?.label}
             </div>
           );
         }
-        if (item.kind === "subgroup") {
-          return (
-            <div key={item.id} className="sheet-subsection">
-              {item.group?.label}
-            </div>
-          );
-        }
+        // A collapsed group's summary bar is canvas-only.
+        if (item.kind === "group-summary") return null;
         const row = item.row!;
         // Everything on this timeline, spans and moments alike: a row holding
         // five events and no entries is not an empty timeline, and a bare "0"

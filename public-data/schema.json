@@ -32,8 +32,7 @@
           "groupId": { "type": "string", "minLength": 1 },
           "color": { "type": "string", "minLength": 1, "description": "Any CSS color for this row's bars; omit for a neutral default." },
           "icon": { "type": "string", "minLength": 1, "description": "One emoji shown before the row label; optional." },
-          "label": { "type": "string", "minLength": 1 },
-          "parentRowId": { "type": "string", "minLength": 1 }
+          "label": { "type": "string", "minLength": 1 }
         }
       }
     },

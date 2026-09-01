@@ -41,10 +41,10 @@ export function keyOf(record: SyncRecord): string {
   return recordKey(record.kind, record.id);
 }
 
-// A row's `parentRowId` and an entry's `parentEntryId` go in the payload, not
-// into a structural column: they are presentational nesting, and no access
-// decision reads them. Only the container link (row → group, entry → row) and
-// the publish flag drive RLS, so only those stay in the clear.
+// An entry's `parentEntryId` goes in the payload, not into a structural
+// column: it is presentational nesting, and no access decision reads it.
+// Only the container link (row → group, entry → row) and the publish flag
+// drive RLS, so only those stay in the clear.
 export function recordsFromSubset(subset: SyncSubset, ownerAccountId: string, clock: string): SyncRecord[] {
   const base = { ownerAccountId, clock, updatedBy: ownerAccountId, deleted: false };
   return [
@@ -131,11 +131,13 @@ export function datasetToRecordsRoundTrip(records: SyncRecord[]): Omit<TimelineD
   const groupIds = new Set(groups.map((group) => group.id));
 
   const rows: TimelineRow[] = live
-    .filter((record) => record.kind === "row" && record.parentId !== undefined && groupIds.has(record.parentId))
+    .filter(
+      (record) => record.kind === "row" && (record.parentId === undefined || groupIds.has(record.parentId)),
+    )
     .map((record) => ({
       ...(record.payload as Omit<TimelineRow, "id" | "groupId" | "shared">),
       id: record.id,
-      groupId: record.parentId as string,
+      groupId: record.parentId,
       shared: record.shared,
     }));
   const rowIds = new Set(rows.map((row) => row.id));
@@ -165,10 +167,7 @@ export function datasetToRecordsRoundTrip(records: SyncRecord[]): Omit<TimelineD
       parentGroupId:
         group.parentGroupId !== undefined && groupIds.has(group.parentGroupId) ? group.parentGroupId : undefined,
     })),
-    rows: rows.map((row) => ({
-      ...row,
-      parentRowId: row.parentRowId !== undefined && rowIds.has(row.parentRowId) ? row.parentRowId : undefined,
-    })),
+    rows,
     entries: entries.map((entry) => ({
       ...entry,
       parentEntryId:

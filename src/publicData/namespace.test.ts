@@ -8,7 +8,8 @@ function fixture(): TimelineDataset {
   ds.groups = [{ id: "g-1", label: "Apple", collapsed: false }];
   ds.rows = [
     { id: "row-1", groupId: "g-1", color: "#888", label: "iPhone" },
-    { id: "row-2", groupId: "g-1", color: "#888", label: "Details", parentRowId: "row-1" },
+    { id: "row-2", groupId: "g-1", color: "#888", label: "Details" },
+    { id: "row-3", color: "#888", label: "Top-level" },
   ];
   ds.entries = [
     {
@@ -33,15 +34,19 @@ describe("namespaceDataset", () => {
     const ds = namespaceDataset(fixture(), "iphone-releases");
     expect(ds.groups[0].id).toBe("pub:iphone-releases:g-1");
     expect(ds.rows[0].groupId).toBe("pub:iphone-releases:g-1");
-    expect(ds.rows[1].parentRowId).toBe("pub:iphone-releases:row-1");
     expect(ds.entries[0].rowId).toBe("pub:iphone-releases:row-1");
     expect(ds.entries[1].parentEntryId).toBe("pub:iphone-releases:e-1");
     expect(ds.rows[0].color).toBe("#888");
   });
 
+  test("a top-level row (no group at all) namespaces its id but stays groupless", () => {
+    const ds = namespaceDataset(fixture(), "iphone-releases");
+    expect(ds.rows[2].id).toBe("pub:iphone-releases:row-3");
+    expect(ds.rows[2].groupId).toBeUndefined();
+  });
+
   test("leaves absent optional references undefined", () => {
     const ds = namespaceDataset(fixture(), "x");
-    expect(ds.rows[0].parentRowId).toBeUndefined();
     expect(ds.entries[0].parentEntryId).toBeUndefined();
     expect(ds.groups[0].parentGroupId).toBeUndefined();
   });

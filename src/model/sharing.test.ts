@@ -7,8 +7,8 @@ function makeEntry(id: string, rowId: string, parentEntryId?: string): TimelineE
   return { id, rowId, title: id, start: { ms: 0, precision: "day" }, parentEntryId };
 }
 
-function makeRow(id: string, groupId: string, shared?: boolean, parentRowId?: string): TimelineRow {
-  return { id, groupId, color: "#333", label: id, parentRowId, shared };
+function makeRow(id: string, groupId: string | undefined, shared?: boolean): TimelineRow {
+  return { id, groupId, color: "#333", label: id, shared };
 }
 
 function makeEvent(id: string, rowId: string): TimelineEvent {
@@ -90,12 +90,12 @@ describe("syncSubset — the privacy gate", () => {
     expect(subset.rows.some((row) => row.groupId === "g2")).toBe(false);
   });
 
-  test("a published sub-row under a private parent loses parentRowId rather than pointing at it", () => {
+  test("a published top-level row (no group at all) needs no ancestor to go up", () => {
     const dataset = fixture();
-    dataset.rows = [makeRow("r1", "g1a", false), makeRow("r2", "g1a", true, "r1")];
+    dataset.rows = [makeRow("top", undefined, true)];
     const subset = syncSubset(dataset, "shared-only");
-    expect(subset.rows.map((row) => row.id)).toEqual(["r2"]);
-    expect(subset.rows[0].parentRowId).toBeUndefined();
+    expect(subset.rows.map((row) => row.id)).toEqual(["top"]);
+    expect(subset.groups).toEqual([]);
   });
 
   test("a published child entry whose parent is on a private row loses parentEntryId", () => {
@@ -195,22 +195,20 @@ describe("describePublishImpact", () => {
     );
   });
 
-  test("an unpublished sub-timeline is not counted — this switch is per-row", () => {
+  test("only the named row's own entries are counted — another row's are not", () => {
     const dataset = fixture();
-    dataset.rows = [makeRow("r1", "g1a", true), makeRow("sub", "g1a", false, "r1")];
-    dataset.entries = [makeEntry("e1", "r1"), makeEntry("e2", "sub")];
+    dataset.rows = [makeRow("r1", "g1a", true), makeRow("other", "g1a", false)];
+    dataset.entries = [makeEntry("e1", "r1"), makeEntry("e2", "other")];
     dataset.events = [];
     expect(describePublishImpact(dataset, "r1")).toBe("This shares 1 entry. It also shares the name “Finn”.");
   });
 
-  test("a published sub-timeline is counted, with its entries", () => {
+  test("a top-level row (no group) names no group in the impact", () => {
     const dataset = fixture();
-    dataset.rows = [makeRow("r1", "g1a", true), makeRow("sub", "g1a", true, "r1")];
-    dataset.entries = [makeEntry("e1", "r1"), makeEntry("e2", "sub")];
+    dataset.rows = [makeRow("top", undefined, true)];
+    dataset.entries = [makeEntry("e1", "top")];
     dataset.events = [];
-    expect(describePublishImpact(dataset, "r1")).toBe(
-      "This shares 2 entries and 1 sub-timeline. It also shares the name “Finn”.",
-    );
+    expect(describePublishImpact(dataset, "top")).toBe("This shares 1 entry.");
   });
 
   test("an unknown row describes nothing", () => {

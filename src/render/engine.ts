@@ -64,7 +64,6 @@ const FALLBACK_COLORS = {
   guide: "#c2410c",
   inactiveHatch: "rgba(120, 120, 120, 0.18)",
   plusFill: "#6d8bc7",
-  bracket: "rgba(80, 76, 70, 0.55)",
   event: "#4a4340",
 };
 
@@ -97,7 +96,6 @@ export function readThemeColors(): ColorTable {
     guide: read("--color-accent", FALLBACK_COLORS.guide),
     inactiveHatch: read("--color-hatch", FALLBACK_COLORS.inactiveHatch),
     plusFill: read("--color-info", FALLBACK_COLORS.plusFill),
-    bracket: read("--color-canvas-bracket", FALLBACK_COLORS.bracket),
     event: read("--color-canvas-event", FALLBACK_COLORS.event),
   };
 }
@@ -621,11 +619,19 @@ export class TimelineEngine {
 
     for (const item of visible) {
       if (item.kind === "group") {
-        ctx.fillStyle = this.colors.groupBand;
-        ctx.fillRect(0, item.y, this.width, item.height - 6);
+        // Only a top-level group gets the shaded band — matches the rail,
+        // where the same rule keeps a deeply nested header from reading as
+        // heavy as the section it sits inside.
+        if (item.depth === 0) {
+          ctx.fillStyle = this.colors.groupBand;
+          ctx.fillRect(0, item.y, this.width, item.height - 6);
+        }
         continue;
       }
-      if (item.kind === "subgroup") continue;
+      if (item.kind === "group-summary") {
+        this.drawGroupSummary(item);
+        continue;
+      }
       if (item.row && !item.hidden) this.drawRow(item, nowMs, emphasis, relatedIds);
     }
 
@@ -675,7 +681,6 @@ export class TimelineEngine {
       if (relatedIds && !relatedIds.has(entry.id)) alpha = Math.min(alpha, 0.25);
       const limit = labelLimitX(index, geometries, this.width);
       this.drawBar(entry, geom, item, color, alpha, entry.id === this.input.selectedEntryId, limit);
-      if (row.parentRowId) this.drawSubEntryBracket(entry, geom, item);
     });
 
     // Above the bars, because a moment happened *on* this timeline — and below
@@ -706,17 +711,9 @@ export class TimelineEngine {
     if (events.length === 0) return;
 
     const { ctx } = this;
-    // A compact row is a dense overview band with no room for text; the pins
-    // still mark where the moments are.
-    const labelled = !item.compact;
     ctx.save();
     ctx.font = "11px -apple-system, system-ui, sans-serif";
-    const markers = layoutEventMarkers(
-      events,
-      this.scale,
-      this.width,
-      labelled ? (text) => ctx.measureText(text).width : () => 0,
-    );
+    const markers = layoutEventMarkers(events, this.scale, this.width, (text) => ctx.measureText(text).width);
     for (const marker of markers) {
       const matched = emphasis?.has(marker.event.id) ?? false;
       let alpha = matched ? 1 : zoomOpacity;
@@ -725,15 +722,15 @@ export class TimelineEngine {
       // connected to; an event is never part of that, so it recedes with
       // everything else rather than staying the brightest thing on the row.
       if (anEntryIsSelected && marker.event.id !== this.input.selectedEventId) alpha = Math.min(alpha, 0.25);
-      this.drawEventMarker(marker, item, alpha, labelled);
+      this.drawEventMarker(marker, item, alpha);
     }
     ctx.restore();
   }
 
-  private drawEventMarker(marker: EventMarker, item: LayoutItem, alpha: number, labelled: boolean): void {
+  private drawEventMarker(marker: EventMarker, item: LayoutItem, alpha: number): void {
     const { ctx } = this;
     const selected = marker.event.id === this.input.selectedEventId;
-    const pinY = item.y + (item.compact ? item.height / 2 : EVENT_PIN_TOP_OFFSET_PX);
+    const pinY = item.y + EVENT_PIN_TOP_OFFSET_PX;
     const top = item.y + 3;
     const bottom = item.y + item.height - 3;
     const x = Math.round(marker.x) + 0.5;
@@ -758,7 +755,7 @@ export class TimelineEngine {
     ctx.lineTo(x, bottom);
     ctx.stroke();
 
-    const radius = item.compact ? EVENT_PIN_RADIUS_PX - 1 : EVENT_PIN_RADIUS_PX;
+    const radius = EVENT_PIN_RADIUS_PX;
     ctx.beginPath();
     ctx.moveTo(x, pinY - radius);
     ctx.lineTo(x + radius, pinY);
@@ -780,7 +777,7 @@ export class TimelineEngine {
 
     // The label sits on a plate of the canvas's own background: it is drawn
     // over bars, and 11px text straight onto a coloured bar is unreadable.
-    if (labelled && marker.label !== "") {
+    if (marker.label !== "") {
       const plateY = pinY - EVENT_LABEL_PLATE_HEIGHT_PX / 2;
       ctx.fillStyle = colorWithAlpha(this.colors.background, 0.85);
       roundRectPath(
@@ -802,7 +799,7 @@ export class TimelineEngine {
     // is 8px across, which is nothing to a thumb.
     this.eventHits.push({
       x0: marker.x - EVENT_PIN_RADIUS_PX,
-      x1: Math.max(marker.x + EVENT_PIN_RADIUS_PX, labelled ? marker.labelX + marker.labelWidth : 0),
+      x1: Math.max(marker.x + EVENT_PIN_RADIUS_PX, marker.labelX + marker.labelWidth),
       pinX: marker.x,
       y0: item.y - this.scrollY + this.contentTop(),
       y1: item.y + item.height - this.scrollY + this.contentTop(),
@@ -821,7 +818,7 @@ export class TimelineEngine {
     labelLimit: number,
   ): void {
     const { ctx } = this;
-    const verticalPadding = item.compact ? 3 : 6;
+    const verticalPadding = 6;
     const top = item.y + verticalPadding;
     const barHeight = item.height - verticalPadding * 2;
     const x0 = geom.xVisualStart;
@@ -884,24 +881,16 @@ export class TimelineEngine {
     // Label anchored inside the near-opaque span so it stays legible (§5),
     // swapping to shortTitle when the full title overflows the bar, with a
     // favicon (if entry.website is set and its icon has loaded) in front.
-    // In a compact (collapsed-area) row the bar carries its ROW's label — the
-    // rail no longer shows it — in a smaller font, with no favicon.
     let labelText: string;
     let iconSpace = 0;
     let icon: CanvasImageSource | undefined;
-    if (item.compact) {
-      ctx.font = "10px -apple-system, system-ui, sans-serif";
-      labelText = item.row?.label ?? entry.title;
-    } else {
-      ctx.font = "12px -apple-system, system-ui, sans-serif";
-      const iconUrl = entry.website ? faviconUrl(entry.website, FAVICON_SIZE_PX) : undefined;
-      icon = iconUrl ? this.getFaviconImage(iconUrl) : undefined;
-      iconSpace = icon ? FAVICON_SIZE_PX + FAVICON_GAP_PX : 0;
-      const titleWidth = ctx.measureText(entry.title).width;
-      const useShortTitle =
-        pickBarLabel(entry, geom, titleWidth + iconSpace) === "shortTitle" && !!entry.shortTitle;
-      labelText = useShortTitle ? entry.shortTitle! : entry.title;
-    }
+    ctx.font = "12px -apple-system, system-ui, sans-serif";
+    const iconUrl = entry.website ? faviconUrl(entry.website, FAVICON_SIZE_PX) : undefined;
+    icon = iconUrl ? this.getFaviconImage(iconUrl) : undefined;
+    iconSpace = icon ? FAVICON_SIZE_PX + FAVICON_GAP_PX : 0;
+    const titleWidth = ctx.measureText(entry.title).width;
+    const useShortTitle = pickBarLabel(entry, geom, titleWidth + iconSpace) === "shortTitle" && !!entry.shortTitle;
+    labelText = useShortTitle ? entry.shortTitle! : entry.title;
     // Clamped to the neighbouring bar, then cut to fit. Before this, a long
     // title was drawn at full length across the bar next to it AND had that
     // width folded into its own tap target below — which is what made the
@@ -947,49 +936,38 @@ export class TimelineEngine {
     return undefined;
   }
 
-  // Sub-timeline bracket (§5): vertical line from the attached parent entry
-  // down to the sub-entry, with a notch "cut into" the parent bar.
-  private drawSubEntryBracket(entry: TimelineEntry, geom: BarGeometry, item: LayoutItem): void {
+  // A collapsed group's whole subtree, flattened into one bar spanning its
+  // earliest start to its latest end (src/render/layout.ts computes the
+  // range). No per-entry detail — that is the point of collapsing.
+  private drawGroupSummary(item: LayoutItem): void {
     const { ctx } = this;
-    const row = item.row!;
-    const parentRow = this.input.dataset.rows.find((r) => r.id === row.parentRowId);
-    if (!parentRow) return;
-    const parentItem = this.input.layout.items.find((i) => i.kind === "row" && i.id === parentRow.id);
-    if (!parentItem) return;
-
-    const parentEntries = this.input.dataset.entries.filter((e) => e.rowId === parentRow.id);
-    let parent: TimelineEntry | undefined;
-    if (entry.parentEntryId) {
-      // Explicit attachment overrides resolution and can span non-overlapping ranges.
-      parent = this.input.dataset.entries.find((e) => e.id === entry.parentEntryId);
-    } else {
-      parent =
-        parentEntries.find(
-          (e) => e.start.ms <= entry.start.ms && (e.end?.ms ?? Number.POSITIVE_INFINITY) >= entry.start.ms,
-        ) ??
-        parentEntries
-          .filter((e) => e.start.ms <= entry.start.ms)
-          .sort((a, b) => b.start.ms - a.start.ms)[0];
-    }
-    if (!parent) return; // no qualifying parent entry → no bracket (§5)
-
-    const x = Math.round(Math.max(geom.xVisualStart, msToX(this.scale, parent.start.ms))) + 0.5;
-    if (x < -1 || x > this.width + 1) return;
-    const parentTop = parentItem.y + 6;
-    const parentBottom = parentItem.y + parentItem.height - 6;
-    const subMid = item.y + item.height / 2;
+    const summary = item.summary;
+    if (!summary) return;
+    const x0 = msToX(this.scale, summary.startMs);
+    const x1 = msToX(this.scale, summary.endMs);
+    if (x1 < 0 || x0 > this.width) return;
+    const color = item.group?.color ?? "#888";
+    const top = item.y + 6;
+    const barHeight = item.height - 12;
+    const width = Math.max(x1 - x0, 2);
 
     ctx.save();
-    ctx.strokeStyle = this.colors.bracket;
-    ctx.lineWidth = 1.5;
-    // Notch across the parent bar where the bracket meets it.
-    ctx.beginPath();
-    ctx.moveTo(x, parentTop);
-    ctx.lineTo(x, parentBottom);
-    // Then down to the sub-entry's vertical center.
-    ctx.lineTo(x, subMid);
-    ctx.lineTo(Math.max(x, geom.xVisualStart), subMid);
-    ctx.stroke();
+    roundRectPath(ctx, x0, top, width, barHeight, 5);
+    ctx.fillStyle = colorWithAlpha(color, 0.6);
+    ctx.fill();
+
+    const label = item.group?.label ?? "";
+    if (label !== "") {
+      ctx.font = "12px -apple-system, system-ui, sans-serif";
+      const labelX = Math.max(x0, 0) + 8;
+      const available = Math.min(x1, this.width) - labelX - LABEL_END_PADDING_PX;
+      const text = truncateToWidth(label, available, (candidate) => ctx.measureText(candidate).width);
+      if (text !== "") {
+        ctx.fillStyle = readableTextColor(colorToRgb(this.ctx, color), this.colors);
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, labelX, top + barHeight / 2);
+      }
+    }
     ctx.restore();
   }
 
