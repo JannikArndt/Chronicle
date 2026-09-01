@@ -222,6 +222,7 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
         railContentRef={railContentRef}
         engineRef={engineRef}
         axisTop={axisTop}
+        showRowLabels
         onViewChange={setView}
       />
 
