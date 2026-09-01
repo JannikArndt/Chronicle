@@ -10,6 +10,7 @@ import { barGeometry, gradientStops, labelAnchorX, labelLimitX, pickBarLabel, tr
 import type { BarGeometry } from "./bars";
 import { EVENT_PIN_RADIUS_PX, eventMarkerOpacity, layoutEventMarkers } from "./events";
 import type { EventMarker } from "./events";
+import { PLUS_RADIUS, plusSpots } from "./plusSpots";
 import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
 import type { TimeScale } from "./timeScale";
 import { computeTicks, snapForScale } from "./timeAxis";
@@ -36,8 +37,6 @@ const EVENT_LABEL_PLATE_HEIGHT_PX = 13;
 const EVENT_LABEL_PLATE_PADDING_PX = 4;
 
 export const AXIS_HEIGHT = 46;
-const PLUS_RADIUS = 11;
-const MIN_GAP_FOR_PLUS_PX = 48;
 
 // What separates a tap from the end of a pan. A finger never holds perfectly
 // still, so movement alone is not enough — a slow, short drag is still a drag.
@@ -368,6 +367,12 @@ export class TimelineEngine {
 
     this.canvas.addEventListener("pointerdown", (event) => {
       this.canvas.setPointerCapture(event.pointerId);
+      // Picking a point on the timeline (e.g. for a "+" click) must not steal
+      // DOM focus from a title input the user is mid-typing in — the browser
+      // moves focus via the compatibility mousedown that follows pointerdown,
+      // and preventDefault here suppresses it. Must come after setPointerCapture
+      // so capture still takes effect.
+      if (this.input.picking) event.preventDefault();
       this.activePointers.set(event.pointerId, { x: event.offsetX, y: event.offsetY });
       if (this.activePointers.size === 2) {
         const [a, b] = [...this.activePointers.values()];
@@ -1036,30 +1041,10 @@ export class TimelineEngine {
     item: LayoutItem,
     nowMs: number,
   ): void {
-    const spots: { x: number; startMs: number }[] = [];
-    if (entries.length === 0) {
-      const clicked = this.emptyRowClick?.rowId === row.id ? this.emptyRowClick.ms : xToMs(this.scale, this.width / 2);
-      spots.push({ x: msToX(this.scale, clicked), startMs: clicked });
-    } else {
-      const first = entries[0];
-      const firstX = msToX(this.scale, first.start.ms);
-      if (firstX > PLUS_RADIUS * 3) {
-        spots.push({ x: firstX - 30, startMs: xToMs(this.scale, firstX - 30) });
-      }
-      for (let i = 0; i < entries.length - 1; i++) {
-        const endMs = entries[i].end?.ms ?? nowMs;
-        const gapStartX = msToX(this.scale, endMs);
-        const gapEndX = msToX(this.scale, entries[i + 1].start.ms);
-        // Only offer a target where the on-screen gap is wide enough (§6).
-        if (gapEndX - gapStartX >= MIN_GAP_FOR_PLUS_PX) {
-          spots.push({ x: (gapStartX + gapEndX) / 2, startMs: endMs });
-        }
-      }
-      const last = entries[entries.length - 1];
-      const lastEndMs = last.end?.ms ?? nowMs;
-      const lastX = msToX(this.scale, lastEndMs);
-      spots.push({ x: lastX + 30, startMs: lastEndMs });
-    }
+    // A remembered click on THIS row always wins over the gap heuristic,
+    // empty or not — see plusSpots.ts.
+    const clickedMs = this.emptyRowClick?.rowId === row.id ? this.emptyRowClick.ms : null;
+    const spots = plusSpots({ entries, scale: this.scale, width: this.width, nowMs, clickedMs });
 
     const { ctx } = this;
     for (const spot of spots) {

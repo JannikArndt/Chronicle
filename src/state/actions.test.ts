@@ -5,6 +5,10 @@ import {
   addOnboardingPlaceEntry,
   addRow,
   addSubGroup,
+  armDatePicking,
+  cancelDatePicking,
+  clearSelection,
+  commitPickedDate,
   completeIdentityStep,
   copyGroup,
   copyRow,
@@ -124,6 +128,54 @@ describe("draft lifecycle", () => {
     const state = appStore.getState();
     expect(state.dataset.entries).toHaveLength(2);
     expect(state.dataset.entries.some((e) => e.title === "Backfilled")).toBe(true);
+  });
+});
+
+describe("pick-on-timeline chaining", () => {
+  test("starting a draft arms start→end as a chain", () => {
+    startDraft("r1", T0);
+    const state = appStore.getState();
+    expect(state.pickingField).toBe("start");
+    expect(state.pickChain).toEqual(["end"]);
+  });
+
+  test("committing the chained start pick re-arms end, then committing end finishes", () => {
+    startDraft("r1", T0);
+    commitPickedDate(T0 + 10 * DAY_MS, "day");
+    let state = appStore.getState();
+    expect(state.pickedDate).toEqual({ ms: T0 + 10 * DAY_MS, precision: "day", field: "start" });
+    expect(state.pickingField).toBe("end");
+    expect(state.pickChain).toEqual([]);
+
+    commitPickedDate(T0 + 20 * DAY_MS, "day");
+    state = appStore.getState();
+    expect(state.pickedDate).toEqual({ ms: T0 + 20 * DAY_MS, precision: "day", field: "end" });
+    expect(state.pickingField).toBeUndefined();
+  });
+
+  test("armDatePicking with no chain argument still ends picking after one commit", () => {
+    armDatePicking("end");
+    expect(appStore.getState().pickChain).toEqual([]);
+    commitPickedDate(T0, "day");
+    const state = appStore.getState();
+    expect(state.pickedDate?.field).toBe("end");
+    expect(state.pickingField).toBeUndefined();
+  });
+
+  test("cancelDatePicking clears both pickingField and pickChain", () => {
+    startDraft("r1", T0);
+    cancelDatePicking();
+    const state = appStore.getState();
+    expect(state.pickingField).toBeUndefined();
+    expect(state.pickChain).toBeUndefined();
+  });
+
+  test("clearSelection clears both pickingField and pickChain", () => {
+    startDraft("r1", T0);
+    clearSelection();
+    const state = appStore.getState();
+    expect(state.pickingField).toBeUndefined();
+    expect(state.pickChain).toBeUndefined();
   });
 });
 

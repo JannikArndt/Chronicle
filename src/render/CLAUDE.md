@@ -67,6 +67,18 @@ has nothing to say there.
   and `groupFontSize()` in `layout.ts` step down with depth (with a floor) so
   the rail's indentation and shrinking font size *are* the hierarchy — there
   is no separate two-tier "group vs. sub-group" styling any more.
+- **A remembered empty-stretch click overrides the gap heuristic.** Clicking an
+  empty stretch of a row remembers that instant (`emptyRowClick`); as long as it
+  is still current for that row, `drawPlusAffordances` shows exactly one "+" at
+  that point — even on a row that already has entries — instead of the
+  first/gap/last heuristic. The spot math itself lives in the pure, unit-tested
+  `plusSpots.ts` (`plusSpots()`, `PLUS_RADIUS`, `MIN_GAP_FOR_PLUS_PX`);
+  `engine.ts` only paints the returned spots and registers `plusHits`, and still
+  owns clamping to `[-PLUS_RADIUS, width + PLUS_RADIUS]` before painting. A pick
+  gesture (`EngineInput.picking`) also calls `event.preventDefault()` on
+  `pointerdown`, after `setPointerCapture` — otherwise the browser's
+  compatibility mousedown pulls DOM focus out of whatever title input the user
+  was typing in.
 - **The engine can draw its own row/group name labels (`EngineInput.showRowLabels`),
   pinned to the left edge on a plate like an event label** — but only the
   mobile shell turns it on. Desktop already has the DOM rail sitting beside the
