@@ -1543,7 +1543,10 @@ textarea {
   gap: 5px;
 }
 
-.date-editor-blocks > .date-block:last-child {
+/* The End block hugs the right, above the handle it controls — but only when
+   there are two of them. An event has a single date, and a lone block sitting
+   hard right reads as a layout bug. */
+.date-editor-blocks > .date-block:last-child:not(:first-child) {
   align-items: flex-end;
   text-align: right;
 }

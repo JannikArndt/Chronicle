@@ -49,6 +49,11 @@ function myDataset(): TimelineDataset {
     { id: "e-berlin", rowId: "r-places", title: "Berlin", start: { ms: Date.UTC(2011, 0, 1), precision: "year" } },
     { id: "e-session", rowId: "r-therapy", title: "Weekly", start: { ms: Date.UTC(2019, 0, 1), precision: "year" } },
   ];
+  // One moment on the published timeline, one on the held-back one.
+  dataset.events = [
+    { id: "v-moved", rowId: "r-places", title: "Moved in", date: { ms: Date.UTC(2011, 3, 1), precision: "day" } },
+    { id: "v-told", rowId: "r-therapy", title: "Told her", date: { ms: Date.UTC(2019, 5, 2), precision: "day" } },
+  ];
   return dataset;
 }
 
@@ -90,6 +95,49 @@ describe("the family scenario", () => {
     const mirror = buildMirrors(await dad.pullVisible())[0];
     expect(mirror.dataset.rows.some((row) => row.label === "Therapy")).toBe(false);
     expect(mirror.dataset.entries.some((entry) => entry.title === "Weekly")).toBe(false);
+  });
+
+  test("the events on a published timeline travel with it", async () => {
+    const { me, dad, meId } = await setUp();
+    await dad.redeemInvite(await me.createInvite({ subjectKind: "group", subjectId: "g-me", role: "reader" }));
+
+    const mirror = buildMirrors(await dad.pullVisible())[0];
+    expect(mirror.dataset.events.map((event) => event.title)).toEqual(["Moved in"]);
+    // Namespaced like everything else, and still attached to its row.
+    expect(mirror.dataset.events[0].rowId).toBe(`shared:${meId}:r-places`);
+  });
+
+  test("the events on a held-back timeline never leave the device", async () => {
+    const { me, dad } = await setUp();
+    await dad.redeemInvite(await me.createInvite({ subjectKind: "group", subjectId: "g-me", role: "reader" }));
+
+    const mirror = buildMirrors(await dad.pullVisible())[0];
+    expect(mirror.dataset.events.some((event) => event.title === "Told her")).toBe(false);
+  });
+
+  test("un-publishing takes the events back too", async () => {
+    const { me, dad, dataset, pusher } = await setUp();
+    await dad.redeemInvite(await me.createInvite({ subjectKind: "group", subjectId: "g-me", role: "reader" }));
+    dataset.rows[0].shared = false;
+    await pusher.push(dataset);
+
+    expect(buildMirrors(await dad.pullVisible())).toEqual([]);
+  });
+
+  test("an event added later reaches the reader", async () => {
+    const { me, dad, dataset, pusher } = await setUp();
+    await dad.redeemInvite(await me.createInvite({ subjectKind: "group", subjectId: "g-me", role: "reader" }));
+
+    dataset.events.push({
+      id: "v-left",
+      rowId: "r-places",
+      title: "Left again",
+      date: { ms: Date.UTC(2014, 8, 1), precision: "month" },
+    });
+    await pusher.push(dataset);
+
+    const titles = buildMirrors(await dad.pullVisible())[0].dataset.events.map((event) => event.title);
+    expect(titles).toContain("Left again");
   });
 
   test("mirrored ids are namespaced by owner, so they cannot collide with my own", async () => {

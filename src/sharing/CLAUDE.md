@@ -11,7 +11,8 @@ chaining), 3 (live co-editing) and 4 (public profile via QR) are not built.
 
 - `hlc.ts` — hybrid logical clock. Serialised fixed-width so string comparison
   *is* the total order.
-- `records.ts` — the wire format. One flat `SyncRecord` for all three entities.
+- `records.ts` — the wire format. One flat `SyncRecord` for every entity, now
+  four kinds (`group`, `row`, `entry`, `event`).
 - `lww.ts` — last-writer-wins merge with tombstones.
 - `diff.ts` — current shareable subset vs. last-pushed snapshot → what to send.
 - `backend.ts` — the interface. Nothing above it knows about Supabase.
@@ -22,6 +23,11 @@ chaining), 3 (live co-editing) and 4 (public profile via QR) are not built.
 
 The privacy gate itself is **not** here: it is `src/model/sharing.ts`
 (`syncSubset`), because it is pure data logic and belongs with the model.
+
+An **event's access control is its row's**, exactly like an entry's: it carries
+`shared: false` on the wire and nothing ever asks. Publishing a timeline
+publishes its moments, and `describePublishImpact` says so before the switch is
+flipped.
 
 Outside `src/`: `supabase/migrations/` (the SQL), `supabase/tests/` (the RLS
 assertions plus a shim standing in for a Supabase project), `supabase/README.md`
@@ -55,13 +61,18 @@ assertions plus a shim standing in for a Supabase project), `supabase/README.md`
 
 ## The SQL is the real access control
 
-`supabase/migrations/0001_sharing.sql` is the enforcement. `fakeBackend.ts`
-re-implements the same visibility rule in TypeScript so the tests can exercise
+`supabase/migrations/0001_sharing.sql` plus `0002_events.sql` are the
+enforcement — 0002 widens the `kind` constraint and adds the `event` branch to
+`can_write_record` and to `records_readable`. It is a separate file rather than
+an edit to 0001 because 0001 has been applied to real databases, where
+`create table if not exists` would silently leave the old constraint in place.
+
+`fakeBackend.ts` re-implements the same visibility rule in TypeScript so the tests can exercise
 the full cycle in-process — **the two are meant to be read side by side, and
 changing one means changing the other.** The client-side rule is a test double,
 never a security boundary.
 
-`npm run verify:sql` is what holds the SQL side up: it applies the migration to
+`npm run verify:sql` is what holds the SQL side up: it applies the migrations to
 a real Postgres and runs `supabase/tests/rls.test.sql`, the family scenario
 asserted with RLS on and the identity switched per statement the way PostgREST
 switches it per request. CI runs it on every pull request. Setup:

@@ -13,8 +13,10 @@ graph TD
     D --> G[Group<br/>“Me”, “My family”, “Finn”<br/><i>a birth date makes it a person</i>]
     D --> R[Row / timeline<br/>“Places lived”<br/><i>has colour + icon</i>]
     D --> E[Entry<br/>“Lived in Berlin”<br/><i>drawn as a bar</i>]
+    D --> V[Event<br/>“First kiss”<br/><i>drawn as a pin, when zoomed in</i>]
 
     E -->|rowId| R
+    V -->|rowId| R
     R -->|groupId| G
     G -.->|parentGroupId, optional| G
     E -.->|parentEntryId, optional| E
@@ -23,17 +25,19 @@ graph TD
     D --- S
 ```
 
-Read it as sentences: **an entry sits on a row, a row sits in a group, and a
-group may sit in another group.** Everything else is optional.
+Read it as sentences: **an entry sits on a row, an event sits on a row, a row
+sits in a group, and a group may sit in another group.** Everything else is
+optional.
 
-There are only three things here. There used to be four — see **Person** below
-for why that turned out to be one too many.
+Four things. There were three until schema v8 added the event, and four before
+that — see **Person** below for why that fourth one turned out to be one too
+many, and **Event** for why this one is not.
 
 ---
 
 ## The data (what you own)
 
-**Dataset** — everything you have, as one object: groups, rows, entries.
+**Dataset** — everything you have, as one object: groups, rows, entries, events.
 There is exactly one, stored under the key `main` in IndexedDB. Exporting is
 literally this object as JSON.
 → `src/model/types.ts` (`TimelineDataset`), `src/storage/db.ts`
@@ -42,8 +46,23 @@ literally this object as JSON.
 "Lived in Berlin", "Read Dune". Drawn as a **bar**. This is the atom of the app.
 → `types.ts` (`TimelineEntry`)
 
-**Row** *(also: **timeline**)* — one horizontal lane holding entries. "Places
-lived" is a row; each flat you lived in is an entry on it. In the UI we say
+**Event** — one thing that happened *at a moment*. "First kiss", "finished the
+big project", "she was born". Drawn as a **pin** on its row, and only once the
+view is zoomed in far enough for a point in time to be readable — from a whole
+life away it would be a speck on a year it cannot resolve. It has one **date**
+(a FuzzyDate, so "sometime in 1998" draws a wide precision band rather than a
+false pin on 1 July), a title, optionally an emoji, a note and a place — and
+nothing that only makes sense for a duration.
+→ `types.ts` (`TimelineEvent`), `src/render/events.ts`
+
+**Entry vs. event** — *span* vs. *point*, and that is the whole of it. A
+zero-length entry is not an event: a bar with no width has no label anchor, no
+soft edges and no honest "ongoing". If you catch yourself giving something a
+one-day span, it wanted to be an event.
+
+**Row** *(also: **timeline**)* — one horizontal lane holding entries and events.
+"Places lived" is a row; each flat you lived in is an entry on it, and the day
+the boiler exploded is an event on it. In the UI we say
 *timeline*; in code it is `TimelineRow` / `rowId`, because "timeline" was already
 taken by the app itself. Rows carry their own **colour** and **icon**.
 Rows are **concurrent**: entries on one row may freely overlap, and no check
@@ -92,7 +111,8 @@ silent wipe of the one copy of your data.
 ## Sharing (who else can see it)
 
 **Shared** *(also: **published**)* — a timeline you have explicitly made visible
-to the people you've invited. New timelines are **private**; publishing is always
+to the people you've invited. Publishing it publishes its entries **and its
+events**: neither has a flag of its own, both follow their row. New timelines are **private**; publishing is always
 a deliberate act. Stored as `shared` on the row — deliberately *not* the
 `visibility` field v1–v3 had and v4 removed, so an old export can never be
 mistaken for a publish instruction.
@@ -230,8 +250,15 @@ sheets.
 
 **Hit test** — working out which entry a tap landed on. Picks the **narrowest**
 overlapping bar, because rows are concurrent and a short bar often sits inside a
-long one.
-→ `engine.ts` (`entryHits`)
+long one. Event pins are checked *first* — a pin is a few pixels wide and sits
+on top of whatever bar it marks, so bars-first would swallow every close tap.
+→ `engine.ts` (`entryHits`, `eventHits`)
+
+**Pin** — one event as drawn: a small diamond near the top of its row with a
+stem through the bars, its label on a plate beside it, and a soft **precision
+band** as wide as the date is vague. Fades in as you zoom past roughly one day
+per pixel; below that zoom no pin is drawn at all.
+→ `src/render/events.ts`
 
 ---
 
@@ -338,21 +365,22 @@ fast you flicked.
 **panes** you navigate between without the sheet itself moving.
 → `src/ui/TimelineSheet.tsx`
 
-**Pane** — one screen inside the sheet. Three of them, sliding sideways like a
-phone's navigation stack:
+**Pane** — one screen inside the sheet. Four of them, sliding sideways like a
+phone's navigation stack — `entry` and `event` are siblings at the same depth:
 
 ```
-   list  ───▶  row  ───▶  entry
-     ◀───────    ◀────────
-  all your     one          one
-  timelines    timeline     entry
+                        ┌──▶  entry
+   list  ───▶  row  ────┤
+     ◀───────    ◀──────┴──▶  event
+  all your     one          one entry,
+  timelines    timeline     or one moment
 ```
 
 → `TimelineListPane.tsx` (the rail's replacement), `RowPane.tsx`,
-`EntryPane.tsx`
+`EntryPane.tsx`, `EventPane.tsx`
 
 The stack is **derived, not remembered**: an entry being selected *means* the
-entry pane. That is why tapping a bar on the canvas, tapping a row in the list,
+entry pane, an event the event pane. That is why tapping a bar on the canvas, tapping a row in the list,
 and finding something in search all land in the same place. And "back" from an
 entry goes to its timeline — a *place*, not a history — because you may have
 arrived from the canvas without ever visiting that timeline.
@@ -416,7 +444,7 @@ does *not* use drafts — it asks everything, then writes once.
 → `src/state/actions.ts`
 
 **Cascade** — the set of things a delete would also take with it (an entry's
-children, a row's entries, a group's sub-groups). Always described before it
+children, a row's entries and events, a group's sub-groups). Always described before it
 happens; never silent.
 → `src/model/cascade.ts`
 

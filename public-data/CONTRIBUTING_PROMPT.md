@@ -43,6 +43,16 @@ The JSON must conform exactly to this structure (no extra fields anywhere):
       "start": { "ms": 0, "precision": "day" },
       "end": { "ms": 0, "precision": "day" }
     }
+  ],
+  "events": [
+    {
+      "id": "v-1",
+      "rowId": "row-1",
+      "title": "<what happened, in a few words>",
+      "icon": "<one fitting emoji, optional>",
+      "description": "<one factual sentence, optional>",
+      "date": { "ms": 0, "precision": "day" }
+    }
   ]
 }
 ```
@@ -55,12 +65,20 @@ Rules:
   `month`, `year`, or `circa` (rough). Use the coarsest precision that is honest —
   for a "sometime in 1994" event use `year` with `ms` at mid-1994.
 - Omit `end` entirely for things that are still ongoing.
+- **Spans go in `entries`, moments go in `events`.** A presidency is an entry; a
+  moon landing is an event. If a thing has no meaningful duration, do not give it
+  a one-day span — make it an event, which is drawn as a marked point on the row.
+  Omit the whole `events` array for a topic that has none.
+- Events are only drawn once the reader has zoomed in to roughly a few years on
+  screen, so use them for detail *within* a topic rather than as its backbone.
 - Consecutive terms/holders/versions on the same row: make each entry's `end` equal
   the next entry's `start` so they read as a continuous sequence.
-- Ids: short and unique within this file only (`g-1`, `cat-1`, `row-1`, `e-1`, …).
+- Ids: short and unique within this file only (`g-1`, `cat-1`, `row-1`, `e-1`, `v-1`, …).
 - Optional per-entry fields: `subtitle`, `shortTitle` (shown on the bar when the
   full title doesn't fit), `website` (fetches a favicon shown before the label),
   `place` (`{ fullName, coordinates?: { lat, lon }, street?, city?, country? }`).
+- Optional per-event fields: `icon`, `description`, `place`. An event has one
+  `date` and no `end` — that is the whole difference from an entry.
 - Output ONLY the JSON, no commentary, no markdown fences.
 
 ---

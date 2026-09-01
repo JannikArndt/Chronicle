@@ -9,8 +9,19 @@ direct manipulation are drafts (`state.draft`) and only enter the dataset once
 titled; `addEntry()` is the other path, for an assistant that asks everything
 first and writes once.
 
+**Events have no draft state.** A draft exists because dragging out a bar puts
+something on screen before it has a name; an event is created from a form that
+already knows its title and its date, so `addEvent()` writes once and there is
+nothing half-made to hold. Don't add one "for symmetry".
+
 ## Invariants
 
+- **One selection at a time, and they are separate fields.**
+  `selectedEntryId` and `selectedEventId` clear each other (and the row) in
+  every selection action. One shared "selected id" would leave every consumer
+  guessing which array to look in, and the two are edited by different panels.
+  `selectedRowClickMs` rides along with the row selection for one purpose: the
+  add-event form opens on the instant that was clicked.
 - **`setInput` must not clear `emptyRowClick`** on the state update caused by
   the very click that stored it (guard compares against
   `emptyRowClick.rowId`).

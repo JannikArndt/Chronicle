@@ -3,6 +3,13 @@
 Loads `public-data/*.json` via `import.meta.glob` at build time and namespaces
 every id/reference as `pub:<file-stem>:`. Read-only, never written.
 
+Contributed files may carry `events` as well as `entries` (schema v8): a moon
+landing is a moment, a presidency is a span. The array is optional in
+`public-data/schema.json` and absent from every file written before v8, which is
+why `namespaceWithPrefix` and `buildFamousDataset` both read it through
+`?? []` — nothing type-checks that JSON. A famous person's events shift with the
+life when "align to my age" is on, exactly as the entries do.
+
 `src/publicData/famous/lives.ts` is now **test-fixture only** (Mozart/Einstein/
 Frida), no longer shown in the UI — keep it out of the product surface.
 

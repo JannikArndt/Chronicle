@@ -50,26 +50,7 @@
           "subtitle": { "type": "string", "minLength": 1 },
           "shortTitle": { "type": "string", "minLength": 1 },
           "website": { "type": "string", "minLength": 1 },
-          "place": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["fullName"],
-            "properties": {
-              "fullName": { "type": "string", "minLength": 1 },
-              "coordinates": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["lat", "lon"],
-                "properties": {
-                  "lat": { "type": "number" },
-                  "lon": { "type": "number" }
-                }
-              },
-              "street": { "type": "string", "minLength": 1 },
-              "city": { "type": "string", "minLength": 1 },
-              "country": { "type": "string", "minLength": 1 }
-            }
-          },
+          "place": { "$ref": "#/$defs/place" },
           "description": { "type": "string" },
           "start": { "$ref": "#/$defs/fuzzyDate" },
           "end": { "$ref": "#/$defs/fuzzyDate" },
@@ -78,9 +59,47 @@
           "parentEntryId": { "type": "string", "minLength": 1 }
         }
       }
+    },
+    "events": {
+      "type": "array",
+      "description": "Moments rather than spans — a launch, a first, a landing. Optional: a dataset of pure spans simply omits this. Events are only drawn once the view is zoomed in far enough for a point in time to be readable.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "rowId", "title", "date"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "rowId": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "icon": { "type": "string", "minLength": 1, "description": "One emoji drawn in front of the label; optional." },
+          "description": { "type": "string" },
+          "place": { "$ref": "#/$defs/place" },
+          "date": { "$ref": "#/$defs/fuzzyDate" }
+        }
+      }
     }
   },
   "$defs": {
+    "place": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fullName"],
+      "properties": {
+        "fullName": { "type": "string", "minLength": 1 },
+        "coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lat", "lon"],
+          "properties": {
+            "lat": { "type": "number" },
+            "lon": { "type": "number" }
+          }
+        },
+        "street": { "type": "string", "minLength": 1 },
+        "city": { "type": "string", "minLength": 1 },
+        "country": { "type": "string", "minLength": 1 }
+      }
+    },
     "fuzzyDate": {
       "type": "object",
       "additionalProperties": false,

@@ -85,9 +85,13 @@ insert into shared_records (owner_account, kind, id, parent_id, shared, payload,
   (:'alice', 'row',   'r-therapy', 'g-me',      false, '{"label":"Therapy"}',  '0001', :'alice'),
   (:'alice', 'row',   'r-dad-job', 'g-dad',     false, '{"label":"Dad: Job"}', '0001', :'alice'),
   (:'alice', 'entry', 'e-job-1',   'r-job',     true,  '{"title":"Kestrel"}',  '0001', :'alice'),
-  (:'alice', 'entry', 'e-ther-1',  'r-therapy', false, '{"title":"Session"}',  '0001', :'alice');
+  (:'alice', 'entry', 'e-ther-1',  'r-therapy', false, '{"title":"Session"}',  '0001', :'alice'),
+  -- Events (schema v8). Like entries they carry `shared = false` and are never
+  -- asked about it: their row answers for them.
+  (:'alice', 'event', 'v-job-1',   'r-job',     false, '{"title":"First day"}', '0001', :'alice'),
+  (:'alice', 'event', 'v-ther-1',  'r-therapy', false, '{"title":"Told her"}',  '0001', :'alice');
 
-select chk('an owner sees all of her own records', (select count(*)::int from shared_records), 8);
+select chk('an owner sees all of her own records', (select count(*)::int from shared_records), 10);
 reset role;
 
 -- ------------------------------------------------------ before any invite ---
@@ -146,7 +150,8 @@ select chk('a co-owner sees an UNPUBLISHED row in his group',
 select chk('the container above it comes along so the row has a lane',
            (select count(*)::int from shared_records where id = 'g-family'), 1);
 select chk('co-ownership leaks none of the rest of her timeline',
-           (select count(*)::int from shared_records where id in ('r-job', 'r-therapy', 'e-job-1', 'e-ther-1')), 0);
+           (select count(*)::int from shared_records
+             where id in ('r-job', 'r-therapy', 'e-job-1', 'e-ther-1', 'v-job-1', 'v-ther-1')), 0);
 select chk('co-ownership does not reveal a sibling group',
            (select count(*)::int from shared_records where kind = 'group' and id = 'g-me'), 0);
 
@@ -156,6 +161,11 @@ insert into shared_records (owner_account, kind, id, parent_id, shared, payload,
   values (:'alice', 'entry', 'e-dad-1', 'r-dad-job', false, '{"title":"Apprenticeship"}', '0002', :'dad');
 select chk('a co-owner can add an entry to a row in his group',
            (select count(*)::int from shared_records where id = 'e-dad-1'), 1);
+
+insert into shared_records (owner_account, kind, id, parent_id, shared, payload, clock, updated_by)
+  values (:'alice', 'event', 'v-dad-1', 'r-dad-job', false, '{"title":"Passed the exam"}', '0002', :'dad');
+select chk('a co-owner can add an event to a row in his group',
+           (select count(*)::int from shared_records where id = 'v-dad-1'), 1);
 
 select chk_denied('a co-owner cannot write outside his group', $sql$
   insert into shared_records (owner_account, kind, id, parent_id, shared, payload, clock, updated_by)
@@ -177,8 +187,10 @@ set role authenticated;
 
 select chk('a grant reveals the published row',       (select count(*)::int from shared_records where id = 'r-job'), 1);
 select chk('a grant reveals its entries',             (select count(*)::int from shared_records where id = 'e-job-1'), 1);
+select chk('a grant reveals its events',              (select count(*)::int from shared_records where id = 'v-job-1'), 1);
 select chk('a grant does NOT reveal a private row',   (select count(*)::int from shared_records where id = 'r-therapy'), 0);
 select chk('a private row''s entries stay hidden',    (select count(*)::int from shared_records where id = 'e-ther-1'), 0);
+select chk('a private row''s events stay hidden',     (select count(*)::int from shared_records where id = 'v-ther-1'), 0);
 select chk('the containing group comes with the row', (select count(*)::int from shared_records where id = 'g-me'), 1);
 
 select chk_denied('a reader cannot edit what he can read', $sql$
@@ -199,6 +211,17 @@ $sql$);
 select chk_denied('a reader cannot add an entry to a row he can read', $sql$
   insert into shared_records (owner_account, kind, id, parent_id, shared, payload, clock, updated_by)
   values ('00000000-0000-4000-8000-00000000a11c', 'entry', 'e-forged', 'r-job', true, '{}', '0009',
+          '00000000-0000-4000-8000-00000000dad0')
+$sql$);
+-- The same trap, one kind along: an event's write branch must ask about
+-- co-ownership of the group, never about being able to read the row.
+select chk_denied('a reader cannot edit an event on a row he can read', $sql$
+  update shared_records set payload = '{"title":"hacked"}'
+   where owner_account = '00000000-0000-4000-8000-00000000a11c' and id = 'v-job-1'
+$sql$);
+select chk_denied('a reader cannot add an event to a row he can read', $sql$
+  insert into shared_records (owner_account, kind, id, parent_id, shared, payload, clock, updated_by)
+  values ('00000000-0000-4000-8000-00000000a11c', 'event', 'v-forged', 'r-job', false, '{}', '0009',
           '00000000-0000-4000-8000-00000000dad0')
 $sql$);
 reset role;
@@ -223,6 +246,8 @@ select chk('...and nothing on the other branch',
            (select count(*)::int from shared_records where id in ('r-job', 'r-therapy', 'g-me')), 0);
 select chk('...and the entry a co-owner wrote into it',
            (select count(*)::int from shared_records where id = 'e-dad-1'), 1);
+select chk('...and the event he wrote into it',
+           (select count(*)::int from shared_records where id = 'v-dad-1'), 1);
 reset role;
 
 -- --------------------------------------------------------------- un-share ---
@@ -236,6 +261,7 @@ select set_config('request.jwt.claim.sub', :'dad', false);
 set role authenticated;
 select chk('un-publishing hides the row again',   (select count(*)::int from shared_records where id = 'r-job'), 0);
 select chk('un-publishing hides its entries too', (select count(*)::int from shared_records where id = 'e-job-1'), 0);
+select chk('un-publishing hides its events too',  (select count(*)::int from shared_records where id = 'v-job-1'), 0);
 select chk('the group goes with the last shared row it held',
            (select count(*)::int from shared_records where id = 'g-me'), 0);
 reset role;
@@ -246,6 +272,7 @@ select set_config('request.jwt.claim.sub', :'alice', false);
 set role authenticated;
 update shared_records set shared = true where id = 'r-job';
 update shared_records set deleted = true, payload = null where id = 'e-job-1';
+update shared_records set deleted = true, payload = null where id = 'v-job-1';
 reset role;
 
 select set_config('request.jwt.claim.sub', :'dad', false);
@@ -253,6 +280,8 @@ set role authenticated;
 select chk('the row is back', (select count(*)::int from shared_records where id = 'r-job'), 1);
 select chk('a tombstone is not shipped to a reader — absence is the delete',
            (select count(*)::int from shared_records where id = 'e-job-1'), 0);
+select chk('an event''s tombstone is not shipped either',
+           (select count(*)::int from shared_records where id = 'v-job-1'), 0);
 reset role;
 
 -- ------------------------------------------------------------- revocation ---
