@@ -9,6 +9,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { moveRow, setRowShared, updateRow } from "../state/actions";
 import { describePublishImpact } from "../model/sharing";
+import { ancestorGroups } from "../model/dataset";
 import { formatByPrecision } from "../model/fuzzyDate";
 import { isForeignId, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { EditableLine } from "./EditableLine";
@@ -137,16 +138,17 @@ export function RowPane({
         {movingToGroup && (
           <SheetMenuPicker
             title="Move to group"
-            // A sub-group is named under its parent ("Family › Finn"), because
-            // on its own "Finn" doesn't say where in the list you'd find it.
-            options={ownGroups.map((group) => ({
-              id: group.id,
-              label:
-                group.parentGroupId === undefined
-                  ? group.label
-                  : `${ownGroups.find((g) => g.id === group.parentGroupId)?.label ?? "—"} › ${group.label}`,
-              current: group.id === row.groupId,
-            }))}
+            // A nested group is named under its full ancestor chain
+            // ("Family › Finn › Finn's kid"), because on its own "Finn's kid"
+            // doesn't say where in the list you'd find it.
+            options={ownGroups.map((group) => {
+              const path = [...ancestorGroups(state.dataset, group.id).reverse(), group];
+              return {
+                id: group.id,
+                label: path.map((g) => g.label).join(" › "),
+                current: group.id === row.groupId,
+              };
+            })}
             // `moveRow`, not `updateRow({ groupId })`: moving is also a
             // reposition, and the row has to land at the end of the target
             // group's rows rather than keep its old index in the array.

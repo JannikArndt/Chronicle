@@ -95,7 +95,7 @@ describe("removing famous overlays", () => {
     expect(appStore.getState().publicDatasets).toHaveLength(0);
   });
 
-  it("removing a parent row as the last area removes the person, not an empty group", () => {
+  it("removing every row — including a lane row inside a sub-group — removes the person, not an empty group", () => {
     const withLanes = {
       id: "x",
       name: "X",
@@ -103,22 +103,24 @@ describe("removing famous overlays", () => {
       birthMs: Date.UTC(1970, 0, 1),
       blurb: "t",
       biography: {
-        groups: [{ id: "g", label: "X", collapsed: false }],
+        groups: [
+          { id: "g", label: "X", collapsed: false },
+          { id: "g-career", parentGroupId: "g", label: "Career", collapsed: false },
+        ],
         rows: [
           { id: "r-flat", groupId: "g", color: "#000", icon: "💼", label: "Places" },
-          { id: "r-parent", groupId: "g", color: "#000", icon: "💼", label: "Career" },
-          { id: "r-parent-0", groupId: "g", color: "#000", icon: "💼", label: "Job", parentRowId: "r-parent" },
+          { id: "r-lane-0", groupId: "g-career", color: "#000", icon: "💼", label: "Job" },
         ],
         entries: [
           { id: "e0", rowId: "r-flat", title: "Home", start: { ms: 0, precision: "year" as const }, end: { ms: 1, precision: "year" as const } },
-          { id: "e1", rowId: "r-parent-0", title: "Job", start: { ms: 0, precision: "year" as const }, end: { ms: 1, precision: "year" as const } },
+          { id: "e1", rowId: "r-lane-0", title: "Job", start: { ms: 0, precision: "year" as const }, end: { ms: 1, precision: "year" as const } },
         ],
       },
     };
     addFamousPerson(withLanes);
     removeFamousRow("x", "r-flat"); // remove the flat area
     expect(appStore.getState().publicDatasets).toHaveLength(1);
-    removeFamousRow("x", "r-parent"); // removing the parent cascades to its child → nothing left
+    removeFamousRow("x", "r-lane-0"); // remove the one lane in the Career sub-group → nothing left
     expect(appStore.getState().activeFamous).toHaveLength(0);
     expect(appStore.getState().publicDatasets).toHaveLength(0);
   });

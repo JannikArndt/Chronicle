@@ -2,9 +2,10 @@
 // and native color/date inputs. It renders from the SAME layout the canvas
 // uses and is translated by the canvas scroll position every frame.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
+import { groupFontSize } from "../render/layout";
 import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
 import {
@@ -12,11 +13,12 @@ import {
   addGroup,
   addRow,
   addSubGroup,
-  addSubRow,
+  copyGroup,
+  copyRow,
   deleteGroupWithCascade,
   deleteRowWithCascade,
+  moveGroup,
   moveRow,
-  reorderGroup,
   selectEvent,
   selectRow,
   addFamousPerson,
@@ -24,13 +26,13 @@ import {
   removePublicGroup,
   setFamousAlignment,
   toggleGroupCollapsed,
-  toggleRowCollapsed,
   setRowShared,
   toggleRowHidden,
   updateGroup,
   updateRow,
 } from "../state/actions";
-import { isForeignId, useAppState, userBirthMs } from "../state/store";
+import { birthDateForRow } from "../model/dataset";
+import { isForeignId, mergedDataset, useAppState, userBirthMs } from "../state/store";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateInput";
 import type { Group, TimelineRow } from "../model/types";
@@ -48,30 +50,34 @@ type PopoverState =
   | { kind: "add-menu"; groupId: string; top: number }
   | { kind: "group-edit"; groupId: string; top: number }
   | { kind: "row-edit"; rowId: string; top: number }
-  | { kind: "add-sub-row"; rowId: string; top: number }
   | { kind: "add-event"; rowId: string; top: number }
   | { kind: "add-group"; top: number }
+  | { kind: "add-row"; top: number }
   | { kind: "rail-add-menu"; top: number }
   | null;
 
 // Popovers anchored to the rail footer's "+" button open upward from the
 // bottom of the rail rather than downward from a click point.
 function isFooterPopover(kind: NonNullable<PopoverState>["kind"]): boolean {
-  return kind === "add-group" || kind === "rail-add-menu";
+  return kind === "add-group" || kind === "add-row" || kind === "rail-add-menu";
 }
 
-// ---------- drag-and-drop (reorder groups, move rows) ----------
+// ---------- drag-and-drop (move or, with Alt/Option held, copy) ----------
 // Hand-rolled Pointer Events (pointerdown/move/up + setPointerCapture) — one
 // code path for mouse, trackpad, and touch, same category as the canvas
 // engine's pan/zoom. No library, no HTML5 DnD (plans/rail-drag-and-drop.md).
+// Groups and timelines both nest arbitrarily now, so a drop target names its
+// CONTAINER (a group id, or null for the root) rather than assuming one fixed
+// level — the same shape computeLayout() itself uses.
 
 // What the pressed handle belongs to.
 type DragDescriptor = { kind: "group"; groupId: string } | { kind: "row"; rowId: string };
 
-// Where releasing the pointer would drop it.
+// Where releasing the pointer would drop it. `null` in either "target"
+// position means the root — no group at all.
 type DropTarget =
-  | { kind: "group"; beforeGroupId: string | null }
-  | { kind: "row"; targetGroupId: string; beforeRowId: string | null };
+  | { kind: "group"; targetParentGroupId: string | null; beforeGroupId: string | null }
+  | { kind: "row"; targetGroupId: string | null; beforeRowId: string | null };
 
 // One candidate insertion line: the drop it stands for and its on-screen Y.
 interface DropSlot {
@@ -86,6 +92,7 @@ interface ActiveDrag {
   startClientY: number;
   started: boolean; // pointer moved past the click threshold
   drop: DropTarget | null;
+  copy: boolean; // Alt/Option held — drop duplicates instead of moving
 }
 
 // A press that moves less than this is a click, not a drag.
@@ -96,6 +103,9 @@ const RAIL_BOUNDS_MARGIN_PX = 32;
 interface RailDragController {
   // Y (in rail-content coordinates) of the insertion-line indicator, or null.
   indicatorTop: number | null;
+  // Whether the drag in progress would copy rather than move (Alt/Option is
+  // held) — drives the indicator's styling.
+  isCopy: boolean;
   startDrag: (event: ReactPointerEvent<HTMLElement>, descriptor: DragDescriptor) => void;
   updateDrag: (event: ReactPointerEvent<HTMLElement>) => void;
   finishDrag: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -107,11 +117,13 @@ function useRailDragController(railContentRef: RefObject<HTMLDivElement>): RailD
   // indicator needs a re-render.
   const activeDragRef = useRef<ActiveDrag | null>(null);
   const [indicatorTop, setIndicatorTop] = useState<number | null>(null);
+  const [isCopy, setIsCopy] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const cancelDrag = () => {
     activeDragRef.current = null;
     setIndicatorTop(null);
+    setIsCopy(false);
     setIsDragging(false);
   };
 
@@ -138,6 +150,7 @@ function useRailDragController(railContentRef: RefObject<HTMLDivElement>): RailD
       startClientY: event.clientY,
       started: false,
       drop: null,
+      copy: event.altKey,
     };
     setIsDragging(true);
   };
@@ -154,6 +167,8 @@ function useRailDragController(railContentRef: RefObject<HTMLDivElement>): RailD
       if (distance < DRAG_START_THRESHOLD_PX) return;
       activeDrag.started = true;
     }
+    activeDrag.copy = event.altKey;
+    setIsCopy(event.altKey);
     const slot = resolveDropSlot(railContent, activeDrag.descriptor, event.clientX, event.clientY);
     activeDrag.drop = slot?.drop ?? null;
     // The rail is scroll-translated by the engine every frame, so slot Ys are
@@ -164,19 +179,31 @@ function useRailDragController(railContentRef: RefObject<HTMLDivElement>): RailD
   const finishDrag = (event: ReactPointerEvent<HTMLElement>) => {
     const activeDrag = activeDragRef.current;
     if (!activeDrag || event.pointerId !== activeDrag.pointerId) return;
-    if (activeDrag.started && activeDrag.drop !== null) applyDrop(activeDrag.descriptor, activeDrag.drop);
+    if (activeDrag.started && activeDrag.drop !== null) {
+      applyDrop(activeDrag.descriptor, activeDrag.drop, activeDrag.copy);
+    }
     cancelDrag();
   };
 
-  return { indicatorTop, startDrag, updateDrag, finishDrag, cancelDrag };
+  return { indicatorTop, isCopy, startDrag, updateDrag, finishDrag, cancelDrag };
 }
 
-function applyDrop(descriptor: DragDescriptor, drop: DropTarget): void {
+function applyDrop(descriptor: DragDescriptor, drop: DropTarget, copy: boolean): void {
   if (descriptor.kind === "group" && drop.kind === "group") {
-    reorderGroup(descriptor.groupId, drop.beforeGroupId);
+    if (copy) {
+      const newGroupId = copyGroup(descriptor.groupId);
+      if (newGroupId) moveGroup(newGroupId, drop.targetParentGroupId, drop.beforeGroupId);
+    } else {
+      moveGroup(descriptor.groupId, drop.targetParentGroupId, drop.beforeGroupId);
+    }
   }
   if (descriptor.kind === "row" && drop.kind === "row") {
-    moveRow(descriptor.rowId, drop.targetGroupId, drop.beforeRowId);
+    if (copy) {
+      const newRowId = copyRow(descriptor.rowId);
+      if (newRowId) moveRow(newRowId, drop.targetGroupId, drop.beforeRowId);
+    } else {
+      moveRow(descriptor.rowId, drop.targetGroupId, drop.beforeRowId);
+    }
   }
 }
 
@@ -184,9 +211,9 @@ function applyDrop(descriptor: DragDescriptor, drop: DropTarget): void {
 // rects because the engine translates the rail via direct style mutation
 // every frame — layout.y alone would miss that offset.
 interface RailElementInfo {
-  kind: "group" | "subgroup" | "row";
+  kind: "group" | "row";
   id: string;
-  isSubRow: boolean;
+  depth: number;
   rect: DOMRect;
 }
 
@@ -195,7 +222,7 @@ function readRailElements(railContent: HTMLElement): RailElementInfo[] {
   return Array.from(railContent.querySelectorAll<HTMLElement>("[data-rail-kind]")).map((element) => ({
     kind: element.dataset.railKind as RailElementInfo["kind"],
     id: element.dataset.railId ?? "",
-    isSubRow: element.dataset.railSubRow === "true",
+    depth: Number(element.dataset.railDepth ?? "0"),
     rect: element.getBoundingClientRect(),
   }));
 }
@@ -225,64 +252,81 @@ function isPointerInsideRailBounds(railContent: HTMLElement, clientX: number, cl
   );
 }
 
-// Group drag: one slot per private group header ("before this group") plus a
-// final slot after the last private item ("end of the list"). Public groups
-// are read-only and never drop anchors.
-function computeGroupDropSlots(elements: RailElementInfo[], draggedGroupId: string): DropSlot[] {
-  const slots: DropSlot[] = [];
-  let insidePrivateGroup = false;
-  let lastPrivateBottom: number | null = null;
-  for (const element of elements) {
+// Reconstructs, purely from the DOM's depth-first order (the same order
+// computeLayout() builds it in), which private group directly contains each
+// element, and — for every private group — the Y position just past its own
+// last descendant, at any nesting depth. Both drop-slot functions below share
+// this: "before a sibling" reads `containerId`, "append as the last child"
+// reads `groupBottom`.
+function analyzeContainers(elements: RailElementInfo[]): {
+  containerId: (string | null)[];
+  groupBottom: Map<string, number>;
+} {
+  const containerAtDepth: (string | null)[] = [null];
+  const containerId: (string | null)[] = [];
+  const groupBottom = new Map<string, number>();
+  // Open private groups, deepest last — a foreign (public/mirror) group is
+  // never pushed, since nothing under it is a valid drop target.
+  const openGroups: { id: string; depth: number }[] = [];
+
+  const closeGroupsAtOrBelow = (depth: number) => {
+    while (openGroups.length > 0 && openGroups[openGroups.length - 1].depth >= depth) openGroups.pop();
+  };
+
+  elements.forEach((element, index) => {
+    closeGroupsAtOrBelow(element.depth);
+    for (const group of openGroups) groupBottom.set(group.id, element.rect.bottom);
+    containerId[index] = containerAtDepth[element.depth] ?? null;
     if (element.kind === "group") {
-      insidePrivateGroup = !isForeignId(element.id);
-      if (insidePrivateGroup && element.id !== draggedGroupId) {
-        slots.push({ drop: { kind: "group", beforeGroupId: element.id }, clientY: element.rect.top });
-      }
+      const isPrivate = !isForeignId(element.id);
+      if (isPrivate) openGroups.push({ id: element.id, depth: element.depth });
+      containerAtDepth[element.depth + 1] = isPrivate ? element.id : null;
     }
-    if (insidePrivateGroup) lastPrivateBottom = element.rect.bottom;
+  });
+  return { containerId, groupBottom };
+}
+
+// Group drag: one "before this group" slot per private group at any depth,
+// one "append as the last child" slot per private group (from `groupBottom`),
+// and one final "append at the very end" slot for the root itself.
+function computeGroupDropSlots(elements: RailElementInfo[], draggedGroupId: string): DropSlot[] {
+  const { containerId, groupBottom } = analyzeContainers(elements);
+  const slots: DropSlot[] = [];
+  elements.forEach((element, index) => {
+    if (element.kind !== "group" || isForeignId(element.id) || element.id === draggedGroupId) return;
+    slots.push({
+      drop: { kind: "group", targetParentGroupId: containerId[index], beforeGroupId: element.id },
+      clientY: element.rect.top,
+    });
+  });
+  for (const [groupId, bottom] of groupBottom) {
+    if (groupId === draggedGroupId) continue;
+    slots.push({ drop: { kind: "group", targetParentGroupId: groupId, beforeGroupId: null }, clientY: bottom });
   }
-  if (lastPrivateBottom !== null) {
-    slots.push({ drop: { kind: "group", beforeGroupId: null }, clientY: lastPrivateBottom });
+  const last = elements[elements.length - 1];
+  if (last) {
+    slots.push({ drop: { kind: "group", targetParentGroupId: null, beforeGroupId: null }, clientY: last.rect.bottom });
   }
   return slots;
 }
 
-// Row drag: one slot per top-level private row ("before this row") plus, per
-// private group, an end-of-group slot after its last item — which for an
-// empty or collapsed group is the header itself, so dropping onto a group
-// header means "end of that group" (the plan's rule). Sub-rows are never
-// anchors (they follow their parent) but do extend the group's bottom.
-// A sub-group header opens a group of its own: dropping a row under "Finn"
-// files it in Finn, which is now the whole of "whose timeline is this".
+// Row drag: one "before this row" slot per private row at any depth, one
+// "append as the last row" slot per private group, and one for the root.
 function computeRowDropSlots(elements: RailElementInfo[], draggedRowId: string): DropSlot[] {
+  const { containerId, groupBottom } = analyzeContainers(elements);
   const slots: DropSlot[] = [];
-  let currentGroupId: string | null = null; // null while inside a public group
-  let currentGroupBottom = 0;
-  const closeCurrentGroup = () => {
-    if (currentGroupId !== null) {
-      slots.push({
-        drop: { kind: "row", targetGroupId: currentGroupId, beforeRowId: null },
-        clientY: currentGroupBottom,
-      });
-    }
-  };
-  for (const element of elements) {
-    if (element.kind === "group" || element.kind === "subgroup") {
-      closeCurrentGroup();
-      currentGroupId = isForeignId(element.id) ? null : element.id;
-      currentGroupBottom = element.rect.bottom;
-      continue;
-    }
-    if (currentGroupId === null) continue;
-    if (element.kind === "row" && !element.isSubRow && element.id !== draggedRowId) {
-      slots.push({
-        drop: { kind: "row", targetGroupId: currentGroupId, beforeRowId: element.id },
-        clientY: element.rect.top,
-      });
-    }
-    currentGroupBottom = element.rect.bottom;
+  elements.forEach((element, index) => {
+    if (element.kind !== "row" || isForeignId(element.id) || element.id === draggedRowId) return;
+    slots.push({
+      drop: { kind: "row", targetGroupId: containerId[index], beforeRowId: element.id },
+      clientY: element.rect.top,
+    });
+  });
+  for (const [groupId, bottom] of groupBottom) {
+    slots.push({ drop: { kind: "row", targetGroupId: groupId, beforeRowId: null }, clientY: bottom });
   }
-  closeCurrentGroup();
+  const last = elements[elements.length - 1];
+  if (last) slots.push({ drop: { kind: "row", targetGroupId: null, beforeRowId: null }, clientY: last.rect.bottom });
   return slots;
 }
 
@@ -300,7 +344,9 @@ function nearestDropSlot(slots: DropSlot[], clientY: number): DropSlot | null {
 }
 
 // The ≡ handle. A click (movement under the threshold) does nothing — the
-// drag only starts once the pointer actually moves.
+// drag only starts once the pointer actually moves. Holding Alt/Option while
+// dragging copies instead of moving (checked live, so pressing or releasing
+// it mid-drag switches modes).
 function RailDragHandle({
   className,
   dragController,
@@ -314,7 +360,7 @@ function RailDragHandle({
     <button
       type="button"
       className={`${className} rail-drag-handle`}
-      title="Drag to reorder"
+      title="Drag to move — hold Alt/Option to copy"
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => dragController.startDrag(e, descriptor)}
       onPointerMove={dragController.updateDrag}
@@ -334,67 +380,57 @@ interface RowRailProps {
 }
 
 export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }: RowRailProps) {
-  const dataset = useAppState((s) => s.dataset);
-  const hiddenRowIds = useAppState((s) => s.hiddenRowIds);
-  const selectedRowId = useAppState((s) => s.selectedRowId);
+  const state = useAppState((s) => s);
+  const dataset = state.dataset;
+  const merged = mergedDataset(state);
+  const hiddenRowIds = state.hiddenRowIds;
+  const selectedRowId = state.selectedRowId;
   const [popover, setPopover] = useState<PopoverState>(null);
   // Which rail item's action buttons are shown (§ hover-reveal). Tracked in JS
   // rather than pure CSS :hover: Safari can leave :hover "stuck" after a fast
   // mouse-exit from these absolutely-positioned, transitioned rows, but real
-  // mouseenter/mouseleave events don't have that failure mode. hoveredTopRowId
-  // is the top-level row a hovered sub-row belongs to, so a top-level row's own
-  // buttons also light up while hovering any of its nested timelines.
+  // mouseenter/mouseleave events don't have that failure mode.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const [hoveredTopRowId, setHoveredTopRowId] = useState<string | null>(null);
   const dragController = useRailDragController(railContentRef);
 
   const closePopover = () => setPopover(null);
 
-  // pushRowTree (layout.ts) emits each top-level row immediately followed by
-  // all its descendants before the next one, so a single running variable is
-  // enough to know which top-level row each item belongs to.
-  const topRowIds: (string | null)[] = [];
-  let currentTopRowId: string | null = null;
-  for (const item of layout.items) {
-    if (item.kind === "row" && item.row && !item.isSubRow) currentTopRowId = item.row.id;
-    topRowIds.push(currentTopRowId);
-  }
-
-  // Rows that have sub-rows get a collapse toggle (like a group). Derived from
-  // the layout so it reflects exactly what's rendered.
-  const parentRowIds = new Set(
-    layout.items.map((item) => item.row?.parentRowId).filter((id): id is string => !!id),
-  );
+  // A row's own birthDate, or its nearest ancestor group's — computed once
+  // per render rather than per rail item, since it needs the whole merged
+  // dataset to walk ancestors.
+  const rowBirthDates = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of merged.rows) {
+      const birth = birthDateForRow(merged, row);
+      if (birth !== undefined) map.set(row.id, birth);
+    }
+    return map;
+  }, [merged]);
 
   return (
     <div className="rail" onPointerDown={(e) => e.stopPropagation()}>
       <div className="rail-scroll">
         <div className="rail-content" ref={railContentRef} style={{ height: layout.totalHeight }}>
-          {layout.items.map((item, index) => (
+          {layout.items.map((item) => (
             <RailItem
               key={`${item.kind}:${item.id}`}
               item={item}
               hiddenRowIds={hiddenRowIds}
-              parentRowIds={parentRowIds}
+              rowBirthDates={rowBirthDates}
               selectedRowId={selectedRowId}
               openPopover={setPopover}
               engineRef={engineRef}
-              topRowId={topRowIds[index]}
               hoveredKey={hoveredKey}
-              hoveredTopRowId={hoveredTopRowId}
-              onHoverEnter={(key, topRowId) => {
-                setHoveredKey(key);
-                setHoveredTopRowId(topRowId);
-              }}
-              onHoverLeave={() => {
-                setHoveredKey(null);
-                setHoveredTopRowId(null);
-              }}
+              onHoverEnter={setHoveredKey}
+              onHoverLeave={() => setHoveredKey(null)}
               dragController={dragController}
             />
           ))}
           {dragController.indicatorTop !== null && (
-            <div className="rail-drop-indicator" style={{ top: dragController.indicatorTop }} />
+            <div
+              className={`rail-drop-indicator ${dragController.isCopy ? "rail-drop-indicator-copy" : ""}`}
+              style={{ top: dragController.indicatorTop }}
+            />
           )}
         </div>
       </div>
@@ -422,7 +458,14 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
 
 function computedAge(group: Group): string | null {
   if (group.birthDate === undefined) return null;
-  const years = (Date.now() - group.birthDate) / (365.25 * 86_400_000);
+  return computedAgeFromBirth(group.birthDate);
+}
+
+// Shared by a group's own birthDate and a row's (own, or inherited from the
+// nearest ancestor group) — a birth date reads the same age badge wherever it
+// sits, since either kind of item can independently be a person.
+function computedAgeFromBirth(birthDate: number): string | null {
+  const years = (Date.now() - birthDate) / (365.25 * 86_400_000);
   return years >= 0 ? `${Math.floor(years)}` : null;
 }
 
@@ -435,14 +478,12 @@ function lifeSpanRange(birthDate: number): { startMs: number; endMs: number } {
 interface RailItemProps {
   item: LayoutItem;
   hiddenRowIds: string[];
-  parentRowIds: Set<string>;
+  rowBirthDates: Map<string, number>;
   selectedRowId?: string;
   openPopover: (p: PopoverState) => void;
   engineRef: MutableRefObject<TimelineEngine | null>;
-  topRowId: string | null;
   hoveredKey: string | null;
-  hoveredTopRowId: string | null;
-  onHoverEnter: (key: string, topRowId: string | null) => void;
+  onHoverEnter: (key: string) => void;
   onHoverLeave: () => void;
   dragController: RailDragController;
 }
@@ -450,51 +491,49 @@ interface RailItemProps {
 function RailItem({
   item,
   hiddenRowIds,
-  parentRowIds,
+  rowBirthDates,
   selectedRowId,
   openPopover,
   engineRef,
-  topRowId,
   hoveredKey,
-  hoveredTopRowId,
   onHoverEnter,
   onHoverLeave,
   dragController,
 }: RailItemProps) {
-  const style = { top: item.y, height: item.height };
+  const style = { top: item.y, height: item.height, fontSize: groupFontSize(item.depth) };
   const readOnly = isForeignId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
-  const collapsedRowIds = useAppState((s) => s.collapsedRowIds);
 
-  // Compact sub-rows live only on the canvas (their parent is collapsed) — the
-  // rail drops them, so the bars carry their own labels instead.
-  if (item.compact) return null;
+  // A collapsed group's summary bar is canvas-only — there is nothing to
+  // click or edit on an aggregate, so the rail simply skips it.
+  if (item.kind === "group-summary") return null;
   const key = `${item.kind}:${item.id}`;
   const hoverReveal = (visible: boolean) => `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`;
 
-  // One block for a group and for a sub-group: since Person was folded into
-  // Group they differ only in header size, in being draggable, and in whether
-  // they can hold children of their own.
-  if ((item.kind === "group" || item.kind === "subgroup") && item.group) {
+  // One block for every group, at any nesting depth — depth alone drives
+  // header size and indentation (§ hierarchy through indentation and font
+  // size), and only a depth-0 group gets the shaded background.
+  if (item.kind === "group" && item.group) {
     const group = item.group;
-    const isSubGroup = item.kind === "subgroup";
     const age = computedAge(group);
     const visible = hoveredKey === key;
-    const famous = isSubGroup ? null : parseFamousGroupId(group.id);
+    const famous = item.depth === 0 ? parseFamousGroupId(group.id) : null;
     return (
       <div
-        className={isSubGroup ? "rail-subgroup" : "rail-group"}
-        style={style}
-        data-rail-kind={item.kind}
+        className={`rail-group ${item.depth === 0 ? "rail-group-top" : ""}`}
+        style={{ ...style, paddingLeft: 8 + item.depth * 14 }}
+        data-rail-kind="group"
         data-rail-id={group.id}
-        onMouseEnter={() => onHoverEnter(key, null)}
+        data-rail-depth={item.depth}
+        onMouseEnter={() => onHoverEnter(key)}
         onMouseLeave={onHoverLeave}
       >
         <button type="button" className="collapse-button" onClick={() => toggleGroupCollapsed(group.id)}>
           {group.collapsed ? "▸" : "▾"}
         </button>
-        <span className={isSubGroup ? "rail-subgroup-label" : "rail-group-label"} title={group.label}>
+        {group.icon && <span className="row-icon">{group.icon}</span>}
+        <span className="rail-group-label" title={group.label} style={{ color: group.color }}>
           {group.label}
           {age !== null && <span className="age-badge">{age}</span>}
         </span>
@@ -509,7 +548,7 @@ function RailItem({
               🎂
             </button>
           )}
-          {readOnly && !isSubGroup && (
+          {readOnly && item.depth === 0 && (
             <button
               type="button"
               className={`${hoverReveal(visible)} remove-overlay`}
@@ -534,13 +573,11 @@ function RailItem({
           )}
           {!readOnly && (
             <>
-              {!isSubGroup && (
-                <RailDragHandle
-                  className={hoverReveal(visible)}
-                  dragController={dragController}
-                  descriptor={{ kind: "group", groupId: group.id }}
-                />
-              )}
+              <RailDragHandle
+                className={hoverReveal(visible)}
+                dragController={dragController}
+                descriptor={{ kind: "group", groupId: group.id }}
+              />
               <button
                 type="button"
                 className={hoverReveal(visible)}
@@ -567,63 +604,43 @@ function RailItem({
   if (item.kind === "row" && item.row) {
     const row = item.row;
     const hidden = hiddenRowIds.includes(row.id);
-    // Compact-collapse is an overlay (public) feature; keep the hide-checkbox for
-    // the user's own parent rows so private sub-timelines stay hideable.
-    const canCollapse = parentRowIds.has(row.id) && readOnly;
-    const collapsed = collapsedRowIds.includes(row.id);
-    // A top-level row's buttons also show while hovering any of its nested
-    // timelines; a sub-row's own buttons show only on its own direct hover.
-    const visible = item.isSubRow ? hoveredKey === key : hoveredKey === key || hoveredTopRowId === row.id;
+    const rowBirth = rowBirthDates.get(row.id);
+    const age = rowBirth === undefined ? null : computedAgeFromBirth(rowBirth);
+    const visible = hoveredKey === key;
     return (
       <div
-        className={`rail-row ${item.isSubRow ? "rail-row-sub" : ""} ${row.id === selectedRowId ? "rail-row-selected" : ""}`}
+        className={`rail-row ${row.id === selectedRowId ? "rail-row-selected" : ""}`}
         style={{ ...style, paddingLeft: 8 + item.depth * 14 }}
         data-rail-kind="row"
         data-rail-id={row.id}
-        data-rail-sub-row={item.isSubRow ? "true" : undefined}
+        data-rail-depth={item.depth}
         onClick={() => selectRow(row.id)}
-        onMouseEnter={() => onHoverEnter(key, topRowId)}
+        onMouseEnter={() => onHoverEnter(key)}
         onMouseLeave={onHoverLeave}
       >
-        {canCollapse ? (
-          <button
-            type="button"
-            className="row-collapse-button"
-            title={collapsed ? "Expand timelines" : "Collapse into a compact band"}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleRowCollapsed(row.id);
-            }}
-          >
-            {collapsed ? "▸" : "▾"}
-          </button>
-        ) : (
-          <input
-            type="checkbox"
-            className="rail-row-checkbox"
-            checked={!hidden}
-            title="Show row"
-            style={{ accentColor: row.color ?? "#888" }}
-            onClick={(e) => e.stopPropagation()}
-            onChange={() => toggleRowHidden(row.id)}
-          />
-        )}
+        <input
+          type="checkbox"
+          className="rail-row-checkbox"
+          checked={!hidden}
+          title="Show row"
+          style={{ accentColor: row.color ?? "#888" }}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => toggleRowHidden(row.id)}
+        />
         <span className="row-icon">{row.icon}</span>
         <span className="rail-row-label" title={row.label}>
           <span className="label-full">{row.label}</span>
           <span className="label-initial">{row.label.slice(0, 1)}</span>
+          {age !== null && <span className="age-badge">{age}</span>}
         </span>
         {!isForeignId(row.id) && (
           <span className="rail-actions">
             <ShareToggle row={row} visible={visible} />
-            {/* Sub-rows are not draggable (plan scope cut) — no handle. */}
-            {!item.isSubRow && (
-              <RailDragHandle
-                className={hoverReveal(visible)}
-                dragController={dragController}
-                descriptor={{ kind: "row", rowId: row.id }}
-              />
-            )}
+            <RailDragHandle
+              className={hoverReveal(visible)}
+              dragController={dragController}
+              descriptor={{ kind: "row", rowId: row.id }}
+            />
             <button
               type="button"
               className={hoverReveal(visible)}
@@ -634,17 +651,6 @@ function RailItem({
               }}
             >
               ◆
-            </button>
-            <button
-              type="button"
-              className={hoverReveal(visible)}
-              title="Add sub-timeline"
-              onClick={(e) => {
-                e.stopPropagation();
-                openPopover({ kind: "add-sub-row", rowId: row.id, top: topOf(e) });
-              }}
-            >
-              ⑃
             </button>
             <button
               type="button"
@@ -711,10 +717,10 @@ function Popover({
           <RailAddMenu open={open} close={close} onStartOnboarding={onStartOnboarding} />
         )}
         {popover.kind === "add-group" && <AddGroupForm close={close} />}
+        {popover.kind === "add-row" && <AddTopLevelRowForm close={close} />}
         {popover.kind === "add-menu" && <AddMenu groupId={popover.groupId} close={close} />}
         {popover.kind === "group-edit" && <GroupEditor groupId={popover.groupId} close={close} />}
         {popover.kind === "row-edit" && <RowEditor rowId={popover.rowId} close={close} />}
-        {popover.kind === "add-sub-row" && <SubRowForm rowId={popover.rowId} close={close} />}
         {popover.kind === "add-event" && <AddEventForm rowId={popover.rowId} close={close} />}
       </div>
     </>
@@ -744,6 +750,9 @@ function RailAddMenu({
     <div className="popover-form">
       <button type="button" className="menu-item" onClick={() => open({ kind: "add-group", top: 0 })}>
         ＋ Group
+      </button>
+      <button type="button" className="menu-item" onClick={() => open({ kind: "add-row", top: 0 })}>
+        ＋ Timeline
       </button>
       <button type="button" className="menu-item" onClick={handleImport}>
         ＋ Import
@@ -1042,13 +1051,36 @@ function AddGroupForm({ close }: { close: () => void }) {
   );
 }
 
+// A timeline that needs no group at all — the footer's other top-level "+".
+function AddTopLevelRowForm({ close }: { close: () => void }) {
+  const [label, setLabel] = useState("");
+  const submit = () => {
+    addRow(undefined, label.trim());
+    close();
+  };
+  return (
+    <div className="popover-form">
+      <div className="popover-title">New timeline</div>
+      <input
+        type="text"
+        autoFocus
+        placeholder="Label (e.g. Job, Residence)"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
+      />
+      <button type="button" className="small-button" disabled={label.trim() === ""} onClick={submit}>
+        Add
+      </button>
+    </div>
+  );
+}
+
 function AddMenu({ groupId, close }: { groupId: string; close: () => void }) {
   const dataset = useAppState((s) => s.dataset);
   const group = dataset.groups.find((g) => g.id === groupId);
   const [mode, setMode] = useState<"menu" | "subgroup" | "row">("menu");
   const [label, setLabel] = useState("");
-  // Only one level of nesting is drawn, so a sub-group can't take children.
-  const canAddSubGroup = group !== undefined && group.parentGroupId === undefined;
 
   const submit = () => {
     if (mode === "subgroup") addSubGroup(groupId, label.trim());
@@ -1059,11 +1091,9 @@ function AddMenu({ groupId, close }: { groupId: string; close: () => void }) {
   if (mode === "menu") {
     return (
       <div className="popover-form">
-        {canAddSubGroup && (
-          <button type="button" className="menu-item" onClick={() => setMode("subgroup")}>
-            🧑 Person or sub-group
-          </button>
-        )}
+        <button type="button" className="menu-item" onClick={() => setMode("subgroup")}>
+          🧑 Person or sub-group
+        </button>
         <button type="button" className="menu-item" onClick={() => setMode("row")}>
           🏷️ Timeline row
         </button>
@@ -1116,11 +1146,38 @@ function GroupEditor({ groupId, close }: { groupId: string; close: () => void })
   return (
     <div className="popover-form">
       <div className="popover-title">Group</div>
-      <input
-        type="text"
-        value={group.label}
-        onChange={(e) => updateGroup(groupId, { label: e.target.value })}
-      />
+      <div className="row-edit-line">
+        <input
+          type="color"
+          value={toHexColor(group.color ?? "#888888")}
+          onChange={(e) => updateGroup(groupId, { color: e.target.value })}
+        />
+        <input
+          type="text"
+          className="emoji-input"
+          value={group.icon ?? ""}
+          maxLength={4}
+          onChange={(e) => updateGroup(groupId, { icon: e.target.value || undefined })}
+        />
+        <input
+          type="text"
+          className="row-edit-name"
+          value={group.label}
+          onChange={(e) => updateGroup(groupId, { label: e.target.value })}
+        />
+      </div>
+      <span className="emoji-picks">
+        {EMOJI_QUICK_PICKS.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            className="icon-button"
+            onClick={() => updateGroup(groupId, { icon: emoji })}
+          >
+            {emoji}
+          </button>
+        ))}
+      </span>
       <label className="field-label">Birth date — if this group is a person</label>
       <input
         type="date"
@@ -1156,6 +1213,7 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
   const dataset = useAppState((s) => s.dataset);
   const row = dataset.rows.find((r) => r.id === rowId);
   if (!row) return null;
+  const birthValue = row.birthDate !== undefined ? new Date(row.birthDate).toISOString().slice(0, 10) : "";
 
   return (
     <div className="popover-form">
@@ -1192,6 +1250,15 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
           </button>
         ))}
       </span>
+      <label className="field-label">Birth date — if this timeline is itself a person</label>
+      <input
+        type="date"
+        value={birthValue}
+        onChange={(e) => {
+          const value = e.target.value;
+          updateRow(rowId, { birthDate: value === "" ? undefined : Date.parse(`${value}T00:00:00Z`) });
+        }}
+      />
       <button
         type="button"
         className="danger-button"
@@ -1207,35 +1274,6 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
       </button>
       <button type="button" className="small-button" onClick={close}>
         Done
-      </button>
-    </div>
-  );
-}
-
-function SubRowForm({ rowId, close }: { rowId: string; close: () => void }) {
-  const [label, setLabel] = useState("");
-  const submit = () => {
-    addSubRow(rowId, label.trim());
-    close();
-  };
-  return (
-    <div className="popover-form">
-      <div className="popover-title">New sub-timeline</div>
-      <input
-        type="text"
-        autoFocus
-        placeholder="Label"
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
-      />
-      <button
-        type="button"
-        className="small-button"
-        disabled={label.trim() === ""}
-        onClick={submit}
-      >
-        Add
       </button>
     </div>
   );

@@ -17,7 +17,7 @@ import { useReducer, useRef, useState } from "react";
 import { AssistantStepShell } from "./AssistantStepShell";
 import { useAssistantFlow } from "./useAssistantFlow";
 import { entryDatesFromYearText } from "./timelineEntryRows";
-import { DEFAULT_ITEM_NOUN, TIMELINE_SUGGESTIONS, suggestionFor } from "./timelineSuggestions";
+import { DEFAULT_ITEM_NOUN, suggestionFor, suggestionsForAge } from "./timelineSuggestions";
 import { addEntry, addRow, deleteEntryWithCascade, updateEntry, updateRow } from "../state/actions";
 import { appStore, isPublicId } from "../state/store";
 
@@ -77,7 +77,7 @@ export function AddTimelineAssistant({ onFinished, onShowTimeline }: AddTimeline
           skipLabel="Cancel"
         >
           <div className="suggestion-row">
-            {TIMELINE_SUGGESTIONS.map((suggestion) => (
+            {suggestionsForAge(ownGroup()?.birthDate).map((suggestion) => (
               <button
                 key={suggestion.label}
                 type="button"

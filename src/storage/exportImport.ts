@@ -76,6 +76,7 @@ export function validateImport(raw: unknown): ImportResult {
     if (Array.isArray(candidate.categories)) foldCategoryColorsIntoRows(candidate);
     if (Array.isArray(candidate.people)) foldPeopleIntoGroups(candidate);
     dropDeadVisibilityFields(candidate);
+    flattenSubRows(candidate);
     candidate.schemaVersion = SCHEMA_VERSION;
   }
   return { ok: true, dataset: candidate as unknown as TimelineDataset };
@@ -103,6 +104,20 @@ function dropDeadVisibilityFields(candidate: Record<string, unknown>): void {
     for (const record of candidate[field] as Array<Record<string, unknown>>) {
       delete record.visibility;
     }
+  }
+}
+
+// v9 migration: a timeline can no longer nest inside another timeline —
+// groups nest arbitrarily deep instead, and a "sub-timeline" is now expressed
+// as a sub-group holding one row. Flattening is the safe default: a row that
+// had `parentRowId` simply becomes a normal sibling in the same `groupId`, so
+// every entry and event (which reference the row directly, never the nesting)
+// survives untouched. Only the visual "nested under its parent" grouping is
+// lost, and the row is one drag away from being re-filed into a sub-group if
+// that grouping is still wanted.
+function flattenSubRows(candidate: Record<string, unknown>): void {
+  for (const row of candidate.rows as Array<Record<string, unknown>>) {
+    delete row.parentRowId;
   }
 }
 

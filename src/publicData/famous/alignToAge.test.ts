@@ -62,7 +62,9 @@ describe("buildFamousDataset — aligned to the user's age", () => {
   });
 });
 
-describe("buildFamousDataset — removing rows cascades to sub-rows", () => {
+describe("buildFamousDataset — removing individual lane rows", () => {
+  // "Career" is a lanes sub-group holding two independent rows (Job A, Job B)
+  // — each removable on its own, since a row has no sub-rows any more.
   const withLanes: import("./types").FamousPerson = {
     id: "x",
     name: "X",
@@ -70,11 +72,13 @@ describe("buildFamousDataset — removing rows cascades to sub-rows", () => {
     birthMs: Date.UTC(1970, 0, 1),
     blurb: "test",
     biography: {
-      groups: [{ id: "g", label: "X", collapsed: false }],
+      groups: [
+        { id: "g", label: "X", collapsed: false },
+        { id: "g-career", parentGroupId: "g", label: "Career", collapsed: false },
+      ],
       rows: [
-        { id: "r-career", groupId: "g", color: "#000", icon: "💼", label: "Career" },
-        { id: "r-career-0", groupId: "g", color: "#000", icon: "💼", label: "Job A", parentRowId: "r-career" },
-        { id: "r-career-1", groupId: "g", color: "#000", icon: "💼", label: "Job B", parentRowId: "r-career" },
+        { id: "r-career-0", groupId: "g-career", color: "#000", icon: "💼", label: "Job A" },
+        { id: "r-career-1", groupId: "g-career", color: "#000", icon: "💼", label: "Job B" },
         { id: "r-places", groupId: "g", color: "#000", icon: "💼", label: "Places lived" },
       ],
       entries: [
@@ -85,15 +89,15 @@ describe("buildFamousDataset — removing rows cascades to sub-rows", () => {
     },
   };
 
-  it("drops a parent row's sub-rows and their entries", () => {
-    const dataset = buildFamousDataset(withLanes, undefined, ["r-career"]);
-    expect(dataset.rows.map((r) => r.label)).toEqual(["Places lived"]);
-    expect(dataset.entries.map((e) => e.title)).toEqual(["Home"]);
+  it("dropping one lane removes only its own row and entries, keeping its sibling lane", () => {
+    const dataset = buildFamousDataset(withLanes, undefined, ["r-career-0"]);
+    expect(dataset.rows.map((r) => r.label)).toEqual(["Job B", "Places lived"]);
+    expect(dataset.entries.map((e) => e.title)).toEqual(["Job B", "Home"]);
   });
 
-  it("can drop just one lane, keeping the parent and its sibling lane", () => {
-    const dataset = buildFamousDataset(withLanes, undefined, ["r-career-0"]);
-    expect(dataset.rows.map((r) => r.label)).toEqual(["Career", "Job B", "Places lived"]);
+  it("dropping both lanes leaves the unrelated row untouched", () => {
+    const dataset = buildFamousDataset(withLanes, undefined, ["r-career-0", "r-career-1"]);
+    expect(dataset.rows.map((r) => r.label)).toEqual(["Places lived"]);
   });
 });
 

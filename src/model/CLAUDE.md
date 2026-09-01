@@ -10,10 +10,21 @@ insert-time conflict check (the exclusive-row concept was removed).
 There are **four** entities: `Group`, `TimelineRow` (a "timeline" in the UI),
 `TimelineEntry` and — since v8 — `TimelineEvent`. `Person` was folded into
 `Group` in schema v6 — a group with a `birthDate` *is* a person, and a group
-nested via `parentGroupId` is what a person inside a container group used to be.
-Don't reintroduce an owner field on the row: the row's group is the whole answer
-to "whose timeline is this", which is what stops a moved timeline keeping a
-stale owner. Full term list in `docs/GLOSSARY.md`.
+nested via `parentGroupId` (arbitrarily deep, since v9) is what a person inside
+a container group used to be. Since v9, `TimelineRow` can independently carry
+its own `birthDate` too — a person doesn't have to be a whole group; a single
+timeline can be one (an acquaintance you're not modelling a whole family for).
+`Group` and `TimelineRow` are deliberate near-mirrors: both carry `label`,
+`color`, `icon`, `birthDate` — the only real difference is that a `Group` can
+contain things (`parentGroupId`, sub-groups, rows) and a `TimelineRow` holds
+entries/events instead. `TimelineRow.groupId` is optional — a timeline needs
+no container at all (a top-level timeline). Don't reintroduce an owner field
+beyond `groupId`: the row's group is the whole answer to "whose timeline is
+this", which is what stops a moved timeline keeping a stale owner. There is no
+`parentRowId` any more — a timeline cannot nest inside another timeline; model
+that as a sub-group holding one row instead (v9 migration flattens any
+existing sub-row into a plain sibling, `flattenSubRows` in
+`src/storage/exportImport.ts`). Full term list in `docs/GLOSSARY.md`.
 
 **An event is a point, an entry is a span**, and that single difference is why
 it is its own entity rather than an entry with `end === start`: a zero-width bar

@@ -20,29 +20,32 @@ function makeEntry(id: string, rowId: string, parentEntryId?: string): TimelineE
   };
 }
 
-function makeRow(id: string, groupId: string, parentRowId?: string): TimelineRow {
-  return { id, groupId, color: "#333", label: id, parentRowId };
+function makeRow(id: string, groupId: string): TimelineRow {
+  return { id, groupId, color: "#333", label: id };
 }
 
 function makeEvent(id: string, rowId: string): TimelineEvent {
   return { id, rowId, title: id, date: { ms: 0, precision: "day" } };
 }
 
-// g1 ("Family") contains the sub-group g1a ("Finn") holding row r1, which has
-// sub-row r2, which has sub-sub-row r3. g2 is a person of its own (it has a
-// birth date) with row r4. g3 is an unrelated group with row r5.
+// g1 ("Family") contains the sub-group g1a ("Finn"), which contains the
+// grandchild sub-group g1a1 ("Finn's kid") holding row r3 — three levels deep,
+// since group nesting is no longer capped at one. g1a itself holds r1 and r2.
+// g2 is a person of its own (it has a birth date) with row r4. g3 is an
+// unrelated group with row r5.
 function fixture(): TimelineDataset {
   const ds = emptyDataset();
   ds.groups = [
     { id: "g1", label: "Family", collapsed: false },
     { id: "g1a", parentGroupId: "g1", label: "Finn", collapsed: false },
+    { id: "g1a1", parentGroupId: "g1a", label: "Finn's kid", collapsed: false },
     { id: "g2", label: "Me", birthDate: Date.UTC(1988, 0, 1), collapsed: false },
     { id: "g3", label: "Friends", collapsed: false },
   ];
   ds.rows = [
     makeRow("r1", "g1a"),
-    makeRow("r2", "g1a", "r1"),
-    makeRow("r3", "g1a", "r2"),
+    makeRow("r2", "g1a"),
+    makeRow("r3", "g1a1"),
     makeRow("r4", "g2"),
     makeRow("r5", "g3"),
   ];
@@ -58,20 +61,20 @@ function fixture(): TimelineDataset {
 }
 
 describe("collectRowCascade", () => {
-  test("collects sub-rows recursively with all their entries", () => {
+  test("collects a row's own entries, recursively through parentEntryId — even across rows", () => {
     const cascade = collectRowCascade(fixture(), "r1");
-    expect(cascade.rowIds.sort()).toEqual(["r1", "r2", "r3"]);
+    expect(cascade.rowIds).toEqual(["r1"]);
     expect(cascade.entryIds.sort()).toEqual(["e1", "e2", "e3"]);
   });
 });
 
 describe("events in a cascade", () => {
-  test("a row takes the events on it and on its sub-rows", () => {
+  test("a row takes only its own events", () => {
     const cascade = collectRowCascade(fixture(), "r1");
-    expect(cascade.eventIds.sort()).toEqual(["v1", "v2"]);
+    expect(cascade.eventIds.sort()).toEqual(["v1"]);
   });
 
-  test("a group takes the events on every timeline it holds", () => {
+  test("a group takes the events on every timeline it holds, at any depth", () => {
     expect(collectGroupCascade(fixture(), "g1").eventIds.sort()).toEqual(["v1", "v2"]);
   });
 
@@ -87,7 +90,7 @@ describe("events in a cascade", () => {
   test("applyDelete removes exactly the collected events", () => {
     const ds = fixture();
     const result = applyDelete(ds, collectRowCascade(ds, "r1"));
-    expect(result.events.map((event) => event.id)).toEqual(["v3"]);
+    expect(result.events.map((event) => event.id).sort()).toEqual(["v2", "v3"]);
   });
 });
 
@@ -103,9 +106,9 @@ describe("collectEntryCascade", () => {
 });
 
 describe("collectGroupCascade", () => {
-  test("takes the group's sub-groups, and everything on them, with it", () => {
+  test("takes the group's sub-groups at every depth, and everything on them, with it", () => {
     const cascade = collectGroupCascade(fixture(), "g1");
-    expect(cascade.groupIds.sort()).toEqual(["g1", "g1a"]);
+    expect(cascade.groupIds.sort()).toEqual(["g1", "g1a", "g1a1"]);
     expect(cascade.rowIds.sort()).toEqual(["r1", "r2", "r3"]);
     expect(cascade.entryIds.sort()).toEqual(["e1", "e2", "e3"]);
   });
@@ -119,17 +122,15 @@ describe("collectGroupCascade", () => {
 
 describe("describeCascade", () => {
   test("summarizes what will be removed", () => {
-    expect(describeCascade(collectRowCascade(fixture(), "r1"))).toBe(
-      "This deletes 3 entries, 2 events and 2 sub-rows.",
-    );
+    expect(describeCascade(collectRowCascade(fixture(), "r1"))).toBe("This deletes 3 entries and 1 event.");
     expect(describeCascade(collectEntryCascade(fixture(), "e3"))).toBe("This deletes 1 entry.");
   });
 
-  // None of g1's three rows is the thing being deleted by name, so calling two
-  // of them "sub-rows" both undercounted and mislabelled them.
-  test("counts a group's rows as whole timelines, not as sub-rows", () => {
+  // None of g1's three rows is the thing being deleted by name, so a row
+  // delete's cascade never mentions "timelines" — only a group delete does.
+  test("counts a group's rows as whole timelines, and its sub-groups at every depth", () => {
     expect(describeCascade(collectGroupCascade(fixture(), "g1"))).toBe(
-      "This deletes 3 entries, 2 events, 3 timelines and 1 sub-group.",
+      "This deletes 3 entries, 2 events, 3 timelines and 2 sub-groups.",
     );
   });
 
@@ -142,7 +143,7 @@ describe("describeCascade", () => {
   test("a row with no events on it says nothing about events", () => {
     const ds = fixture();
     ds.events = [];
-    expect(describeCascade(collectRowCascade(ds, "r1"))).toBe("This deletes 3 entries and 2 sub-rows.");
+    expect(describeCascade(collectRowCascade(ds, "r1"))).toBe("This deletes 3 entries.");
   });
 });
 

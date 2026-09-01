@@ -11,13 +11,13 @@ thing without describing it. Each entry says what it is, then **where it lives**
 graph TD
     D[Dataset<br/><i>one per browser, in IndexedDB</i>]
     D --> G[Group<br/>“Me”, “My family”, “Finn”<br/><i>a birth date makes it a person</i>]
-    D --> R[Row / timeline<br/>“Places lived”<br/><i>has colour + icon</i>]
+    D --> R[Row / timeline<br/>“Places lived”<br/><i>colour + icon; a birth date can make IT a person too</i>]
     D --> E[Entry<br/>“Lived in Berlin”<br/><i>drawn as a bar</i>]
     D --> V[Event<br/>“First kiss”<br/><i>drawn as a pin, when zoomed in</i>]
 
     E -->|rowId| R
     V -->|rowId| R
-    R -->|groupId| G
+    R -.->|groupId, optional| G
     G -.->|parentGroupId, optional| G
     E -.->|parentEntryId, optional| E
 
@@ -26,8 +26,8 @@ graph TD
 ```
 
 Read it as sentences: **an entry sits on a row, an event sits on a row, a row
-sits in a group, and a group may sit in another group.** Everything else is
-optional.
+may sit in a group, and a group may sit in another group — at any depth.**
+Everything past "an entry/event sits on a row" is optional.
 
 Four things. There were three until schema v8 added the event, and four before
 that — see **Person** below for why that fourth one turned out to be one too
@@ -64,30 +64,47 @@ one-day span, it wanted to be an event.
 "Places lived" is a row; each flat you lived in is an entry on it, and the day
 the boiler exploded is an event on it. In the UI we say
 *timeline*; in code it is `TimelineRow` / `rowId`, because "timeline" was already
-taken by the app itself. Rows carry their own **colour** and **icon**.
-Rows are **concurrent**: entries on one row may freely overlap, and no check
-prevents it.
+taken by the app itself. Rows carry their own **colour**, **icon**, and — since
+v9 — optionally a **birth date** (see **Person** below). A row's `groupId` is
+optional: a timeline needs no group at all (a **top-level timeline**). Rows are
+**concurrent**: entries on one row may freely overlap, and no check prevents it.
+There is no nesting a row inside another row any more (`parentRowId` is gone,
+schema v9) — model what used to be a "sub-timeline" as a **sub-group** holding
+one row instead.
 → `types.ts` (`TimelineRow`), `src/render/layout.ts`
 
-**Group** — a labelled bundle of rows, drawn as a section header. "Me", "My
-family", "World events". A group can hold **sub-groups** ("My family" → "Finn")
-and, if it has a **birth date**, it *is* a person. Your own group is the **self
-group** (`dataset.selfGroupId`), set during setup; it is how the app knows whose
-birth year to show and where new timelines go.
+**Group** — a labelled bundle of sub-groups and rows, drawn as a section
+header. "Me", "My family", "World events". A group can hold **sub-groups**
+("My family" → "Finn" → "Finn's kid"), nested to any depth (schema v9 lifted
+the one-level cap), and, if it has a **birth date**, it *is* a person. Groups
+carry their own **colour** and **icon** too, since v9 — a group is now a
+near-mirror of a row in every field except what it can contain. Your own group
+is the **self group** (`dataset.selfGroupId`), set during setup; it is how the
+app knows whose birth year to show and where new timelines go.
 → `types.ts` (`Group`)
 
-**Sub-group** — a group nested in another one, drawn with a smaller header. This
-is what a person inside "My family" is. Only one level deep is drawn.
+**Sub-group** — a group nested in another one, drawn with a progressively
+smaller header the deeper it sits (`groupHeaderHeight`/`groupFontSize` in
+`src/render/layout.ts`, with a floor). This is what a person inside "My
+family" is. Nests to any depth since schema v9; only a **top-level** group
+(depth 0) gets the shaded rail background — depth alone, via indentation and
+shrinking font size, is what makes the hierarchy legible past that.
 
-**Person** — **not a thing in the model.** A person is a group with a birth
-date; that date is the only difference, and it is what greys out the time before
-someone was born and puts an age in the header. There used to be a separate
-`Person` entity that both `Group` and `TimelineRow` pointed at, which forced the
-rule "a group either *is* a person or *contains* people, never both" — an
-asymmetry every consumer had to special-case, and the source of a timeline
-keeping a stale owner after being moved. Folded into `Group` in schema v6.
-→ `types.ts` (`Group.birthDate`), `src/storage/exportImport.ts`
-(`foldPeopleIntoGroups`)
+**Person** — **not a thing in the model.** A person is a `Group` *or, since
+schema v9, a `TimelineRow`* with a birth date; that date is what greys out the
+time before someone was born and puts an age next to the name. Most people get
+a whole group (a family full of sub-groups and timelines); someone you're not
+building out a full family tree for — an acquaintance — can just get one
+timeline with its own birth date instead. There used to be a separate `Person`
+entity that both `Group` and `TimelineRow` pointed at, which forced the rule "a
+group either *is* a person or *contains* people, never both" — an asymmetry
+every consumer had to special-case, and the source of a timeline keeping a
+stale owner after being moved. Folded into `Group` in schema v6, extended to
+`TimelineRow` in v9. `birthDateForRow()` in `src/model/dataset.ts` is the one
+place "whose life is this row" gets resolved — the row's own date first, else
+the nearest ancestor group's.
+→ `types.ts` (`Group.birthDate`, `TimelineRow.birthDate`),
+`src/storage/exportImport.ts` (`foldPeopleIntoGroups`)
 
 **Category** — **gone.** Removed from the model; colour and icon moved onto the
 row. If you see "category" today it means only the *wording group* the add-entry
@@ -230,11 +247,19 @@ theirs.*
 testing. Framework-agnostic on purpose — no React imports inside it.
 → `src/render/engine.ts`
 
-**Layout** — the computed list of what goes where vertically (group headers,
-sub-group headers, rows, their heights and y positions). The canvas *and* the
-DOM rail *and* the minimap all render from this one result, which is what keeps
-them in sync.
+**Layout** — the computed list of what goes where vertically (group headers at
+any depth, rows, their heights and y positions). The canvas *and* the DOM rail
+*and* the minimap all render from this one result, which is what keeps them in
+sync.
 → `src/render/layout.ts` (`computeLayout`)
+
+**Group summary** — the one bar a **collapsed** group draws on the canvas,
+spanning the earliest start to the latest end across every entry and event
+anywhere in its subtree, at any depth. Replaces drawing nothing at all; the
+rail draws nothing for it (there is no per-entry detail to click or edit on an
+aggregate) but the canvas still shows *something* is there.
+→ `src/render/layout.ts` (the `"group-summary"` `LayoutItem` kind),
+`src/render/engine.ts` (`drawGroupSummary`)
 
 **Time scale** — the mapping between an instant and an x pixel, and back
 (`msToX` / `xToMs`). Zooming changes `msPerPx`.
@@ -451,9 +476,20 @@ does *not* use drafts — it asks everything, then writes once.
 → `src/state/actions.ts`
 
 **Cascade** — the set of things a delete would also take with it (an entry's
-children, a row's entries and events, a group's sub-groups). Always described before it
-happens; never silent.
+children, a row's entries and events, a group's sub-groups at any depth).
+Always described before it happens; never silent.
 → `src/model/cascade.ts`
+
+**Move** *(drag)* — repositioning a group or row anywhere in the tree: into or
+out of any group, at any depth, or to the root (no group at all). A plain drag.
+→ `src/state/actions.ts` (`moveGroup`, `moveRow`)
+
+**Copy** *(drag)* — Alt/Option-drag instead of a plain drag. Deep: a group
+copies its whole subtree — nested groups, their rows, and every entry/event on
+them — with fresh ids throughout; a row copies its own entries/events. Always
+private, regardless of whether the original was shared — publishing stays a
+deliberate act.
+→ `src/state/actions.ts` (`copyGroup`, `copyRow`)
 
 **Store** — the hand-rolled state container. Every mutation goes through
 `actions.ts`; changes are saved to IndexedDB 250 ms after they stop arriving

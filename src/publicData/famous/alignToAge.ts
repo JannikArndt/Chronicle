@@ -86,11 +86,10 @@ export function buildFamousDataset(
   return namespaceDataset(raw, famousKey(person.id, aligned));
 }
 
-// The base row ids that still remain for a person after removals. Removing a
-// parent row cascades to its sub-rows (a sub-timeline can't outlive its parent).
+// The row ids that still remain for a person after removals. Each row (a
+// flat life-area, or one lane inside a "lanes" sub-group) is removable on its
+// own — there is no longer a parent row for a removal to cascade through.
 export function remainingRowKeys(person: FamousPerson, removedRowKeys: string[]): string[] {
   const removed = new Set(removedRowKeys);
-  const isRemoved = (row: { id: string; parentRowId?: string }): boolean =>
-    removed.has(row.id) || (row.parentRowId !== undefined && removed.has(row.parentRowId));
-  return person.biography.rows.filter((row) => !isRemoved(row)).map((row) => row.id);
+  return person.biography.rows.filter((row) => !removed.has(row.id)).map((row) => row.id);
 }

@@ -15,18 +15,6 @@ export interface Cascade {
   eventIds: string[];
 }
 
-function descendantRowIds(dataset: TimelineDataset, rootRowIds: string[]): string[] {
-  const collected = new Set(rootRowIds);
-  let frontier = rootRowIds;
-  while (frontier.length > 0) {
-    frontier = dataset.rows
-      .filter((row) => row.parentRowId !== undefined && frontier.includes(row.parentRowId) && !collected.has(row.id))
-      .map((row) => row.id);
-    frontier.forEach((id) => collected.add(id));
-  }
-  return [...collected];
-}
-
 function descendantEntryIds(dataset: TimelineDataset, rootEntryIds: string[]): string[] {
   const collected = new Set(rootEntryIds);
   let frontier = rootEntryIds;
@@ -47,13 +35,12 @@ function eventIdsOfRows(dataset: TimelineDataset, rowIds: string[]): string[] {
 }
 
 export function collectRowCascade(dataset: TimelineDataset, rowId: string): Cascade {
-  const rowIds = descendantRowIds(dataset, [rowId]);
-  const directEntryIds = dataset.entries.filter((e) => rowIds.includes(e.rowId)).map((e) => e.id);
+  const directEntryIds = dataset.entries.filter((e) => e.rowId === rowId).map((e) => e.id);
   return {
     groupIds: [],
-    rowIds,
+    rowIds: [rowId],
     entryIds: descendantEntryIds(dataset, directEntryIds),
-    eventIds: eventIdsOfRows(dataset, rowIds),
+    eventIds: eventIdsOfRows(dataset, [rowId]),
   };
 }
 
@@ -66,10 +53,21 @@ export function collectEventCascade(_dataset: TimelineDataset, eventId: string):
   return { groupIds: [], rowIds: [], entryIds: [], eventIds: [eventId] };
 }
 
+// All descendant groups of `groupId`, at any depth, `groupId` first.
+function descendantGroupIds(dataset: TimelineDataset, groupId: string): string[] {
+  const collected = [groupId];
+  let frontier = [groupId];
+  while (frontier.length > 0) {
+    const children = dataset.groups.filter((g) => g.parentGroupId !== undefined && frontier.includes(g.parentGroupId));
+    frontier = children.map((g) => g.id);
+    collected.push(...frontier);
+  }
+  return collected;
+}
+
 export function collectGroupCascade(dataset: TimelineDataset, groupId: string): Cascade {
-  const groupIds = [groupId, ...dataset.groups.filter((g) => g.parentGroupId === groupId).map((g) => g.id)];
-  const directRowIds = dataset.rows.filter((row) => groupIds.includes(row.groupId)).map((row) => row.id);
-  const rowIds = descendantRowIds(dataset, directRowIds);
+  const groupIds = descendantGroupIds(dataset, groupId);
+  const rowIds = dataset.rows.filter((row) => row.groupId !== undefined && groupIds.includes(row.groupId)).map((row) => row.id);
   const directEntryIds = dataset.entries.filter((e) => rowIds.includes(e.rowId)).map((e) => e.id);
   return {
     groupIds,
@@ -93,14 +91,11 @@ export function describeCascade(cascade: Cascade): string {
   if (cascade.eventIds.length > 0) parts.push(count(cascade.eventIds.length, "event", "events"));
   // Deleting a group takes whole timelines with it, and none of them is the
   // thing named in the prompt — so all of them are counted, as timelines.
-  // Deleting a row is the other case: the first row id IS the named row, and
-  // the rest are its sub-rows.
+  // Deleting a single row never reaches here: rowIds is just that one row,
+  // already named in the prompt by the caller.
   const deletesAGroup = cascade.groupIds.length > 0;
-  if (deletesAGroup) {
-    if (cascade.rowIds.length > 0) parts.push(count(cascade.rowIds.length, "timeline", "timelines"));
-  } else {
-    const subRowCount = Math.max(0, cascade.rowIds.length - 1);
-    if (subRowCount > 0) parts.push(count(subRowCount, "sub-row", "sub-rows"));
+  if (deletesAGroup && cascade.rowIds.length > 0) {
+    parts.push(count(cascade.rowIds.length, "timeline", "timelines"));
   }
   // The first group id is the group being deleted itself, not a sub-group.
   const subGroupCount = Math.max(0, cascade.groupIds.length - 1);

@@ -62,6 +62,14 @@ what's true across the whole codebase.
   when zoomed in* (`src/render/events.ts` owns that rule and nothing else may
   re-decide it). A zero-length entry is not an event and must not be used as
   one: it has no label anchor, no fade edges and no honest "ongoing".
+- **A person is a `Group` or a `TimelineRow` with a `birthDate`** — either can
+  independently be a person now (a big family gets a group full of sub-groups
+  and timelines; an acquaintance might get exactly one timeline). Both carry
+  the same four presentational fields (`label`, `color`, `icon`, `birthDate`).
+  `birthDateForRow()` in `src/model/dataset.ts` is the one place that resolves
+  "whose life is this" — a row's own date first, else the nearest ancestor
+  group's — and every consumer (the pre-birth hatch, the age badge, name
+  suggestions) goes through it rather than re-deriving the walk.
 
 ## Testing conventions
 
@@ -95,9 +103,11 @@ what's true across the whole codebase.
   `shareByDefault`, deliberately *not* the `visibility` name that v1–v3 used and
   v4 removed; the v7 migration deletes the dead keys and never converts them.
   No Gist sync — still a marked, honest gap (PAT flow unsolved
-  for non-technical users). No keyboard-only/screen-reader path. Only one level
-  of group nesting is *drawn* — the model no longer forbids more, but
-  `computeLayout` draws a group, then its sub-groups, and stops.
+  for non-technical users). No keyboard-only/screen-reader path. Groups nest
+  arbitrarily deep now (`computeLayout` is recursive) — the former one-level
+  cap is gone, and with it timeline-in-timeline nesting (`TimelineRow` no
+  longer has a `parentRowId`): a "sub-timeline" is now a sub-group holding one
+  row instead.
 - Hover-revealed rail controls on fine pointers vs always-visible on touch is an
   intentional split, not an inconsistency.
 

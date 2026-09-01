@@ -37,8 +37,9 @@ assertions plus a shim standing in for a Supabase project), `supabase/README.md`
 
 - **`syncSubset` is the only way data leaves the device.** Every push goes
   through it. It fails closed, and it strips references pointing outside the
-  subset — a shared sub-row under a private parent keeps a `parentRowId` to a
-  row the viewer must not see unless something removes it.
+  subset — a published entry whose `parentEntryId` points at one on a private
+  row loses that reference rather than pointing at something the viewer must
+  not see.
 - **Mirrors never enter `state.dataset`.** They are a sibling of
   `publicDatasets`, namespaced `shared:<accountId>:`, stored under their own
   IndexedDB key. This is what keeps exports clean (`triggerDownload` serialises
@@ -92,9 +93,6 @@ only ever been read:
   satisfies — so a **read-only grant carried write access to every entry** on a
   shared timeline. Writes now go through `can_write_record`, which asks about
   co-ownership of the group and nothing else.
-
-Group nesting is walked exactly one level, not recursively: `addSubGroup`
-refuses to nest deeper and only one level is drawn.
 
 ## Not yet done
 

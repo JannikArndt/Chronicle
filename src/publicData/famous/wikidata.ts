@@ -73,9 +73,10 @@ export async function searchWikidataPeople(query: string): Promise<WikidataSearc
 }
 
 // The rows a Wikidata life maps onto. `key` also names the SPARQL ?type.
-// `layout: "lanes"` means each item gets its own sub-row, so overlapping things
-// (concurrent jobs, siblings growing up in parallel) are visible as separate
-// lanes instead of bars stacked on top of each other.
+// `layout: "lanes"` means each item gets its own row inside a sub-group named
+// after the spec, so overlapping things (concurrent jobs, siblings growing up
+// in parallel) are visible as separate lanes instead of bars stacked on top
+// of each other.
 const WIKIDATA_ROWS = [
   { key: "place", label: "Places lived", icon: "🏠", color: "#6b8e6b", layout: "flat" },
   { key: "education", label: "Education", icon: "🎓", color: "#4a6fa5", layout: "flat" },
@@ -243,42 +244,47 @@ export function bindingsToPerson(
   }
 
   // Second pass: turn items into rows. Flat rows hold their items as entries;
-  // "lanes" rows become a parent header row with one sub-row per item, so
-  // overlaps read as parallel lanes.
+  // "lanes" rows become a sub-group named after the spec, holding one row per
+  // item, so overlaps read as parallel lanes.
   const usedSpecs = WIKIDATA_ROWS.filter((spec) => byType.has(spec.key));
   if (usedSpecs.length === 0) {
     throw new Error(`No timeline data found on Wikidata for ${name}.`);
   }
 
+  const groups: FamousBiography["groups"] = [{ id: "g", label: name, collapsed: false }];
   const rows: FamousBiography["rows"] = [];
   const entries: FamousBiography["entries"] = [];
 
   for (const spec of usedSpecs) {
     const items = byType.get(spec.key)!.sort((a, b) => a.start.ms - b.start.ms);
-    const parentRowId = `r-${spec.key}`;
-    // Every row in a life-area shares the spec's color and icon (what the
-    // category used to carry); lane sub-rows inherit them so parallel lanes
-    // read as one colored area.
-    rows.push({ id: parentRowId, groupId: "g", color: spec.color, icon: spec.icon, label: spec.label });
 
     if (spec.layout === "lanes") {
+      const subGroupId = `g-${spec.key}`;
+      groups.push({
+        id: subGroupId,
+        parentGroupId: "g",
+        label: spec.label,
+        color: spec.color,
+        icon: spec.icon,
+        collapsed: false,
+      });
+      // Every lane inherits the spec's color and icon (what the category used
+      // to carry) so parallel lanes read as one colored area.
       items.slice(0, MAX_LANES_PER_ROW).forEach((item, index) => {
-        const rowId = `${parentRowId}-${index}`;
-        rows.push({ id: rowId, groupId: "g", color: spec.color, icon: spec.icon, label: item.title, parentRowId });
+        const rowId = `r-${spec.key}-${index}`;
+        rows.push({ id: rowId, groupId: subGroupId, color: spec.color, icon: spec.icon, label: item.title });
         entries.push({ id: `${spec.key}-${index}`, rowId, title: item.title, start: item.start, end: item.end });
       });
     } else {
+      const rowId = `r-${spec.key}`;
+      rows.push({ id: rowId, groupId: "g", color: spec.color, icon: spec.icon, label: spec.label });
       items.forEach((item, index) => {
-        entries.push({ id: `${spec.key}-${index}`, rowId: parentRowId, title: item.title, start: item.start, end: item.end });
+        entries.push({ id: `${spec.key}-${index}`, rowId, title: item.title, start: item.start, end: item.end });
       });
     }
   }
 
-  const biography: FamousBiography = {
-    groups: [{ id: "g", label: name, collapsed: false }],
-    rows,
-    entries,
-  };
+  const biography: FamousBiography = { groups, rows, entries };
 
   return {
     id: qid,

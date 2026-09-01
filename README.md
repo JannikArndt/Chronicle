@@ -106,5 +106,3 @@ Deployment: pushes to `main` build and publish to GitHub Pages via
   planned; it is deliberately not faked.
 - **No keyboard-only / screen-reader support**: the canvas with mouse/touch input is the
   only interaction path in v1 — an accepted scope cut.
-- **Only one level of nesting**: a group may contain sub-groups (that is what a person
-  inside "Family" is), but a sub-group's own sub-groups are not drawn.

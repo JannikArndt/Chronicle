@@ -6,10 +6,12 @@ import {
   addRow,
   addSubGroup,
   completeIdentityStep,
+  copyGroup,
+  copyRow,
   deleteEvent,
   deleteRowWithCascade,
+  moveGroup,
   moveRow,
-  reorderGroup,
   replaceDataset,
   selectEntry,
   selectEvent,
@@ -164,39 +166,68 @@ function rowById(rowId: string) {
   return appStore.getState().dataset.rows.find((r) => r.id === rowId);
 }
 
-describe("rail drag-and-drop: reorderGroup", () => {
+describe("rail drag-and-drop: moveGroup", () => {
   beforeEach(() => {
     replaceDataset(dragFixture());
   });
 
-  test("moves a group to the front", () => {
-    reorderGroup("g3", "g1");
+  test("moves a group to the front, same level", () => {
+    moveGroup("g3", null, "g1");
     expect(groupOrder()).toEqual(["g3", "g1", "g2"]);
   });
 
-  test("moves a group to the middle", () => {
-    reorderGroup("g1", "g3");
+  test("moves a group to the middle, same level", () => {
+    moveGroup("g1", null, "g3");
     expect(groupOrder()).toEqual(["g2", "g1", "g3"]);
   });
 
   test("moves a group to the end with a null sibling", () => {
-    reorderGroup("g1", null);
+    moveGroup("g1", null, null);
     expect(groupOrder()).toEqual(["g2", "g3", "g1"]);
   });
 
   test("dropping a group onto itself is a no-op", () => {
-    reorderGroup("g2", "g2");
+    moveGroup("g2", null, "g2");
     expect(groupOrder()).toEqual(["g1", "g2", "g3"]);
   });
 
   test("an unknown group id is a no-op", () => {
-    reorderGroup("no-such-group", "g1");
+    moveGroup("no-such-group", null, "g1");
     expect(groupOrder()).toEqual(["g1", "g2", "g3"]);
   });
 
   test("an unknown beforeGroupId is a no-op", () => {
-    reorderGroup("g1", "no-such-group");
+    moveGroup("g1", null, "no-such-group");
     expect(groupOrder()).toEqual(["g1", "g2", "g3"]);
+  });
+
+  test("nests a top-level group inside another, at arbitrary depth", () => {
+    moveGroup("g3", "g2", null);
+    const g3 = appStore.getState().dataset.groups.find((g) => g.id === "g3");
+    expect(g3?.parentGroupId).toBe("g2");
+    // g1's own children stay at the front of g2's, ahead of the newly nested g3.
+    expect(groupOrder()).toEqual(["g1", "g2", "g3"]);
+  });
+
+  test("un-nests a sub-group back to the root", () => {
+    const ds = dragFixture();
+    ds.groups.push({ id: "g2a", parentGroupId: "g2", label: "Alex", collapsed: false });
+    replaceDataset(ds);
+    moveGroup("g2a", null, null);
+    expect(appStore.getState().dataset.groups.find((g) => g.id === "g2a")?.parentGroupId).toBeUndefined();
+  });
+
+  test("cannot nest a group inside its own descendant", () => {
+    const ds = dragFixture();
+    ds.groups.push({ id: "g2a", parentGroupId: "g2", label: "Alex", collapsed: false });
+    replaceDataset(ds);
+    moveGroup("g2", "g2a", null);
+    expect(appStore.getState().dataset.groups.find((g) => g.id === "g2")?.parentGroupId).toBeUndefined();
+  });
+
+  test("cannot nest a group inside itself", () => {
+    moveGroup("g2", "g2", null);
+    expect(appStore.getState().dataset.groups.find((g) => g.id === "g2")?.parentGroupId).toBeUndefined();
   });
 });
 
@@ -263,12 +294,76 @@ describe("rail drag-and-drop: moveRow", () => {
     expect(rowById("r1")?.groupId).toBe("g1");
   });
 
-  test("a sub-row cannot be moved", () => {
+  test("moves a row out to the top level, no group at all", () => {
+    moveRow("r1", null, null);
+    expect(rowById("r1")?.groupId).toBeUndefined();
+  });
+
+  test("moves a top-level row into a group", () => {
     const ds = dragFixture();
-    ds.rows.push({ id: "r1-sub", groupId: "g1", color: "#333", label: "Sub", parentRowId: "r1" });
+    ds.rows.push({ id: "r-top", label: "Top-level", color: "#333" });
     replaceDataset(ds);
-    moveRow("r1-sub", "g2", null);
-    expect(rowById("r1-sub")?.groupId).toBe("g1");
+    moveRow("r-top", "g1", null);
+    expect(rowById("r-top")?.groupId).toBe("g1");
+  });
+});
+
+describe("rail drag-and-drop: copyRow / copyGroup (deep copy)", () => {
+  beforeEach(() => {
+    replaceDataset(dragFixture());
+  });
+
+  test("copyRow duplicates the row and its entries with fresh ids", () => {
+    const ds = appStore.getState().dataset;
+    ds.entries.push({ id: "e1", rowId: "r1", title: "Original", start: { ms: T0, precision: "day" } });
+    replaceDataset(ds);
+
+    const newRowId = copyRow("r1");
+    expect(newRowId).toBeDefined();
+    expect(newRowId).not.toBe("r1");
+
+    const state = appStore.getState();
+    const copiedRow = state.dataset.rows.find((r) => r.id === newRowId)!;
+    expect(copiedRow.label).toBe("Job");
+    expect(copiedRow.groupId).toBe("g1");
+
+    const copiedEntries = state.dataset.entries.filter((e) => e.rowId === newRowId);
+    expect(copiedEntries).toHaveLength(1);
+    expect(copiedEntries[0].id).not.toBe("e1");
+    expect(copiedEntries[0].title).toBe("Original");
+  });
+
+  test("copyGroup duplicates nested sub-groups, their rows, and entries — all with fresh ids", () => {
+    const ds = dragFixture();
+    ds.groups.push({ id: "g1a", parentGroupId: "g1", label: "Finn", collapsed: false });
+    ds.rows.push({ id: "r1a", groupId: "g1a", color: "#333", label: "School" });
+    ds.entries.push({ id: "e1a", rowId: "r1a", title: "First day", start: { ms: T0, precision: "day" } });
+    replaceDataset(ds);
+
+    const newGroupId = copyGroup("g1");
+    expect(newGroupId).toBeDefined();
+    expect(newGroupId).not.toBe("g1");
+
+    const state = appStore.getState();
+    const copiedSubGroup = state.dataset.groups.find(
+      (g) => g.parentGroupId === newGroupId && g.label === "Finn",
+    );
+    expect(copiedSubGroup).toBeDefined();
+    expect(copiedSubGroup!.id).not.toBe("g1a");
+
+    const copiedRows = state.dataset.rows.filter((r) => r.groupId === newGroupId || r.groupId === copiedSubGroup!.id);
+    expect(copiedRows.map((r) => r.label).sort()).toEqual(["Home", "Job", "School"]);
+
+    const copiedSubRow = copiedRows.find((r) => r.label === "School")!;
+    const copiedEntries = state.dataset.entries.filter((e) => e.rowId === copiedSubRow.id);
+    expect(copiedEntries).toHaveLength(1);
+    expect(copiedEntries[0].id).not.toBe("e1a");
+  });
+
+  test("a copy is always private, even when the original was shared", () => {
+    setRowShared("r1", true);
+    const newRowId = copyRow("r1");
+    expect(appStore.getState().dataset.rows.find((r) => r.id === newRowId)?.shared).toBeUndefined();
   });
 });
 

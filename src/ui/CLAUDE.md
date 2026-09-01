@@ -134,6 +134,18 @@ is desktop-only now.
   (the co-owned case is checked against the mirror's `role` instead). Using
   `isPublicId` for a new read-only check makes someone else's data editable, and
   the edit then goes nowhere.
+- **Rail drag-and-drop targets a container (a group id, or `null` for the
+  root), not a fixed level.** `RowRail.tsx`'s `analyzeContainers()` rebuilds,
+  purely from the rendered DOM's depth-first order (`data-rail-depth`), which
+  private group directly contains each element and where its subtree ends —
+  the same reconstruction-from-flattened-list trick `computeLayout()` itself
+  relies on. Both groups and timelines can drop at any depth or at the root.
+- **Holding Alt/Option while dragging copies instead of moving** (checked live
+  via `event.altKey` on every `pointermove`, not just at drag-start, so
+  pressing or releasing it mid-drag switches modes). The drop still composes
+  with positioning: `copyGroup`/`copyRow` create the duplicate, then
+  `moveGroup`/`moveRow` place it at the drop target — a copy is always
+  private, regardless of whether the original was shared.
 
 ## Still open / untested
 
@@ -152,7 +164,12 @@ is desktop-only now.
 - Rail actions still missing on mobile: "＋ Group" (a design gap, not an
   extraction one — creating a group on a phone has no designed home) and 🌟
   Famous people (still private to `RowRail.tsx`; worth extracting together
-  with gating its 🐞 debug panel — see `src/publicData/CLAUDE.md`).
+  with gating its 🐞 debug panel — see `src/publicData/CLAUDE.md`). Since v9,
+  also missing: editing a group's color/emoji/birth date (desktop-only —
+  `GroupEditor` in `RowRail.tsx` has no mobile counterpart), moving a group or
+  timeline to the root level (`RowPane`'s "Move to group" picker only offers
+  existing groups, not "no group"), and copy-via-drag (Alt/Option-drag has no
+  touch equivalent).
 - **Bar or pin is the last question, not the first.** The FAB flow does not ask
   what kind of thing you are adding up front — "an entry or an event?" is
   vocabulary, not a question anyone has — it asks how long it lasted at the end,
