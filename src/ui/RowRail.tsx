@@ -397,6 +397,15 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
     <div className="rail" onPointerDown={(e) => e.stopPropagation()}>
       <div className="rail-scroll">
         <div className="rail-content" ref={railContentRef} style={{ height: layout.totalHeight }}>
+          {layout.items
+            .filter((item) => item.kind === "group" && item.subtreeEndY !== undefined)
+            .map((item) => (
+              <div
+                key={`band:${item.id}`}
+                className="rail-group-band"
+                style={{ top: item.y, height: item.subtreeEndY! - item.y }}
+              />
+            ))}
           {layout.items.map((item) => (
             <RailItem
               key={`${item.kind}:${item.id}`}
@@ -496,7 +505,7 @@ function RailItem({
 
   // One block for every group, at any nesting depth — depth alone drives
   // header size and indentation (§ hierarchy through indentation and font
-  // size), and only a depth-0 group gets the shaded background.
+  // size); the shaded background comes from `.rail-group-band` behind it.
   if (item.kind === "group" && item.group) {
     const group = item.group;
     const age = computedAge(group);
@@ -504,7 +513,7 @@ function RailItem({
     const famous = item.depth === 0 ? parseFamousGroupId(group.id) : null;
     return (
       <div
-        className={`rail-group ${item.depth === 0 ? "rail-group-top" : ""}`}
+        className="rail-group"
         style={{ ...style, paddingLeft: 8 + item.depth * 14 }}
         data-rail-kind="group"
         data-rail-id={group.id}

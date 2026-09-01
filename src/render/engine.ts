@@ -56,7 +56,7 @@ const FALLBACK_COLORS = {
   axisFineText: "#a8a29e",
   gridline: "#eceae5",
   gridlineCoarse: "#dedcd5",
-  groupBand: "#efeee9",
+  groupBand: "rgba(41, 37, 34, 0.035)",
   rowSelected: "rgba(120, 140, 200, 0.10)",
   barText: "#292524",
   barTextInverse: "#ffffff",
@@ -88,7 +88,7 @@ export function readThemeColors(): ColorTable {
     axisFineText: read("--color-text-faint", FALLBACK_COLORS.axisFineText),
     gridline: read("--color-canvas-gridline", FALLBACK_COLORS.gridline),
     gridlineCoarse: read("--color-canvas-gridline-strong", FALLBACK_COLORS.gridlineCoarse),
-    groupBand: read("--color-bg-subtle", FALLBACK_COLORS.groupBand),
+    groupBand: read("--color-group-band", FALLBACK_COLORS.groupBand),
     rowSelected: read("--color-canvas-row-selected", FALLBACK_COLORS.rowSelected),
     barText: read("--color-text", FALLBACK_COLORS.barText),
     barTextInverse: FALLBACK_COLORS.barTextInverse, // white-on-accent stays white in both themes
@@ -604,7 +604,13 @@ export class TimelineEngine {
   private visibleRowItems(): LayoutItem[] {
     const top = this.scrollY - ROW_HEIGHT;
     const bottom = this.scrollY + this.height - this.contentTop() + ROW_HEIGHT;
-    return this.input.layout.items.filter((item) => item.y + item.height >= top && item.y <= bottom);
+    return this.input.layout.items.filter((item) => {
+      // A group's band spans its whole subtree, so it stays "visible" (and
+      // keeps painting its band) as long as any of that subtree is on
+      // screen — even once its own header has scrolled past the top.
+      const itemBottom = item.kind === "group" ? (item.subtreeEndY ?? item.y + item.height) : item.y + item.height;
+      return itemBottom >= top && item.y <= bottom;
+    });
   }
 
   private drawContent(): void {
@@ -619,12 +625,15 @@ export class TimelineEngine {
 
     for (const item of visible) {
       if (item.kind === "group") {
-        // Only a top-level group gets the shaded band — matches the rail,
-        // where the same rule keeps a deeply nested header from reading as
-        // heavy as the section it sits inside.
-        if (item.depth === 0) {
+        // Every group gets a background band over its FULL extent — header
+        // plus everything nested under it (`subtreeEndY`), not just the
+        // header line. Items come in depth-first order, so a nested group's
+        // band is painted after (on top of) its ancestors' — the same low
+        // alpha stacking into a visibly stronger shade wherever nesting goes
+        // deeper, which is the whole of how depth reads here.
+        if (item.subtreeEndY !== undefined) {
           ctx.fillStyle = this.colors.groupBand;
-          ctx.fillRect(0, item.y, this.width, item.height - 6);
+          ctx.fillRect(0, item.y, this.width, item.subtreeEndY - item.y);
         }
         continue;
       }
