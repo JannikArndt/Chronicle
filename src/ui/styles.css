@@ -2268,9 +2268,8 @@ textarea {
   color: var(--color-accent);
 }
 
-/* One date, answered with chips and sliders. `.year-slider` is the older,
-   year-only version, still used where a single year is genuinely the answer. */
-.year-slider,
+/* One date, answered with chips and sliders — a readout, then as much control
+   as the chosen granularity needs. */
 .date-answer {
   display: flex;
   flex-direction: column;
@@ -2289,7 +2288,6 @@ textarea {
   color: var(--color-text-muted);
 }
 
-.year-slider input[type="range"],
 .answer-slider-row input[type="range"] {
   width: 100%;
   margin-top: 8px;

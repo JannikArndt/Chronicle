@@ -16,6 +16,7 @@ import { useAssistantFlow } from "./useAssistantFlow";
 import {
   MONTH_LABELS,
   answerFromMs,
+  answerMs,
   clampDay,
   daysInMonth,
   formatAnswer,
@@ -473,14 +474,15 @@ function buildEntry({
   };
 }
 
-// An end can never sit before its start. The end answer keeps its own
-// granularity while being pulled forward, so "ended in May" does not silently
-// become "ended in 2014".
+// An end can never sit before its start — compared on the anchored instants,
+// because a "2014" answer stands in July and would otherwise pass a raw
+// year-month-day comparison against a start in November of the same year.
+//
+// When it does sit before, the end becomes the start outright, granularity and
+// all: keeping a coarser granularity would just re-anchor it back into the past.
+// Same instant, and the slider is right there to drag it forward.
 function notBefore(end: DateAnswer, start: DateAnswer): DateAnswer {
-  const endMs = Date.UTC(end.year, end.monthIndex, clampDay(end.year, end.monthIndex, end.day));
-  const startMs = Date.UTC(start.year, start.monthIndex, clampDay(start.year, start.monthIndex, start.day));
-  if (endMs >= startMs) return end;
-  return { ...end, year: start.year, monthIndex: start.monthIndex, day: start.day };
+  return answerMs(end) >= answerMs(start) ? end : { ...start };
 }
 
 // Creating the row is deferred to here, the moment of commit, for the same

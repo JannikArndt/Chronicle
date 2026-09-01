@@ -77,7 +77,11 @@ export function answerFromMs(ms: number, granularity: DateGranularity = "year"):
   };
 }
 
-export function toFuzzyDate(answer: DateAnswer, certainty: DateCertainty): FuzzyDate {
+// The instant this answer stands on, mid-period anchoring included. Exported
+// because "is the end before the start?" has to be asked about the anchored
+// instants: a year answer sits in July, so a raw year/month/day comparison says
+// "2014 is not before 20 Nov 2014" when after anchoring it plainly is.
+export function answerMs(answer: DateAnswer): number {
   const { year, granularity } = answer;
   const monthIndex = granularity === "year" ? MID_YEAR_MONTH_INDEX : answer.monthIndex;
   const day =
@@ -86,10 +90,14 @@ export function toFuzzyDate(answer: DateAnswer, certainty: DateCertainty): Fuzzy
       : granularity === "month"
         ? MID_MONTH_DAY
         : MID_YEAR_DAY;
-  const fuzzDays = FUZZ_DAYS[granularity][certainty];
+  return Date.UTC(year, monthIndex, day);
+}
+
+export function toFuzzyDate(answer: DateAnswer, certainty: DateCertainty): FuzzyDate {
+  const fuzzDays = FUZZ_DAYS[answer.granularity][certainty];
   return {
-    ms: Date.UTC(year, monthIndex, day),
-    precision: PRECISION[granularity][certainty],
+    ms: answerMs(answer),
+    precision: PRECISION[answer.granularity][certainty],
     ...(fuzzDays === undefined ? {} : { fuzzDays }),
   };
 }
