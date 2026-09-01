@@ -692,9 +692,17 @@ export class TimelineEngine {
   // (src/render/events.ts owns that rule and the fade that goes with it).
   private drawEvents(item: LayoutItem, anEntryIsSelected: boolean): void {
     const zoomOpacity = eventMarkerOpacity(this.scale);
-    if (zoomOpacity === 0) return;
+    const emphasis = this.input.emphasizedEventIds;
     const row = item.row!;
-    const events = this.input.dataset.events.filter((event) => event.rowId === row.id);
+    let events = this.input.dataset.events.filter((event) => event.rowId === row.id);
+    // A search is a request to find something, so a matching moment is drawn
+    // even at a zoom that would otherwise hide it — dimming the whole timeline
+    // and then showing no match is search telling a lie. Only the matches are
+    // drawn there, so the declutter below has just them to space out.
+    if (zoomOpacity === 0) {
+      if (emphasis === null) return;
+      events = events.filter((event) => emphasis.has(event.id));
+    }
     if (events.length === 0) return;
 
     const { ctx } = this;
@@ -709,10 +717,10 @@ export class TimelineEngine {
       this.width,
       labelled ? (text) => ctx.measureText(text).width : () => 0,
     );
-    const emphasis = this.input.emphasizedEventIds;
     for (const marker of markers) {
-      let alpha = zoomOpacity;
-      if (emphasis && !emphasis.has(marker.event.id)) alpha *= 0.22;
+      const matched = emphasis?.has(marker.event.id) ?? false;
+      let alpha = matched ? 1 : zoomOpacity;
+      if (emphasis && !matched) alpha *= 0.22;
       // An entry selection focuses the picture on that entry and what it is
       // connected to; an event is never part of that, so it recedes with
       // everything else rather than staying the brightest thing on the row.
