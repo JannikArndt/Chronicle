@@ -169,4 +169,50 @@ describe("import validation", () => {
     ds.entries.push({ id: 42 });
     expect(validateImport(ds).ok).toBe(false);
   });
+
+  // v8: events arrive. Everything written before it lacks the array entirely,
+  // and every consumer reads `dataset.events` unguarded.
+  test("a v7 export with no events array gains an empty one", () => {
+    const legacy = {
+      schemaVersion: 7,
+      groups: [{ id: "g1", label: "Me", collapsed: false }],
+      rows: [{ id: "r1", groupId: "g1", label: "Job" }],
+      entries: [],
+    };
+    const result = validateImport(legacy);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.dataset.events).toEqual([]);
+  });
+
+  // Not only on an older file: a v8 file written by hand can be missing it too,
+  // and `events: undefined` would break the first row that tried to draw.
+  test("a file already claiming v8 also gets the array filled in", () => {
+    const result = validateImport({ schemaVersion: SCHEMA_VERSION, groups: [], rows: [], entries: [] });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.dataset.events).toEqual([]);
+  });
+
+  test("events survive an export/import round trip", () => {
+    const dataset = emptyDataset();
+    dataset.groups.push({ id: "g1", label: "Me", collapsed: false });
+    dataset.rows.push({ id: "r1", groupId: "g1", label: "Love" });
+    dataset.events.push({
+      id: "v1",
+      rowId: "r1",
+      title: "First kiss",
+      icon: "💋",
+      date: { ms: Date.UTC(2004, 6, 2), precision: "day" },
+    });
+    const result = parseImportFile(serializeDataset(dataset));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.dataset.events).toEqual(dataset.events);
+  });
+
+  test("rejects malformed events rather than importing half of one", () => {
+    const ds = emptyDataset() as unknown as { events: unknown[] };
+    ds.events.push({ id: "v1", rowId: "r1" }); // no date
+    expect(validateImport(ds).ok).toBe(false);
+    expect(validateImport({ ...emptyDataset(), events: "nope" }).ok).toBe(false);
+  });
 });

@@ -8,6 +8,15 @@ properties defined on `:root` in `styles.css` with a `@media
 new rule; add or reuse a variable instead, or the dark theme silently breaks
 for that element.
 
+Events are edited in two places, mirroring entries: `DetailPanel.tsx` splits
+into `EntryDetail` and `EventDetail` on desktop, `EventPane.tsx` is the mobile
+half. They are separate components rather than one with branches — an event has
+a single date, no fades, no short title and no ongoing state, and each of those
+would otherwise be an "unless this is an event" in the middle of a field list.
+Creating one is a two-field form, not an assistant: `AddEventForm` in
+`RowRail.tsx` (behind the row's ◆ button, opening on the instant last clicked on
+that row) and `AddEventRow` in `RowPane.tsx`.
+
 Sharing's contents live in `SharingPanel.tsx` (sign in, invite links, who can
 see what, the disclosures) and are rendered by two frames: `SharingMenu.tsx`,
 the desktop top-bar popover, and the mobile ⋯ menu's sharing sub-view in
@@ -36,10 +45,12 @@ starts *below* the floating controls instead of behind them.
 
 `BottomSheet.tsx` is the shared primitive (hand-rolled Pointer Events, anchors
 + `sheetSnap.ts` for velocity-aware snapping). There is exactly **one**
-navigational sheet: `TimelineSheet.tsx`, holding three panes —
+navigational sheet: `TimelineSheet.tsx`, holding four panes —
 `TimelineListPane` (the rail's replacement) → `RowPane` (one timeline) →
-`EntryPane` (the `DetailPanel`'s replacement). The add flows get the *same*
-primitive through `AssistantSheet.tsx` rather than a modal overlay, so they
+`EntryPane` or `EventPane` (the `DetailPanel`'s replacements; siblings at the
+same depth, both reached from a timeline and both leading back to it). The add
+flows get the *same* primitive through `AssistantSheet.tsx` rather than a modal
+overlay, so they
 drag, snap and flick away identically and the canvas stays live behind them;
 its scrim is invisible and only takes taps while the sheet is raised, where a
 tap parks it at peek. Onboarding is the one thing that still takes the whole
@@ -97,15 +108,20 @@ is desktop-only now.
   its own click ran.
 - **The mobile pane stack is derived, never stored.** `TimelineSheet` computes
   its pane from the store and from `settingsRowId`: an entry selection means
-  the entry pane, otherwise an opened timeline means the row pane, otherwise
-  the list. That is what lets the canvas, the list and search all select an
-  entry through the same action and land in the same place. `settingsRowId`
+  the entry pane, an event selection the event pane, otherwise an opened
+  timeline means the row pane, otherwise the list. That is what lets the canvas,
+  the list and search all select through the same action and land in the same
+  place. `settingsRowId`
   lives in `MobileShell`, above the sheet, because "back from an entry" leads
   to a *place* (its timeline) and not to a history — the entry may have been
   tapped on the canvas, having never visited the timeline at all.
 - **No dropdowns under ~7 options** — use `PillSelector`. No Save/Cancel
   buttons — autosave per field change. No browse/edit mode toggle, no modal
   create screen.
+- **`DateBlock` right-aligns only when it has a sibling.** The range editor's
+  End block hugs the right, above the handle it controls; an event has one date,
+  and a lone block sitting hard right reads as a layout bug — hence
+  `:last-child:not(:first-child)`.
 - **The share toggle stays visible while it is on**, unlike every other
   hover-revealed rail action. "Who can see this" has to be legible at a glance;
   a share control that hides itself is how someone forgets what they published.
@@ -133,6 +149,11 @@ is desktop-only now.
   extraction one — creating a group on a phone has no designed home) and 🌟
   Famous people (still private to `RowRail.tsx`; worth extracting together
   with gating its 🐞 debug panel — see `src/publicData/CLAUDE.md`).
+- **The FAB does not add events.** It opens the add-entry assistant, and an
+  event is reached through its timeline's pane instead. Deliberate for now:
+  "add something" would have to ask which of the two first, and that question
+  is worse than the extra tap for the rarer one. Revisit if events turn out to
+  be the more common thing to add.
 - **A co-owned mirror is still read-only.** `isForeignId` blocks the edit and
   there is no write-back path, so the "Shared with you" list says editing comes
   later rather than offering it. Don't loosen the `isForeignId` check to "fix"

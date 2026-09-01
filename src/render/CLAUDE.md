@@ -1,7 +1,7 @@
 # src/render — the canvas engine
 
 `engine.ts` is a **framework-agnostic** class — keep it free of React imports.
-`timeScale`/`timeAxis`/`layout`/`bars` are pure and unit-tested. Both the canvas
+`timeScale`/`timeAxis`/`layout`/`bars`/`events` are pure and unit-tested. Both the canvas
 and the DOM rail render from the same `computeLayout()` result — that shared
 layout is what keeps them in sync.
 
@@ -11,8 +11,15 @@ properties as the DOM (`readThemeColors()`, resolved via `getComputedStyle` on
 events to re-resolve and repaint — never hardcode a second color table here, it
 will drift out of sync with the DOM theme.
 
+`events.ts` is the whole of "events appear when you zoom in": an opacity ramp
+between two and one day per pixel (`eventMarkerOpacity`) and the label
+declutter (`layoutEventMarkers`). The engine paints from it and decides nothing
+about visibility itself.
+
 `miniMap.ts` (paired with `src/ui/MiniMap.tsx`) is a second canvas — one lane
-per row, plus the current viewport window on both axes.
+per row, plus the current viewport window on both axes. It deliberately draws
+no events: it is an overview of spans, and a pin that only exists at high zoom
+has nothing to say there.
 
 ## Invariants
 
@@ -33,6 +40,14 @@ per row, plus the current viewport window on both axes.
   short one unselectable by thumb. A tap is also bounded in time
   (`TAP_MAX_DURATION_MS`) for touch and pen only — a mouse may legitimately
   rest on a target.
+- **Events are hit-tested before bars, and the nearest pin wins.** A pin is a
+  few pixels wide and is drawn *on top of* whatever bar it sits over, so
+  checking bars first loses every ambiguous tap to the bar behind it. The pin
+  head is outlined in the canvas background and its label sits on a plate of
+  the same colour — both are drawn over bars of arbitrary colour, and 11px text
+  straight onto one is unreadable. `EVENT_PIN_TOP_OFFSET_PX` and
+  `EVENT_LABEL_PLATE_HEIGHT_PX` are tuned so the plate ends where a bar label's
+  ascender begins; changing one without the other clips the bar's own label.
 - **The minimap reads `--color-*` through the engine's own `readThemeColors()`.**
   That function and its `ColorTable` are exported for exactly this reason —
   there is no third color table, just as there is no second one in `engine.ts`.

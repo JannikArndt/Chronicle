@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { defaultSharedFor, describePublishImpact, syncSubset } from "./sharing";
 import { emptyDataset } from "./dataset";
-import type { TimelineDataset, TimelineEntry, TimelineRow } from "./types";
+import type { TimelineDataset, TimelineEntry, TimelineEvent, TimelineRow } from "./types";
 
 function makeEntry(id: string, rowId: string, parentEntryId?: string): TimelineEntry {
   return { id, rowId, title: id, start: { ms: 0, precision: "day" }, parentEntryId };
@@ -9,6 +9,10 @@ function makeEntry(id: string, rowId: string, parentEntryId?: string): TimelineE
 
 function makeRow(id: string, groupId: string, shared?: boolean, parentRowId?: string): TimelineRow {
   return { id, groupId, color: "#333", label: id, parentRowId, shared };
+}
+
+function makeEvent(id: string, rowId: string): TimelineEvent {
+  return { id, rowId, title: id, date: { ms: 0, precision: "day" } };
 }
 
 // g1 ("Family") holds the sub-group g1a ("Finn"). Finn has one published
@@ -22,6 +26,7 @@ function fixture(): TimelineDataset {
   ];
   dataset.rows = [makeRow("r1", "g1a", true), makeRow("r2", "g1a", false), makeRow("r3", "g2")];
   dataset.entries = [makeEntry("e1", "r1"), makeEntry("e2", "r2"), makeEntry("e3", "r3")];
+  dataset.events = [makeEvent("v1", "r1"), makeEvent("v2", "r2"), makeEvent("v3", "r3")];
   return dataset;
 }
 
@@ -30,6 +35,28 @@ describe("syncSubset — the privacy gate", () => {
     const subset = syncSubset(fixture(), "shared-only");
     expect(subset.rows.map((row) => row.id)).toEqual(["r1"]);
     expect(subset.entries.map((entry) => entry.id)).toEqual(["e1"]);
+  });
+
+  test("an event follows its row, exactly as an entry does", () => {
+    const subset = syncSubset(fixture(), "shared-only");
+    expect(subset.events.map((event) => event.id)).toEqual(["v1"]);
+  });
+
+  test("an event never rides along on a private row — the moments are the diary", () => {
+    const subset = syncSubset(fixture(), "shared-only");
+    expect(subset.events.some((event) => event.rowId === "r2")).toBe(false);
+    expect(subset.events.some((event) => event.rowId === "r3")).toBe(false);
+  });
+
+  test("a row with no shared flag keeps its events home too", () => {
+    const dataset = fixture();
+    dataset.rows = [makeRow("r1", "g1a")];
+    expect(syncSubset(dataset, "shared-only").events).toEqual([]);
+  });
+
+  test("everything mode takes the events with it", () => {
+    const subset = syncSubset(fixture(), "everything");
+    expect(subset.events.map((event) => event.id)).toEqual(["v1", "v2", "v3"]);
   });
 
   test("an entry never rides along on a private row", () => {
@@ -155,13 +182,24 @@ describe("defaultSharedFor", () => {
 
 describe("describePublishImpact", () => {
   test("counts the entries and names the group whose label goes with them", () => {
-    expect(describePublishImpact(fixture(), "r1")).toBe("This shares 1 entry. It also shares the name “Finn”.");
+    const dataset = fixture();
+    dataset.events = [];
+    expect(describePublishImpact(dataset, "r1")).toBe("This shares 1 entry. It also shares the name “Finn”.");
+  });
+
+  // Publishing a timeline publishes its moments, so the sentence read before
+  // the switch is flipped has to say so.
+  test("counts the events too, when there are any", () => {
+    expect(describePublishImpact(fixture(), "r1")).toBe(
+      "This shares 1 entry and 1 event. It also shares the name “Finn”.",
+    );
   });
 
   test("an unpublished sub-timeline is not counted — this switch is per-row", () => {
     const dataset = fixture();
     dataset.rows = [makeRow("r1", "g1a", true), makeRow("sub", "g1a", false, "r1")];
     dataset.entries = [makeEntry("e1", "r1"), makeEntry("e2", "sub")];
+    dataset.events = [];
     expect(describePublishImpact(dataset, "r1")).toBe("This shares 1 entry. It also shares the name “Finn”.");
   });
 
@@ -169,6 +207,7 @@ describe("describePublishImpact", () => {
     const dataset = fixture();
     dataset.rows = [makeRow("r1", "g1a", true), makeRow("sub", "g1a", true, "r1")];
     dataset.entries = [makeEntry("e1", "r1"), makeEntry("e2", "sub")];
+    dataset.events = [];
     expect(describePublishImpact(dataset, "r1")).toBe(
       "This shares 2 entries and 1 sub-timeline. It also shares the name “Finn”.",
     );

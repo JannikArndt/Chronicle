@@ -1,18 +1,24 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, test } from "vitest";
 import {
+  addEvent,
   addOnboardingPlaceEntry,
   addRow,
   addSubGroup,
   completeIdentityStep,
+  deleteEvent,
+  deleteRowWithCascade,
   moveRow,
   reorderGroup,
   replaceDataset,
+  selectEntry,
+  selectEvent,
   selectRow,
   setGroupShareByDefault,
   setRowShared,
   startDraft,
   updateDraft,
+  updateEvent,
   updateOnboardingPlaceEntry,
 } from "./actions";
 import { appStore, mergedDataset } from "./store";
@@ -41,6 +47,55 @@ function fixture(): TimelineDataset {
 
 beforeEach(() => {
   replaceDataset(fixture());
+});
+
+describe("events", () => {
+  test("an event is written straight away — there is no draft state for a moment", () => {
+    const id = addEvent("r1", "First kiss", { ms: T0, precision: "day" }, "💋");
+    const [event] = appStore.getState().dataset.events;
+    expect(event).toMatchObject({ id, rowId: "r1", title: "First kiss", icon: "💋" });
+    expect(event.date).toEqual({ ms: T0, precision: "day" });
+  });
+
+  test("editing one field leaves the rest alone", () => {
+    const id = addEvent("r1", "First kiss", { ms: T0, precision: "day" });
+    updateEvent(id, { description: "on the school steps" });
+    expect(appStore.getState().dataset.events[0]).toMatchObject({
+      title: "First kiss",
+      description: "on the school steps",
+    });
+  });
+
+  test("selecting an event deselects whatever entry or row was open, and back", () => {
+    const id = addEvent("r1", "First kiss", { ms: T0, precision: "day" });
+    selectEntry("e1");
+    selectEvent(id);
+    expect(appStore.getState().selectedEntryId).toBeUndefined();
+    expect(appStore.getState().selectedEventId).toBe(id);
+    selectEntry("e1");
+    expect(appStore.getState().selectedEventId).toBeUndefined();
+  });
+
+  test("selecting a row remembers where on the axis it was clicked", () => {
+    selectRow("r1", T0);
+    expect(appStore.getState().selectedRowClickMs).toBe(T0);
+    selectRow(undefined);
+    expect(appStore.getState().selectedRowClickMs).toBeUndefined();
+  });
+
+  test("deleting an event removes it and clears the selection", () => {
+    const id = addEvent("r1", "First kiss", { ms: T0, precision: "day" });
+    selectEvent(id);
+    deleteEvent(id);
+    expect(appStore.getState().dataset.events).toEqual([]);
+    expect(appStore.getState().selectedEventId).toBeUndefined();
+  });
+
+  test("deleting the timeline takes its events with it", () => {
+    addEvent("r1", "First kiss", { ms: T0, precision: "day" });
+    deleteRowWithCascade("r1");
+    expect(appStore.getState().dataset.events).toEqual([]);
+  });
 });
 
 describe("draft lifecycle", () => {

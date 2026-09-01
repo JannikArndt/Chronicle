@@ -29,8 +29,8 @@ The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `bas
 Each directory below has its own `CLAUDE.md` with the detail — this file only holds
 what's true across the whole codebase.
 
-- `src/model/` — pure data logic, no DOM. Three entities: `Group`, `TimelineRow`,
-  `TimelineEntry` (glossary in `docs/GLOSSARY.md`).
+- `src/model/` — pure data logic, no DOM. Four entities: `Group`, `TimelineRow`,
+  `TimelineEntry` and `TimelineEvent` (glossary in `docs/GLOSSARY.md`).
 - `src/render/` — the framework-agnostic canvas engine.
 - `src/state/` — the observable store and all mutations.
 - `src/publicData/` — read-only shared datasets loaded from `public-data/*.json`.
@@ -58,6 +58,10 @@ what's true across the whole codebase.
   (see `src/sharing/CLAUDE.md`).
 - **No dropdowns under ~7 options** — use `PillSelector`. No Save/Cancel buttons —
   autosave per field change. No browse/edit mode toggle, no modal create screen.
+- **An entry is a span, an event is a point** — and the point is *only drawn
+  when zoomed in* (`src/render/events.ts` owns that rule and nothing else may
+  re-decide it). A zero-length entry is not an event and must not be used as
+  one: it has no label anchor, no fade edges and no honest "ongoing".
 
 ## Testing conventions
 

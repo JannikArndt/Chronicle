@@ -28,10 +28,11 @@ const LABEL_END_PADDING_PX = 6;
 const AXIS_LABEL_GAP_PX = 10;
 
 // An event marker's pin head sits near the top of its row, with the label
-// beside it — above the bar labels, which are centred on the bar itself, so the
-// two never sit on the same line.
-const EVENT_PIN_TOP_OFFSET_PX = 8;
-const EVENT_LABEL_PLATE_HEIGHT_PX = 15;
+// beside it. These two numbers are what keeps that label's plate clear of the
+// bar labels below it, which are centred on the bar itself: at ROW_HEIGHT the
+// plate ends where a bar label's ascender begins.
+const EVENT_PIN_TOP_OFFSET_PX = 7;
+const EVENT_LABEL_PLATE_HEIGHT_PX = 13;
 const EVENT_LABEL_PLATE_PADDING_PX = 4;
 
 export const AXIS_HEIGHT = 46;

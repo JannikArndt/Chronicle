@@ -7,13 +7,21 @@ Pure data logic, no DOM. `types.ts` (schema, `SCHEMA_VERSION`), `fuzzyDate.ts`
 Every row is concurrent — entries on the same row may freely overlap, with no
 insert-time conflict check (the exclusive-row concept was removed).
 
-There are exactly **three** entities: `Group`, `TimelineRow` (a "timeline" in the
-UI) and `TimelineEntry`. `Person` was folded into `Group` in schema v6 — a group
-with a `birthDate` *is* a person, and a group nested via `parentGroupId` is what
-a person inside a container group used to be. Don't reintroduce an owner field
-on the row: the row's group is the whole answer to "whose timeline is this",
-which is what stops a moved timeline keeping a stale owner. Full term list in
-`docs/GLOSSARY.md`.
+There are **four** entities: `Group`, `TimelineRow` (a "timeline" in the UI),
+`TimelineEntry` and — since v8 — `TimelineEvent`. `Person` was folded into
+`Group` in schema v6 — a group with a `birthDate` *is* a person, and a group
+nested via `parentGroupId` is what a person inside a container group used to be.
+Don't reintroduce an owner field on the row: the row's group is the whole answer
+to "whose timeline is this", which is what stops a moved timeline keeping a
+stale owner. Full term list in `docs/GLOSSARY.md`.
+
+**An event is a point, an entry is a span**, and that single difference is why
+it is its own entity rather than an entry with `end === start`: a zero-width bar
+has no label anchor, no fade edges and no "ongoing", so every one of those would
+have grown an "unless it is a point" branch. An event carries one `date`
+(a `FuzzyDate`, so "sometime in 1998" stays honest), a `rowId`, and nothing that
+only makes sense for a duration. Nothing in the model points *at* an event —
+which is why `collectEventCascade` walks no tree.
 
 ## Invariants
 
