@@ -2,7 +2,7 @@
 // and native color/date inputs. It renders from the SAME layout the canvas
 // uses and is translated by the canvas scroll position every frame.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import { groupFontSize } from "../render/layout";
@@ -31,8 +31,7 @@ import {
   updateGroup,
   updateRow,
 } from "../state/actions";
-import { birthDateForRow } from "../model/dataset";
-import { isForeignId, mergedDataset, useAppState, userBirthMs } from "../state/store";
+import { isForeignId, useAppState, userBirthMs } from "../state/store";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateInput";
 import type { Group, TimelineRow } from "../model/types";
@@ -382,7 +381,6 @@ interface RowRailProps {
 export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }: RowRailProps) {
   const state = useAppState((s) => s);
   const dataset = state.dataset;
-  const merged = mergedDataset(state);
   const hiddenRowIds = state.hiddenRowIds;
   const selectedRowId = state.selectedRowId;
   const [popover, setPopover] = useState<PopoverState>(null);
@@ -395,18 +393,6 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
 
   const closePopover = () => setPopover(null);
 
-  // A row's own birthDate, or its nearest ancestor group's — computed once
-  // per render rather than per rail item, since it needs the whole merged
-  // dataset to walk ancestors.
-  const rowBirthDates = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of merged.rows) {
-      const birth = birthDateForRow(merged, row);
-      if (birth !== undefined) map.set(row.id, birth);
-    }
-    return map;
-  }, [merged]);
-
   return (
     <div className="rail" onPointerDown={(e) => e.stopPropagation()}>
       <div className="rail-scroll">
@@ -416,7 +402,6 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
               key={`${item.kind}:${item.id}`}
               item={item}
               hiddenRowIds={hiddenRowIds}
-              rowBirthDates={rowBirthDates}
               selectedRowId={selectedRowId}
               openPopover={setPopover}
               engineRef={engineRef}
@@ -478,7 +463,6 @@ function lifeSpanRange(birthDate: number): { startMs: number; endMs: number } {
 interface RailItemProps {
   item: LayoutItem;
   hiddenRowIds: string[];
-  rowBirthDates: Map<string, number>;
   selectedRowId?: string;
   openPopover: (p: PopoverState) => void;
   engineRef: MutableRefObject<TimelineEngine | null>;
@@ -491,7 +475,6 @@ interface RailItemProps {
 function RailItem({
   item,
   hiddenRowIds,
-  rowBirthDates,
   selectedRowId,
   openPopover,
   engineRef,
@@ -604,8 +587,12 @@ function RailItem({
   if (item.kind === "row" && item.row) {
     const row = item.row;
     const hidden = hiddenRowIds.includes(row.id);
-    const rowBirth = rowBirthDates.get(row.id);
-    const age = rowBirth === undefined ? null : computedAgeFromBirth(rowBirth);
+    // The row's own birthDate only — not a group's inherited one (§ pre-birth
+    // fade uses birthDateForRow for that approximation; the badge states a
+    // specific age, which would be wrong for a nested row that just hasn't
+    // had its own birth date entered yet, e.g. a child dragged under a
+    // parent's group).
+    const age = row.birthDate === undefined ? null : computedAgeFromBirth(row.birthDate);
     const visible = hoveredKey === key;
     return (
       <div
