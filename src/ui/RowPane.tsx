@@ -1,5 +1,5 @@
 // The second pane of the timeline sheet: one timeline's identity, then its
-// entries, then a way to add another.
+// entries and its events, then a way to add another of either.
 //
 // It leads with identity (icon, colour, name — all three tapped to change),
 // because that is what you came here to recognise. Navigation chrome (the back
@@ -7,8 +7,10 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { moveRow, setRowShared, updateRow } from "../state/actions";
+import { addEvent, moveRow, setRowShared, updateRow } from "../state/actions";
 import { describePublishImpact } from "../model/sharing";
+import { formatByPrecision, formatFuzzyDate } from "../model/fuzzyDate";
+import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateInput";
 import { isForeignId, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { EditableLine } from "./EditableLine";
 import { nextEntryStartMs } from "./nextEntryStart";
@@ -28,6 +30,7 @@ export function RowPane({
   movingToGroup,
   onCloseGroupPicker,
   onOpenEntry,
+  onOpenEvent,
   onAddEntry,
 }: {
   rowId: string;
@@ -36,6 +39,7 @@ export function RowPane({
   movingToGroup: boolean;
   onCloseGroupPicker: () => void;
   onOpenEntry: (entryId: string) => void;
+  onOpenEvent: (eventId: string) => void;
   onAddEntry: (rowId: string, startMs: number) => void;
 }) {
   const state = useAppState((s) => s);
@@ -49,6 +53,9 @@ export function RowPane({
   const entries = merged.entries
     .filter((entry) => entry.rowId === row.id)
     .sort((a, b) => a.start.ms - b.start.ms);
+  const events = merged.events
+    .filter((event) => event.rowId === row.id)
+    .sort((a, b) => a.date.ms - b.date.ms);
 
   // Public groups are read-only, so they are never a destination.
   const ownGroups = state.dataset.groups.filter((group) => !isPublicId(group.id));
@@ -186,7 +193,81 @@ export function RowPane({
           ＋ Add an entry
         </button>
       )}
+
+      <div className="sheet-section">Events · {events.length}</div>
+      {events.length === 0 && <div className="sheet-empty">No moments marked on this timeline.</div>}
+      {events.map((event) => (
+        <button key={event.id} type="button" className="sheet-row" onClick={() => onOpenEvent(event.id)}>
+          <span className="sheet-row-label">
+            {event.icon ? `${event.icon} ` : ""}
+            {event.title}
+          </span>
+          <span className="sheet-row-count">{formatByPrecision(event.date)}</span>
+          <span className="sheet-chevron">›</span>
+        </button>
+      ))}
+
+      {!readOnly && <AddEventRow rowId={row.id} onAdded={onOpenEvent} />}
     </>
+  );
+}
+
+// Adding a moment, inline. Deliberately not an assistant like the entry flow:
+// an event is a name and a date, and two fields in place beat four screens for
+// something this small. It stays folded away until asked for, so the pane still
+// reads as a list of what is on this timeline.
+function AddEventRow({ rowId, onAdded }: { rowId: string; onAdded: (eventId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [dateText, setDateText] = useState(() => formatFuzzyDate({ ms: Date.now(), precision: "day" }));
+  const parsed = parseDateInput(dateText);
+  const canSubmit = title.trim() !== "" && parsed.kind === "date";
+
+  if (!open) {
+    return (
+      <button type="button" className="sheet-add-row" onClick={() => setOpen(true)}>
+        ◆ Add an event
+      </button>
+    );
+  }
+
+  const submit = () => {
+    if (parsed.kind !== "date") return;
+    const id = addEvent(rowId, title.trim(), { ms: parsed.ms, precision: parsed.precision });
+    setOpen(false);
+    setTitle("");
+    // Straight into the event's own pane, where the date can be dragged and a
+    // note added — the same landing the desktop form gives.
+    onAdded(id);
+  };
+
+  return (
+    <div className="sheet-inline-form">
+      <input
+        type="text"
+        autoFocus
+        placeholder="What happened"
+        value={title}
+        onChange={(input) => setTitle(input.target.value)}
+      />
+      <input
+        type="text"
+        placeholder="When"
+        value={dateText}
+        onChange={(input) => setDateText(input.target.value)}
+      />
+      <div className="hint">
+        {parsed.kind === "date" ? "Events show up once you zoom in." : ACCEPTED_DATE_FORMATS_HINT}
+      </div>
+      <div className="sheet-inline-form-actions">
+        <button type="button" className="small-button" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+        <button type="button" className="small-button small-button-primary" disabled={!canSubmit} onClick={submit}>
+          Add
+        </button>
+      </div>
+    </div>
   );
 }
 

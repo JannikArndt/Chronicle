@@ -5,7 +5,7 @@
 // the server. It is pure, it fails closed (private unless something says
 // otherwise), and it is the most heavily tested code in the model.
 
-import type { Group, TimelineDataset, TimelineEntry, TimelineRow } from "./types";
+import type { Group, TimelineDataset, TimelineEntry, TimelineEvent, TimelineRow } from "./types";
 
 // "shared-only" is the default and uploads nothing the user hasn't published.
 // "everything" is the opt-in multi-device mode (Phase 1b): private records go up
@@ -17,6 +17,9 @@ export interface SyncSubset {
   groups: Group[];
   rows: TimelineRow[];
   entries: TimelineEntry[];
+  // Events have no flag of their own either — like entries, they follow their
+  // row, which is the whole of their access control.
+  events: TimelineEvent[];
 }
 
 // Does a row or sub-group created in this group start out shared? The nearest
@@ -79,6 +82,7 @@ export function syncSubset(dataset: TimelineDataset, mode: SyncMode): SyncSubset
   // whole of entry-level access control.
   const entries = dataset.entries.filter((entry) => rowIds.has(entry.rowId));
   const entryIds = new Set(entries.map((entry) => entry.id));
+  const events = dataset.events.filter((event) => rowIds.has(event.rowId));
 
   return {
     groups: dataset.groups
@@ -97,6 +101,9 @@ export function syncSubset(dataset: TimelineDataset, mode: SyncMode): SyncSubset
       parentEntryId:
         entry.parentEntryId !== undefined && entryIds.has(entry.parentEntryId) ? entry.parentEntryId : undefined,
     })),
+    // Nothing to strip: an event references only its row, and it is here
+    // precisely because that row is in the subset.
+    events,
   };
 }
 
@@ -122,12 +129,14 @@ export function describePublishImpact(dataset: TimelineDataset, rowId: string): 
   const publishedSubRows = [...subRowIds].filter(
     (id) => dataset.rows.find((candidate) => candidate.id === id)?.shared === true,
   );
-  const entryCount = dataset.entries.filter(
-    (entry) => entry.rowId === rowId || publishedSubRows.includes(entry.rowId),
-  ).length;
+  const carried = (rowIdOfRecord: string): boolean =>
+    rowIdOfRecord === rowId || publishedSubRows.includes(rowIdOfRecord);
+  const entryCount = dataset.entries.filter((entry) => carried(entry.rowId)).length;
+  const eventCount = dataset.events.filter((event) => carried(event.rowId)).length;
 
   const count = (n: number, singular: string, plural: string): string => `${n} ${n === 1 ? singular : plural}`;
   const parts = [count(entryCount, "entry", "entries")];
+  if (eventCount > 0) parts.push(count(eventCount, "event", "events"));
   if (publishedSubRows.length > 0) parts.push(count(publishedSubRows.length, "sub-timeline", "sub-timelines"));
 
   const group = dataset.groups.find((candidate) => candidate.id === row.groupId);

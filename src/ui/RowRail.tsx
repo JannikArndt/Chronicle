@@ -8,6 +8,7 @@ import { collectGroupCascade, collectRowCascade, describeCascade } from "../mode
 import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
 import {
+  addEvent,
   addGroup,
   addRow,
   addSubGroup,
@@ -16,6 +17,7 @@ import {
   deleteRowWithCascade,
   moveRow,
   reorderGroup,
+  selectEvent,
   selectRow,
   addFamousPerson,
   removeFamousRow,
@@ -29,6 +31,8 @@ import {
   updateRow,
 } from "../state/actions";
 import { isForeignId, useAppState, userBirthMs } from "../state/store";
+import { formatFuzzyDate } from "../model/fuzzyDate";
+import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateInput";
 import type { Group, TimelineRow } from "../model/types";
 import { describePublishImpact } from "../model/sharing";
 import { importDatasetWithConfirmation } from "./importFlow";
@@ -45,6 +49,7 @@ type PopoverState =
   | { kind: "group-edit"; groupId: string; top: number }
   | { kind: "row-edit"; rowId: string; top: number }
   | { kind: "add-sub-row"; rowId: string; top: number }
+  | { kind: "add-event"; rowId: string; top: number }
   | { kind: "add-group"; top: number }
   | { kind: "rail-add-menu"; top: number }
   | null;
@@ -622,6 +627,17 @@ function RailItem({
             <button
               type="button"
               className={hoverReveal(visible)}
+              title="Add event — a moment on this timeline"
+              onClick={(e) => {
+                e.stopPropagation();
+                openPopover({ kind: "add-event", rowId: row.id, top: topOf(e) });
+              }}
+            >
+              ◆
+            </button>
+            <button
+              type="button"
+              className={hoverReveal(visible)}
               title="Add sub-timeline"
               onClick={(e) => {
                 e.stopPropagation();
@@ -699,6 +715,7 @@ function Popover({
         {popover.kind === "group-edit" && <GroupEditor groupId={popover.groupId} close={close} />}
         {popover.kind === "row-edit" && <RowEditor rowId={popover.rowId} close={close} />}
         {popover.kind === "add-sub-row" && <SubRowForm rowId={popover.rowId} close={close} />}
+        {popover.kind === "add-event" && <AddEventForm rowId={popover.rowId} close={close} />}
       </div>
     </>
   );
@@ -1218,6 +1235,58 @@ function SubRowForm({ rowId, close }: { rowId: string; close: () => void }) {
         disabled={label.trim() === ""}
         onClick={submit}
       >
+        Add
+      </button>
+    </div>
+  );
+}
+
+// A moment, in two fields. It opens on the instant last clicked on this row —
+// pointing at a spot on the timeline and naming it is the shortest honest path
+// to "first kiss, roughly there", and the typed date's own precision is what
+// the event keeps ("1998" stays a year, not a false 1 July).
+function AddEventForm({ rowId, close }: { rowId: string; close: () => void }) {
+  const clickedMs = useAppState((state) =>
+    state.selectedRowId === rowId ? state.selectedRowClickMs : undefined,
+  );
+  const [title, setTitle] = useState("");
+  const [dateText, setDateText] = useState(() =>
+    formatFuzzyDate({ ms: clickedMs ?? Date.now(), precision: "day" }),
+  );
+  const parsed = parseDateInput(dateText);
+  const canSubmit = title.trim() !== "" && parsed.kind === "date";
+
+  const submit = () => {
+    if (parsed.kind !== "date") return;
+    const id = addEvent(rowId, title.trim(), { ms: parsed.ms, precision: parsed.precision });
+    // Selecting it opens the detail panel on the thing just created, which is
+    // where a note or a place goes — the form deliberately asks for neither.
+    selectEvent(id);
+    close();
+  };
+
+  return (
+    <div className="popover-form">
+      <div className="popover-title">New event</div>
+      <input
+        type="text"
+        autoFocus
+        placeholder="What happened"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
+      />
+      <input
+        type="text"
+        placeholder="When"
+        value={dateText}
+        onChange={(e) => setDateText(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && canSubmit && submit()}
+      />
+      <div className="hint">
+        {parsed.kind === "date" ? "Events show up once you zoom in." : ACCEPTED_DATE_FORMATS_HINT}
+      </div>
+      <button type="button" className="small-button" disabled={!canSubmit} onClick={submit}>
         Add
       </button>
     </div>

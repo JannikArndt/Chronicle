@@ -34,6 +34,9 @@ function datasetWithRows(rowCount: number, entriesPerRow = 1): TimelineDataset {
     groups: [{ id: "group-1", label: "Life", collapsed: false }],
     rows,
     entries,
+    // The minimap is an overview of spans; events are a zoomed-in detail and
+    // deliberately have no lane in it.
+    events: [],
   };
 }
 

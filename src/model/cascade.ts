@@ -9,6 +9,10 @@ export interface Cascade {
   groupIds: string[];
   rowIds: string[];
   entryIds: string[];
+  // Events sit on rows, so they are collected whenever a row goes — but an
+  // event has no children of its own, which is why there is no event tree walk
+  // anywhere below.
+  eventIds: string[];
 }
 
 function descendantRowIds(dataset: TimelineDataset, rootRowIds: string[]): string[] {
@@ -38,14 +42,28 @@ function descendantEntryIds(dataset: TimelineDataset, rootEntryIds: string[]): s
   return [...collected];
 }
 
+function eventIdsOfRows(dataset: TimelineDataset, rowIds: string[]): string[] {
+  return dataset.events.filter((event) => rowIds.includes(event.rowId)).map((event) => event.id);
+}
+
 export function collectRowCascade(dataset: TimelineDataset, rowId: string): Cascade {
   const rowIds = descendantRowIds(dataset, [rowId]);
   const directEntryIds = dataset.entries.filter((e) => rowIds.includes(e.rowId)).map((e) => e.id);
-  return { groupIds: [], rowIds, entryIds: descendantEntryIds(dataset, directEntryIds) };
+  return {
+    groupIds: [],
+    rowIds,
+    entryIds: descendantEntryIds(dataset, directEntryIds),
+    eventIds: eventIdsOfRows(dataset, rowIds),
+  };
 }
 
 export function collectEntryCascade(dataset: TimelineDataset, entryId: string): Cascade {
-  return { groupIds: [], rowIds: [], entryIds: descendantEntryIds(dataset, [entryId]) };
+  return { groupIds: [], rowIds: [], entryIds: descendantEntryIds(dataset, [entryId]), eventIds: [] };
+}
+
+// An event takes nothing with it: nothing in the model points at one.
+export function collectEventCascade(_dataset: TimelineDataset, eventId: string): Cascade {
+  return { groupIds: [], rowIds: [], entryIds: [], eventIds: [eventId] };
 }
 
 export function collectGroupCascade(dataset: TimelineDataset, groupId: string): Cascade {
@@ -53,13 +71,26 @@ export function collectGroupCascade(dataset: TimelineDataset, groupId: string): 
   const directRowIds = dataset.rows.filter((row) => groupIds.includes(row.groupId)).map((row) => row.id);
   const rowIds = descendantRowIds(dataset, directRowIds);
   const directEntryIds = dataset.entries.filter((e) => rowIds.includes(e.rowId)).map((e) => e.id);
-  return { groupIds, rowIds, entryIds: descendantEntryIds(dataset, directEntryIds) };
+  return {
+    groupIds,
+    rowIds,
+    entryIds: descendantEntryIds(dataset, directEntryIds),
+    eventIds: eventIdsOfRows(dataset, rowIds),
+  };
 }
 
 export function describeCascade(cascade: Cascade): string {
   const parts: string[] = [];
   const count = (n: number, singular: string, plural: string) => `${n} ${n === 1 ? singular : plural}`;
-  parts.push(count(cascade.entryIds.length, "entry", "entries"));
+  // The entry count leads and is stated even at zero — "this deletes 0 entries"
+  // is worth knowing before removing a timeline. The one delete where entries
+  // are not the subject at all is an event's own, and there it is left out.
+  const eventsOnly =
+    cascade.entryIds.length === 0 && cascade.rowIds.length === 0 && cascade.groupIds.length === 0;
+  if (!eventsOnly) parts.push(count(cascade.entryIds.length, "entry", "entries"));
+  // Only mentioned when there are some: "0 events" on every row delete would be
+  // noise on the one prompt that has to be read.
+  if (cascade.eventIds.length > 0) parts.push(count(cascade.eventIds.length, "event", "events"));
   // Deleting a group takes whole timelines with it, and none of them is the
   // thing named in the prompt — so all of them are counted, as timelines.
   // Deleting a row is the other case: the first row id IS the named row, and
@@ -84,5 +115,6 @@ export function applyDelete(dataset: TimelineDataset, cascade: Cascade): Timelin
     groups: dataset.groups.filter((g) => !cascade.groupIds.includes(g.id)),
     rows: dataset.rows.filter((r) => !cascade.rowIds.includes(r.id)),
     entries: dataset.entries.filter((e) => !cascade.entryIds.includes(e.id)),
+    events: dataset.events.filter((e) => !cascade.eventIds.includes(e.id)),
   };
 }

@@ -36,5 +36,12 @@ export function namespaceWithPrefix(dataset: TimelineDataset, prefix: string): T
       rowId: ns(entry.rowId),
       parentEntryId: nsOptional(entry.parentEntryId),
     })),
+    // `?? []` because a contributed public-data file predating schema v8 has no
+    // events array at all — the JSON is typed, but nothing type-checks it.
+    events: (dataset.events ?? []).map((event) => ({
+      ...event,
+      id: ns(event.id),
+      rowId: ns(event.rowId),
+    })),
   };
 }

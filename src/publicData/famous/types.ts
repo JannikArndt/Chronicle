@@ -13,7 +13,12 @@
 import type { TimelineDataset } from "../../model/types";
 
 // The un-namespaced authoring shape: a normal dataset minus the owner concept.
-export type FamousBiography = Omit<TimelineDataset, "people" | "schemaVersion">;
+// `events` is optional here and required on the dataset itself: a life scraped
+// from Wikidata is spans, and a hand-written biography should not have to write
+// `events: []` to say it has no moments in it.
+export type FamousBiography = Omit<TimelineDataset, "people" | "schemaVersion" | "events"> & {
+  events?: TimelineDataset["events"];
+};
 
 export interface FamousPerson {
   id: string; // unique within the catalog, e.g. "mozart"

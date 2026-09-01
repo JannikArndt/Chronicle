@@ -2,7 +2,13 @@
 // IndexedDB — there are no Save buttons anywhere (§6). Public datasets are
 // never written back.
 
-import { applyDelete, collectEntryCascade, collectGroupCascade, collectRowCascade } from "../model/cascade";
+import {
+  applyDelete,
+  collectEntryCascade,
+  collectEventCascade,
+  collectGroupCascade,
+  collectRowCascade,
+} from "../model/cascade";
 import { emptyDataset, newId } from "../model/dataset";
 import { defaultSharedFor } from "../model/sharing";
 import { initializeSharing, notifyDatasetChanged } from "../sharing/sync";
@@ -11,13 +17,15 @@ import { loadPublicCatalog } from "../publicData/loader";
 import { buildFamousDataset, parseFamousGroupId, remainingRowKeys } from "../publicData/famous/alignToAge";
 import { isMirrorId } from "../sharing/mirror";
 import { appStore, isForeignId, userBirthMs } from "./store";
-import type { AppState } from "./store";
+import type { AppState, PickableDateField } from "./store";
 import type { FamousPerson } from "../publicData/famous/types";
 import type {
+  FuzzyDate,
   Group,
   Precision,
   TimelineDataset,
   TimelineEntry,
+  TimelineEvent,
   TimelineRow,
 } from "../model/types";
 
@@ -173,15 +181,30 @@ export function setFamousAlignment(personId: string, aligned: boolean): void {
 export function selectEntry(entryId: string | undefined): void {
   appStore.setState({
     selectedEntryId: entryId,
+    selectedEventId: undefined,
     selectedRowId: undefined,
     draft: undefined,
   });
 }
 
-export function selectRow(rowId: string | undefined): void {
+export function selectEvent(eventId: string | undefined): void {
+  appStore.setState({
+    selectedEventId: eventId,
+    selectedEntryId: undefined,
+    selectedRowId: undefined,
+    draft: undefined,
+  });
+}
+
+// `clickMs` is where on the axis the row was clicked, and it is remembered for
+// exactly one thing: the add-event form opens at that instant instead of
+// asking for a date the user has just pointed at.
+export function selectRow(rowId: string | undefined, clickMs?: number): void {
   appStore.setState({
     selectedRowId: rowId,
+    selectedRowClickMs: rowId === undefined ? undefined : clickMs,
     selectedEntryId: undefined,
+    selectedEventId: undefined,
     draft: undefined,
   });
 }
@@ -189,7 +212,9 @@ export function selectRow(rowId: string | undefined): void {
 export function clearSelection(): void {
   appStore.setState({
     selectedEntryId: undefined,
+    selectedEventId: undefined,
     selectedRowId: undefined,
+    selectedRowClickMs: undefined,
     draft: undefined,
     pickingField: undefined,
   });
@@ -253,6 +278,35 @@ export function updateEntry(entryId: string, patch: Partial<TimelineEntry>): voi
 
 export function deleteEntryWithCascade(entryId: string): void {
   const cascade = collectEntryCascade(appStore.getState().dataset, entryId);
+  updateDataset((dataset) => applyDelete(dataset, cascade));
+  clearSelection();
+}
+
+// ---------- events (§: a moment on a timeline) ----------
+
+// Events have no draft state, unlike entries. A draft exists because dragging
+// out a bar puts something on screen before it has a name; an event is created
+// from a form that already knows its title and its date, so there is nothing to
+// show early and nothing to commit later.
+export function addEvent(rowId: string, title: string, date: FuzzyDate, icon?: string): string {
+  const id = newId("event");
+  updateDataset((dataset) => {
+    dataset.events.push({ id, rowId, title, date, icon });
+    return dataset;
+  });
+  return id;
+}
+
+export function updateEvent(eventId: string, patch: Partial<TimelineEvent>): void {
+  updateDataset((dataset) => {
+    const event = dataset.events.find((candidate) => candidate.id === eventId);
+    if (event) Object.assign(event, patch);
+    return dataset;
+  });
+}
+
+export function deleteEvent(eventId: string): void {
+  const cascade = collectEventCascade(appStore.getState().dataset, eventId);
   updateDataset((dataset) => applyDelete(dataset, cascade));
   clearSelection();
 }
@@ -604,7 +658,7 @@ type AppStateFilters = ReturnType<typeof appStore.getState>["filters"];
 
 // ---------- date picking (§6 "pick on timeline") ----------
 
-export function armDatePicking(field: "start" | "end"): void {
+export function armDatePicking(field: PickableDateField): void {
   appStore.setState({ pickingField: field, pickedDate: undefined });
 }
 

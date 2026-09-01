@@ -48,6 +48,9 @@
   --color-canvas-gridline-strong: #dedcd5;
   --color-canvas-row-selected: rgba(120, 140, 200, 0.1);
   --color-canvas-bracket: rgba(80, 76, 70, 0.55);
+  /* Event pins: ink rather than a hue, because a pin is drawn over bars of
+     every colour and has to stay legible on all of them. */
+  --color-canvas-event: #4a4340;
 
   color-scheme: light dark;
 }
@@ -99,6 +102,7 @@
     --color-canvas-gridline-strong: #3e392f;
     --color-canvas-row-selected: rgba(140, 160, 220, 0.16);
     --color-canvas-bracket: rgba(200, 195, 185, 0.5);
+    --color-canvas-event: #ded9d0;
   }
 }
 
@@ -1342,6 +1346,24 @@ textarea {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-accent);
+}
+
+/* The inline add-an-event form: two fields in place, rather than a fourth
+   assistant sheet for something that is a name and a date. */
+.sheet-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 8px 12px;
+  padding: 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+}
+
+.sheet-inline-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .sheet-back {

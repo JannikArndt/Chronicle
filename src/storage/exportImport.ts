@@ -12,15 +12,18 @@ export function serializeDataset(dataset: TimelineDataset): string {
 export type ImportResult = { ok: true; dataset: TimelineDataset } | { ok: false; error: string };
 
 // `people` is not here: v6 removed it, so an export written today has no such
-// array and requiring one would reject the app's own output.
+// array and requiring one would reject the app's own output. `events` is not
+// here either, for the opposite reason: v8 *added* it, so every export written
+// before then legitimately lacks one — see `addMissingEventsArray`.
 const ARRAY_FIELDS = ["groups", "rows", "entries"] as const;
 
 // Oldest export shape this importer still reads. v1/v2/v3/v4 files are
 // structurally valid as-is: v2 only added the optional selfPersonId, v3
 // dropped the (now-ignored) `entities`/`linkedEntityIds` fields, and v4
-// dropped `visibility`/`defaultVisibility`. Three versions carry a real data
+// dropped `visibility`/`defaultVisibility`. Four versions carry a real data
 // step: v5 folded each category's color and icon onto the row, v6 folded the
-// whole Person entity into Group, and v7 added sharing (all below).
+// whole Person entity into Group, v7 added sharing, and v8 added events (all
+// below).
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
 
 export function validateImport(raw: unknown): ImportResult {
@@ -47,6 +50,23 @@ export function validateImport(raw: unknown): ImportResult {
       return { ok: false, error: "Malformed entry found (needs id, rowId, start). Import aborted." };
     }
   }
+  // Absent is fine (anything written before v8); present but not an array, or
+  // holding something that isn't an event, is a corrupt file and says so.
+  if (candidate.events !== undefined) {
+    if (!Array.isArray(candidate.events)) {
+      return { ok: false, error: "Not a Chronicle export: “events” is not an array." };
+    }
+    for (const event of candidate.events as Array<Record<string, unknown>>) {
+      if (typeof event.id !== "string" || typeof event.rowId !== "string" || typeof event.date !== "object") {
+        return { ok: false, error: "Malformed event found (needs id, rowId, date). Import aborted." };
+      }
+    }
+  }
+  // Outside the version check on purpose: the array is what every consumer
+  // reads unguarded, and a v8 file that simply has no `events` key — a
+  // hand-written one, or one from a build between the schema bump and the first
+  // event — would otherwise arrive with `events: undefined`.
+  addMissingEventsArray(candidate);
   // v1→v4 need no data migration: their diffs are either an optional new field
   // (selfPersonId) or removed fields the app no longer reads
   // (`entities`/`linkedEntityIds`), so leftover copies are simply ignored. v5,
@@ -84,6 +104,14 @@ function dropDeadVisibilityFields(candidate: Record<string, unknown>): void {
       delete record.visibility;
     }
   }
+}
+
+// v8 migration: events arrive. There is nothing to convert — no earlier version
+// had a concept to translate from — so this only guarantees the array exists,
+// which is what lets every consumer read `dataset.events` without a `?? []`.
+// Runs on every import, not only on an older one (see the call site).
+function addMissingEventsArray(candidate: Record<string, unknown>): void {
+  if (!Array.isArray(candidate.events)) candidate.events = [];
 }
 
 // v5 migration: rows used to get their color and icon from a shared Category

@@ -208,7 +208,10 @@ export function DateRangeEditor({ start, end, disabled, onChange }: DateRangeEdi
 // beside a field that also accepted "now", so two controls claimed the same
 // meaning and could visibly disagree. Ongoing is a value of the End field now,
 // and the only way to reach it is to edit that field.
-function DateBlock({
+//
+// Exported because an event is a single date: `EventPane` uses one of these on
+// its own, with no lane under it — a lane shows a span, and a moment has none.
+export function DateBlock({
   caption,
   value,
   disabled,

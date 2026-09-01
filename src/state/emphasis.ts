@@ -1,7 +1,7 @@
 // Search & filter share one treatment: matches stay opaque, everything else
 // dims — non-matches never disappear, so temporal context stays legible (§6).
 
-import type { TimelineDataset, TimelineEntry } from "../model/types";
+import type { TimelineDataset, TimelineEntry, TimelineEvent } from "../model/types";
 import type { Filters } from "./store";
 
 export function hasActiveFilters(search: string, filters: Filters): boolean {
@@ -9,6 +9,25 @@ export function hasActiveFilters(search: string, filters: Filters): boolean {
     search.trim() !== "" ||
     filters.groupIds.length > 0 ||
     filters.timeRange !== undefined
+  );
+}
+
+// Whether a row passes the group and (for a single instant) the time filter.
+// Shared by entries and events so a filter can never mean two different things
+// on one screen.
+function rowPasses(
+  dataset: TimelineDataset,
+  filters: Filters,
+  rowId: string,
+): boolean {
+  if (filters.groupIds.length === 0) return true;
+  const row = dataset.rows.find((candidate) => candidate.id === rowId);
+  const group = row ? dataset.groups.find((candidate) => candidate.id === row.groupId) : undefined;
+  // A filter on "Family" must also keep the timelines of the people inside it,
+  // so a row matches on its own group or on that group's parent.
+  return (
+    (group !== undefined && filters.groupIds.includes(group.id)) ||
+    (group?.parentGroupId !== undefined && filters.groupIds.includes(group.parentGroupId))
   );
 }
 
@@ -21,8 +40,6 @@ export function computeEmphasis(
 ): Set<string> | null {
   if (!hasActiveFilters(search, filters)) return null;
   const query = search.trim().toLowerCase();
-  const rowById = new Map(dataset.rows.map((r) => [r.id, r]));
-  const groupById = new Map(dataset.groups.map((g) => [g.id, g]));
 
   const matches = (entry: TimelineEntry): boolean => {
     if (query !== "") {
@@ -32,16 +49,7 @@ export function computeEmphasis(
       const inPlace = entry.place?.fullName.toLowerCase().includes(query) ?? false;
       if (!inTitle && !inDescription && !inSubtitle && !inPlace) return false;
     }
-    const row = rowById.get(entry.rowId);
-    if (filters.groupIds.length > 0) {
-      // A filter on "Family" must also keep the timelines of the people inside
-      // it, so a row matches on its own group or on that group's parent.
-      const group = row ? groupById.get(row.groupId) : undefined;
-      const matchesGroup =
-        (group !== undefined && filters.groupIds.includes(group.id)) ||
-        (group?.parentGroupId !== undefined && filters.groupIds.includes(group.parentGroupId));
-      if (!matchesGroup) return false;
-    }
+    if (!rowPasses(dataset, filters, entry.rowId)) return false;
     if (filters.timeRange) {
       const endMs = entry.end?.ms ?? Number.POSITIVE_INFINITY;
       if (endMs < filters.timeRange.startMs || entry.start.ms > filters.timeRange.endMs) return false;
@@ -50,4 +58,34 @@ export function computeEmphasis(
   };
 
   return new Set(dataset.entries.filter(matches).map((entry) => entry.id));
+}
+
+// The same treatment for events. A separate pass rather than one mixed set:
+// an event has one date instead of a range and no subtitle to search, and the
+// engine looks the two up in different loops anyway.
+export function computeEventEmphasis(
+  dataset: TimelineDataset,
+  search: string,
+  filters: Filters,
+): Set<string> | null {
+  if (!hasActiveFilters(search, filters)) return null;
+  const query = search.trim().toLowerCase();
+
+  const matches = (event: TimelineEvent): boolean => {
+    if (query !== "") {
+      const inTitle = event.title.toLowerCase().includes(query);
+      const inDescription = event.description?.toLowerCase().includes(query) ?? false;
+      const inPlace = event.place?.fullName.toLowerCase().includes(query) ?? false;
+      if (!inTitle && !inDescription && !inPlace) return false;
+    }
+    if (!rowPasses(dataset, filters, event.rowId)) return false;
+    // A moment is inside the window or it is not — there is no overlap to
+    // reason about, which is the whole difference from an entry.
+    if (filters.timeRange) {
+      if (event.date.ms < filters.timeRange.startMs || event.date.ms > filters.timeRange.endMs) return false;
+    }
+    return true;
+  };
+
+  return new Set(dataset.events.filter(matches).map((event) => event.id));
 }

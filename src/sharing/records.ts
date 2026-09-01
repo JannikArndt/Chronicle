@@ -1,8 +1,8 @@
 // The wire format — plans/sharing-feature-design.md §D3.
 //
-// One flat record type for all three entities, because the merge, the diff and
-// the transport all treat them identically and a discriminated union would make
-// every one of them branch three ways for no gain.
+// One flat record type for every entity, because the merge, the diff and the
+// transport all treat them identically and a discriminated union would make
+// every one of them branch four ways for no gain.
 //
 // The column split is the load-bearing part: structural fields are plaintext
 // because row-level security has to evaluate them, and everything that carries
@@ -10,20 +10,20 @@
 // drawn along later — `payload` becomes ciphertext and nothing else moves.
 
 import type { SyncSubset } from "../model/sharing";
-import type { Group, TimelineDataset, TimelineEntry, TimelineRow } from "../model/types";
+import type { Group, TimelineDataset, TimelineEntry, TimelineEvent, TimelineRow } from "../model/types";
 
-export type RecordKind = "group" | "row" | "entry";
+export type RecordKind = "group" | "row" | "entry" | "event";
 
 export interface SyncRecord {
   kind: RecordKind;
   id: string; // the owner's local id; unique per owner, not globally
   ownerAccountId: string;
-  // Structural. group → its parentGroupId; row → its groupId; entry → its rowId.
-  // Undefined for a top-level group.
+  // Structural. group → its parentGroupId; row → its groupId; entry and event
+  // → their rowId. Undefined for a top-level group.
   parentId?: string;
-  // The publish flag RLS reads. Entries carry `false` and are never consulted:
-  // an entry's visibility is its row's, which is what "entries have no flag of
-  // their own" means in practice.
+  // The publish flag RLS reads. Entries and events carry `false` and are never
+  // consulted: their visibility is their row's, which is what "they have no
+  // flag of their own" means in practice.
   shared: boolean;
   // Content. Null on a tombstone — a delete must not keep shipping the thing
   // it deleted.
@@ -72,6 +72,14 @@ export function recordsFromSubset(subset: SyncSubset, ownerAccountId: string, cl
       shared: false,
       payload: entryPayload(entry),
     })),
+    ...subset.events.map((event) => ({
+      ...base,
+      kind: "event" as const,
+      id: event.id,
+      parentId: event.rowId,
+      shared: false,
+      payload: eventPayload(event),
+    })),
   ];
 }
 
@@ -93,6 +101,13 @@ function rowPayload(row: TimelineRow): Record<string, unknown> {
 
 function entryPayload(entry: TimelineEntry): Record<string, unknown> {
   const { id, rowId, ...rest } = entry;
+  void id;
+  void rowId;
+  return rest;
+}
+
+function eventPayload(event: TimelineEvent): Record<string, unknown> {
+  const { id, rowId, ...rest } = event;
   void id;
   void rowId;
   return rest;
@@ -134,6 +149,16 @@ export function datasetToRecordsRoundTrip(records: SyncRecord[]): Omit<TimelineD
     }));
   const entryIds = new Set(entries.map((entry) => entry.id));
 
+  // Events are dropped the moment their row did not arrive, exactly like
+  // entries — a moment with no lane to sit on has nothing to be drawn against.
+  const events: TimelineEvent[] = live
+    .filter((record) => record.kind === "event" && record.parentId !== undefined && rowIds.has(record.parentId))
+    .map((record) => ({
+      ...(record.payload as Omit<TimelineEvent, "id" | "rowId">),
+      id: record.id,
+      rowId: record.parentId as string,
+    }));
+
   return {
     groups: groups.map((group) => ({
       ...group,
@@ -149,5 +174,6 @@ export function datasetToRecordsRoundTrip(records: SyncRecord[]): Omit<TimelineD
       parentEntryId:
         entry.parentEntryId !== undefined && entryIds.has(entry.parentEntryId) ? entry.parentEntryId : undefined,
     })),
+    events,
   };
 }

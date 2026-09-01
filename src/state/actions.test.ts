@@ -374,6 +374,7 @@ describe("mirrors stay out of the user's own data", () => {
       groups: [{ id: "shared:acct-dad:g1", label: "Dad", collapsed: false }],
       rows: [{ id: "shared:acct-dad:r1", groupId: "shared:acct-dad:g1", label: "His jobs" }],
       entries: [],
+      events: [],
     },
   };
 
