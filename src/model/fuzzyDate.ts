@@ -98,7 +98,7 @@ export function snapMsToPrecision(ms: number, precision: Precision): number {
   }
 }
 
-const SHORT_MONTH_NAMES = [
+export const SHORT_MONTH_NAMES = [
   "Jan",
   "Feb",
   "Mar",

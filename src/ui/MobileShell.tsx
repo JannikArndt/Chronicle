@@ -11,7 +11,7 @@ import type { EngineView, TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import { AddEntryAssistant } from "../onboarding/AddEntryAssistant";
 import { AddTimelineAssistant } from "../onboarding/AddTimelineAssistant";
-import { clearSelection, selectEntry, setSearch } from "../state/actions";
+import { clearSelection, selectEntry, selectEvent, setSearch } from "../state/actions";
 import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { triggerDownload } from "../storage/exportImport";
 import { AssistantSheet } from "./AssistantSheet";
@@ -19,7 +19,7 @@ import { CanvasHost } from "./CanvasHost";
 import { importDatasetWithConfirmation } from "./importFlow";
 import { SharingPanel } from "./SharingPanel";
 import { WorldEventsPicker } from "./WorldEventsPicker";
-import { centerOnEntry } from "./centerOnEntry";
+import { centerOnEntry, centerOnEvent } from "./centerOnEntry";
 import { MiniMap } from "./MiniMap";
 import { TimelineSheet } from "./TimelineSheet";
 import { useViewportHeight } from "./useIsMobile";
@@ -49,10 +49,13 @@ const AXIS_CLEARANCE_PX = 8;
 
 // What the add flow was opened with. An empty object is the FAB — "add
 // something, somewhere". With a row it came from that timeline's pane, which
-// answers two of the flow's questions before it starts.
+// answers two of the flow's questions before it starts, and `shape` is set when
+// it came from that pane's "add an event": the same flow, opened on the answer
+// that makes it a moment.
 interface AddEntryRequest {
   rowId?: string;
   startMs?: number;
+  shape?: "moment";
 }
 
 interface MobileShellProps {
@@ -197,6 +200,21 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
     centerOnEntry(engineRef.current, layout, entry, Date.now());
   };
 
+  // The same landing for a moment — and it has to zoom, not only pan: a pin is
+  // not drawn at all from a whole-life view, so "here it is" would otherwise
+  // point at an empty stretch of row.
+  const showNewEvent = (eventId: string) => {
+    setAddEntry(null);
+    const event = mergedDataset(appStore.getState()).events.find(
+      (candidate) => candidate.id === eventId,
+    );
+    if (!event) return;
+    setSettingsRowId(event.rowId);
+    setSheetKeptOpen(true);
+    selectEvent(eventId);
+    centerOnEvent(engineRef.current, layout, event);
+  };
+
   return (
     <div className="mobile-shell">
       <CanvasHost
@@ -249,20 +267,25 @@ export function MobileShell({ layout, engineRef, onStartOnboarding }: MobileShel
         onOpenRowSettings={openRowPane}
         onCloseRowSettings={() => setSettingsRowId(null)}
         onAddEntry={(rowId, startMs) => startAdding({ rowId, startMs })}
+        onAddEvent={(rowId) => startAdding({ rowId, shape: "moment" })}
         onAddTimeline={startAddingTimeline}
       />
 
       {addEntry && (
         <AssistantSheet
-          title="Add an entry"
+          // Not "add an entry": the flow's last question can turn it into an
+          // event, and a title contradicting what you just chose reads as a bug.
+          title={addEntry.shape === "moment" ? "Add an event" : "Add to your timeline"}
           viewportHeight={viewportHeight}
           onDismiss={() => setAddEntry(null)}
         >
           <AddEntryAssistant
             startOnRowId={addEntry.rowId}
             startMs={addEntry.startMs}
+            startShape={addEntry.shape}
             onFinished={() => setAddEntry(null)}
             onShowEntry={showNewEntry}
+            onShowEvent={showNewEvent}
           />
         </AssistantSheet>
       )}

@@ -2268,7 +2268,10 @@ textarea {
   color: var(--color-accent);
 }
 
-.year-slider {
+/* One date, answered with chips and sliders. `.year-slider` is the older,
+   year-only version, still used where a single year is genuinely the answer. */
+.year-slider,
+.date-answer {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2286,13 +2289,90 @@ textarea {
   color: var(--color-text-muted);
 }
 
-.year-slider input[type="range"] {
+.year-slider input[type="range"],
+.answer-slider-row input[type="range"] {
   width: 100%;
   margin-top: 8px;
   accent-color: var(--color-accent);
   /* The slider is the one control here meant to be dragged sideways; the page
      must not steal that gesture. */
   touch-action: pan-x;
+}
+
+/* A slider with its name beside it: "Year" and "Day" sit one above the other,
+   and two bare tracks would be a guess. */
+.answer-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.answer-slider-label {
+  flex: none;
+  width: 34px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+/* How much of the date is known: year, month, day. A quieter treatment than the
+   certainty chips below it — this narrows the question, those answer it. */
+.granularity-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.granularity {
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.granularity-on {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Twelve months, tapped rather than typed — three rows of four on the narrowest
+   phone, all twelve visible without scrolling. */
+.month-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.month-pick {
+  padding: 8px 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.month-pick-on {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* The label above a chip row, when two rows in a row would otherwise look like
+   one question asked twice. */
+.answer-caption {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
 }
 
 .vagueness-row {
@@ -2345,6 +2425,26 @@ textarea {
   top: 2px;
   bottom: 2px;
   border-radius: 4px;
+}
+
+/* A moment, in the same lane: the pin and the window it might have happened in.
+   Same pair the canvas paints, so the preview is not a different picture. */
+.preview-pin {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
+
+.preview-band {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 4px;
+  background: var(--color-accent-soft);
 }
 
 .preview-axis {

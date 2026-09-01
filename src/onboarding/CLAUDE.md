@@ -35,6 +35,18 @@ programmatic change, shows a brief confirmed state, then hands off to
 steps use the default (`onSubmit` advances the step), same as before
 `PlacesTable` existed.
 
+`AddEntryAssistant` is the mobile add flow: category → name → timeline → when →
+how long. Its last question is what decides *what gets created*: "Still
+ongoing" and "It ended" make a `TimelineEntry`, "It was a moment" makes a
+`TimelineEvent`. That is the only branch in the flow — every step before it is
+the same for both — and it is the last question rather than the first because
+"an entry or an event?" is vocabulary, not something anyone wants to be asked.
+
+`dateAnswer.ts` is the "when" step's data: a `DateAnswer` (year, month, day and
+a **granularity**) plus the **certainty** answered beside it, folded into the
+one `precision`/`fuzzDays` pair the model stores. The step used to ask for a
+year and nothing else, so "exactly" could only ever mean "exactly this year".
+
 `AddTimelineAssistant` builds the flow for creating a timeline; the domain
 knowledge that would prefill it (release years, "your first car was probably
 at 18", lists of universities) is deliberately deferred, and belongs in
@@ -42,6 +54,19 @@ at 18", lists of universities) is deliberately deferred, and belongs in
 
 ## Invariants
 
+- **Granularity and certainty are two questions, not one.** How much of the date
+  is known (year / month / day) and how sure you are of it (exactly / around
+  then / sometime around) are independent — "the 14th of May, give or take a
+  week" is as real as "sometime in the nineties" — and `dateAnswer.ts` is where
+  the pair is folded back into the model's single `precision`. At year
+  granularity the vaguer answers become `circa`, which is what that precision
+  means and what the readout says; below it the certainty rides on `fuzzDays` so
+  the date keeps saying which day. Answering both with one control is what made
+  "exactly" mean "exactly this year".
+- **A day is always clamped to its month.** `Date.UTC(2015, 1, 30)` is the 2nd
+  of March, so a 31st dragged into February must be clamped rather than allowed
+  to roll — every change in `DateAnswerField` re-clamps, and `toFuzzyDate`
+  clamps again on the way out.
 - **Assistants create nothing until the last step.** `AddEntryAssistant`
   builds the entry — and the row, when a new one is needed — only in
   `commitAndFinish`, which is what makes its Back button safe. The two
