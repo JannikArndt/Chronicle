@@ -67,3 +67,10 @@ has nothing to say there.
   and `groupFontSize()` in `layout.ts` step down with depth (with a floor) so
   the rail's indentation and shrinking font size *are* the hierarchy — there
   is no separate two-tier "group vs. sub-group" styling any more.
+- **The engine can draw its own row/group name labels (`EngineInput.showRowLabels`),
+  pinned to the left edge on a plate like an event label** — but only the
+  mobile shell turns it on. Desktop already has the DOM rail sitting beside the
+  canvas for that; enabling it there would just duplicate every name. Mobile
+  has no rail at all (`MobileShell`'s `railContentRef` is a permanent no-op),
+  so without this the entries drawn on screen have nothing naming the
+  timeline they belong to.

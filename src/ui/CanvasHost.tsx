@@ -24,13 +24,16 @@ interface CanvasHostProps {
   engineRef: MutableRefObject<TimelineEngine | null>;
   // Pixels to leave empty above the axis — the mobile shell floats controls there.
   axisTop?: number;
+  // Draw row/group names on the canvas itself. The mobile shell has no DOM
+  // rail to show them instead — see `EngineInput.showRowLabels`.
+  showRowLabels?: boolean;
   // Called on every change to the visible window (the minimap follows it).
   onViewChange?: (view: EngineView) => void;
 }
 
 // The engine takes its whole input in one call, and two different effects below
 // have to produce it, so it is built in one place.
-function engineInputFor(layout: Layout, axisTop: number): EngineInput {
+function engineInputFor(layout: Layout, axisTop: number, showRowLabels: boolean): EngineInput {
   const state = appStore.getState();
   const merged = mergedDataset(state);
   return {
@@ -44,6 +47,7 @@ function engineInputFor(layout: Layout, axisTop: number): EngineInput {
     emphasizedEventIds: computeEventEmphasis(merged, state.search, state.filters),
     picking: state.pickingField !== undefined,
     axisTop,
+    showRowLabels,
   };
 }
 
@@ -52,6 +56,7 @@ export function CanvasHost({
   railContentRef,
   engineRef,
   axisTop = 0,
+  showRowLabels = false,
   onViewChange,
 }: CanvasHostProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -59,6 +64,8 @@ export function CanvasHost({
   layoutRef.current = layout;
   const axisTopRef = useRef(axisTop);
   axisTopRef.current = axisTop;
+  const showRowLabelsRef = useRef(showRowLabels);
+  showRowLabelsRef.current = showRowLabels;
   // Read through a ref: the engine's callbacks are bound once, at construction.
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
@@ -86,7 +93,7 @@ export function CanvasHost({
     testHooks.__chronicleStore = appStore;
 
     const feedEngine = () => {
-      engine.setInput(engineInputFor(layoutRef.current, axisTopRef.current));
+      engine.setInput(engineInputFor(layoutRef.current, axisTopRef.current, showRowLabelsRef.current));
     };
     feedEngine();
     const unsubscribe = appStore.subscribe(feedEngine);
@@ -108,8 +115,8 @@ export function CanvasHost({
   // Layout and axis-offset changes re-feed the engine even though the store
   // subscription fired before these props updated.
   useEffect(() => {
-    engineRef.current?.setInput(engineInputFor(layout, axisTop));
-  }, [layout, axisTop, engineRef]);
+    engineRef.current?.setInput(engineInputFor(layout, axisTop, showRowLabels));
+  }, [layout, axisTop, showRowLabels, engineRef]);
 
   return <canvas ref={canvasRef} className="timeline-canvas" />;
 }

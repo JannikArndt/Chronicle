@@ -5,7 +5,7 @@
 
 import { computeLayout } from "./layout";
 import type { Layout, LayoutItem } from "./layout";
-import { ROW_HEIGHT } from "./layout";
+import { groupFontSize, ROW_HEIGHT } from "./layout";
 import { barGeometry, gradientStops, labelAnchorX, labelLimitX, pickBarLabel, truncateToWidth } from "./bars";
 import type { BarGeometry } from "./bars";
 import { EVENT_PIN_RADIUS_PX, eventMarkerOpacity, layoutEventMarkers } from "./events";
@@ -142,6 +142,11 @@ export interface EngineInput {
   // its chips over the canvas, and the axis has to start below them or the
   // years are unreadable. Desktop leaves this at 0.
   axisTop?: number;
+  // Draw each row's and group's own name on the canvas, pinned to the left
+  // edge. Desktop already shows these in the DOM rail beside the canvas, so
+  // this stays false there; the mobile shell has no rail at all, and without
+  // it the entries drawn on screen have no name to hang off.
+  showRowLabels?: boolean;
 }
 
 interface EntryHit {
@@ -635,6 +640,7 @@ export class TimelineEngine {
           ctx.fillStyle = this.colors.groupBand;
           ctx.fillRect(0, item.y, this.width, item.subtreeEndY - item.y);
         }
+        if (this.input.showRowLabels) this.drawGroupLabel(item);
         continue;
       }
       if (item.kind === "group-summary") {
@@ -695,6 +701,8 @@ export class TimelineEngine {
     // Above the bars, because a moment happened *on* this timeline — and below
     // the plus affordances, which are the one thing that must never be covered.
     this.drawEvents(item, relatedIds !== null);
+
+    if (this.input.showRowLabels) this.drawRowLabel(item, row, color);
 
     if (row.id === this.input.selectedRowId && !this.input.draft) {
       this.drawPlusAffordances(row, entries, item, nowMs);
@@ -928,6 +936,48 @@ export class TimelineEngine {
       barWidth: width,
       entry,
     });
+  }
+
+  // The row's own name, pinned to the left edge rather than anchored to the
+  // time axis — unlike a bar label, it has no span of its own to sit inside.
+  // Only drawn when there's no DOM rail to show it instead (`showRowLabels`,
+  // mobile only). Plated like an event label: it is drawn over bars of any
+  // colour, so a name at full opacity straight onto one would be unreadable.
+  private drawRowLabel(item: LayoutItem, row: TimelineRow, color: string): void {
+    const { ctx } = this;
+    const indent = 8 + item.depth * 14;
+    ctx.save();
+    ctx.font = "600 12px -apple-system, system-ui, sans-serif";
+    const text = row.icon ? `${row.icon} ${row.label}` : row.label;
+    const textWidth = ctx.measureText(text).width;
+    const plateHeight = 16;
+    const plateY = item.y + 4;
+    ctx.fillStyle = colorWithAlpha(this.colors.background, 0.85);
+    roundRectPath(ctx, indent - 4, plateY, textWidth + 8, plateHeight, 4);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, indent, plateY + plateHeight / 2);
+    ctx.restore();
+  }
+
+  // A group header's own name — the canvas otherwise paints only the band
+  // behind it (`drawContent`). Same `showRowLabels` gate as `drawRowLabel`,
+  // and the same indent/font-size step-down the rail uses so nesting reads
+  // identically in both places.
+  private drawGroupLabel(item: LayoutItem): void {
+    const group = item.group;
+    if (!group) return;
+    const { ctx } = this;
+    const indent = 8 + item.depth * 14;
+    const fontSize = groupFontSize(item.depth);
+    ctx.save();
+    ctx.font = `600 ${fontSize}px -apple-system, system-ui, sans-serif`;
+    ctx.fillStyle = group.color ?? this.colors.barText;
+    ctx.textBaseline = "middle";
+    const text = group.icon ? `${group.icon} ${group.label}` : group.label;
+    ctx.fillText(text, indent, item.y + item.height / 2);
+    ctx.restore();
   }
 
   // Lazily loads and caches a favicon image; returns undefined until it has
