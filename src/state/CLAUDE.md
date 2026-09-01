@@ -22,6 +22,12 @@ nothing half-made to hold. Don't add one "for symmetry".
   guessing which array to look in, and the two are edited by different panels.
   `selectedRowClickMs` rides along with the row selection for one purpose: the
   add-event form opens on the instant that was clicked.
+- **`computeEmphasis` and `computeEventEmphasis` are two passes, not one set.**
+  An event has one date instead of a range and no subtitle to search, the engine
+  looks the two up in different loops, and an id from the wrong entity would
+  silently dim nothing. The row/group half of the filter is shared
+  (`rowPasses`) so a filter cannot come to mean two different things on one
+  screen.
 - **`setInput` must not clear `emptyRowClick`** on the state update caused by
   the very click that stored it (guard compares against
   `emptyRowClick.rowId`).

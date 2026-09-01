@@ -14,7 +14,10 @@ will drift out of sync with the DOM theme.
 `events.ts` is the whole of "events appear when you zoom in": an opacity ramp
 between two and one day per pixel (`eventMarkerOpacity`) and the label
 declutter (`layoutEventMarkers`). The engine paints from it and decides nothing
-about visibility itself.
+about visibility itself — with one deliberate exception: **a search match is
+drawn at any zoom**. Dimming the whole timeline and then showing no match is
+search telling a lie, and below the ramp only the matches are drawn, so there
+is nothing for them to collide with.
 
 `miniMap.ts` (paired with `src/ui/MiniMap.tsx`) is a second canvas — one lane
 per row, plus the current viewport window on both axes. It deliberately draws

@@ -38,7 +38,12 @@ export function TimelineListPane({
           );
         }
         const row = item.row!;
-        const entryCount = merged.entries.filter((entry) => entry.rowId === row.id).length;
+        // Everything on this timeline, spans and moments alike: a row holding
+        // five events and no entries is not an empty timeline, and a bare "0"
+        // beside it said it was.
+        const count =
+          merged.entries.filter((entry) => entry.rowId === row.id).length +
+          merged.events.filter((event) => event.rowId === row.id).length;
         return (
           <button
             key={row.id}
@@ -49,7 +54,7 @@ export function TimelineListPane({
           >
             <span className="sheet-row-emoji">{row.icon ?? "🏷️"}</span>
             <span className="sheet-row-label">{row.label}</span>
-            <span className="sheet-row-count">{entryCount}</span>
+            <span className="sheet-row-count">{count}</span>
             <span className="sheet-chevron">›</span>
           </button>
         );
