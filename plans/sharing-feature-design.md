@@ -314,7 +314,10 @@ invites        (token text pk, owner_account uuid, subject_kind text,
 
 **Deviation from the sketch this doc was signed off with:** one `shared_records`
 table rather than three. The wire format is uniform, so three tables meant three
-copies of one policy for no gain.
+copies of one policy for no gain. That paid off in schema v8, where events
+became a fourth `kind` and one `case` branch in each of two functions
+(`supabase/migrations/0002_events.sql`) rather than a fourth table with its own
+policy set — an event's visibility is its row's, exactly like an entry's.
 
 Read policy in words: *a row is visible if I own its group, or it is `shared`
 and I hold a grant on it, on its group, or on that group's parent. A group is
