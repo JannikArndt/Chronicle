@@ -43,6 +43,14 @@
   --color-overlay-backdrop: rgba(41, 37, 34, 0.35);
   --color-hatch: rgba(120, 120, 120, 0.18);
 
+  /* A group's background band, painted over its FULL extent (header plus
+     everything nested under it) rather than just the header line — both the
+     canvas (engine.ts) and the rail (RowRail.tsx) use it. Deliberately low
+     alpha and identical at every depth: a nested group's band paints on top
+     of its ancestors', so overlap — not a hand-picked color per depth — is
+     what makes deeper nesting read as a slightly stronger shade. */
+  --color-group-band: rgba(41, 37, 34, 0.035);
+
   /* Canvas-only tokens — read at paint time by src/render/engine.ts. */
   --color-canvas-gridline: #eceae5;
   --color-canvas-gridline-strong: #dedcd5;
@@ -96,6 +104,9 @@
     --color-overlay-hover: rgba(255, 255, 255, 0.09);
     --color-overlay-backdrop: rgba(10, 9, 7, 0.55);
     --color-hatch: rgba(200, 200, 200, 0.16);
+
+    /* Lighter-on-dark rather than darker-on-light, same low alpha. */
+    --color-group-band: rgba(255, 255, 255, 0.035);
 
     --color-canvas-gridline: #322e27;
     --color-canvas-gridline-strong: #3e392f;
@@ -277,15 +288,25 @@ textarea {
 
 /* Groups nest arbitrarily deep now — depth alone (set inline, from
    groupFontSize()) drives font size, and indentation is inline padding-left.
-   Only a TOP-level group (.rail-group-top) gets the shaded background; a
-   nested one reads as lighter/smaller, which is the whole of how the
-   hierarchy is legible without a second visual language per level. */
+   The shaded background is `.rail-group-band` below, painted behind the
+   header (transparent itself) over the group's whole extent; a nested
+   group's band stacks on top of its ancestors', which is the whole of how
+   the hierarchy reads without a second visual language per level. */
 .rail-group {
   font-weight: 700;
 }
 
-.rail-group-top {
-  background: var(--color-bg-subtle);
+/* One per group, positioned by JS from `subtreeEndY` and rendered BEFORE the
+   rail items in DOM order so items paint on top of it and stay legible.
+   Rendered in the same depth-first order `computeLayout()` already produces,
+   so a nested group's band (added later in that order) paints over its
+   ancestors' — see --color-group-band in :root. */
+.rail-group-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--color-group-band);
+  pointer-events: none;
 }
 
 .rail-row {

@@ -86,9 +86,10 @@ app knows whose birth year to show and where new timelines go.
 **Sub-group** — a group nested in another one, drawn with a progressively
 smaller header the deeper it sits (`groupHeaderHeight`/`groupFontSize` in
 `src/render/layout.ts`, with a floor). This is what a person inside "My
-family" is. Nests to any depth since schema v9; only a **top-level** group
-(depth 0) gets the shaded rail background — depth alone, via indentation and
-shrinking font size, is what makes the hierarchy legible past that.
+family" is. Nests to any depth since schema v9; every group, at any depth,
+gets a shaded background over its whole extent (`LayoutItem.subtreeEndY`) —
+a nested group's band paints on top of its ancestors', so overlap (not a
+color per depth) is what makes deeper nesting read as a stronger shade.
 
 **Person** — **not a thing in the model.** A person is a `Group` *or, since
 schema v9, a `TimelineRow`* with a birth date; that date is what greys out the

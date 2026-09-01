@@ -1,5 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { GROUP_GAP, GROUP_HEADER_HEIGHT, ROW_GAP, ROW_HEIGHT, computeLayout, groupHeaderHeight } from "./layout";
+import {
+  GROUP_GAP_BEFORE,
+  GROUP_HEADER_CHILD_GAP,
+  GROUP_HEADER_HEIGHT,
+  ROW_GAP,
+  ROW_HEIGHT,
+  computeLayout,
+  groupHeaderHeight,
+} from "./layout";
 import { emptyDataset } from "../model/dataset";
 import type { TimelineDataset } from "../model/types";
 
@@ -62,13 +70,38 @@ describe("computeLayout", () => {
     expect(groupHeaderHeight(50)).toBeGreaterThan(0);
   });
 
-  test("only a top-level group gets the extra breathing room after it", () => {
+  test("a group header gets more space before it than a sibling row does, at every depth", () => {
     const { items } = computeLayout(fixture(), new Set());
     const r1 = items.find((i) => i.id === "r1")!;
     const gFamily = items.find((i) => i.id === "g-family")!;
-    // g-me has no nested groups, so its content is just r1 — the gap after the
-    // whole top-level group's content lands right after r1.
-    expect(gFamily.y - (r1.y + r1.height)).toBe(GROUP_GAP);
+    const r2 = items.find((i) => i.id === "r2")!;
+    const gFinnKid = items.find((i) => i.id === "g-finn-kid")!;
+    // g-me has no nested groups, so its content is just r1 — the gap before
+    // the next top-level group lands right after r1.
+    expect(gFamily.y - (r1.y + r1.height)).toBe(GROUP_GAP_BEFORE);
+    // Same rule one level down: "Finn's kid" is a sub-group sibling after
+    // "Finn"'s own row r2.
+    expect(gFinnKid.y - (r2.y + r2.height)).toBe(GROUP_GAP_BEFORE);
+    expect(GROUP_GAP_BEFORE).toBeGreaterThan(ROW_GAP);
+  });
+
+  test("a group's header binds tighter to its own first child than to what precedes it", () => {
+    const { items } = computeLayout(fixture(), new Set());
+    const gMe = items.find((i) => i.id === "g-me")!;
+    const r1 = items.find((i) => i.id === "r1")!;
+    // r1 is g-me's only (and therefore first) child.
+    expect(r1.y - (gMe.y + gMe.height)).toBe(GROUP_HEADER_CHILD_GAP);
+    expect(GROUP_HEADER_CHILD_GAP).toBeLessThan(GROUP_GAP_BEFORE);
+    expect(GROUP_HEADER_CHILD_GAP).toBeLessThan(ROW_GAP);
+  });
+
+  test("a group's subtreeEndY spans its header and everything nested under it", () => {
+    const { items } = computeLayout(fixture(), new Set());
+    const gFamily = items.find((i) => i.id === "g-family")!;
+    const r3 = items.find((i) => i.id === "r3")!;
+    // "Family" holds no rows directly — its whole visible extent is "Finn"
+    // and "Finn's kid" nested underneath, bottoming out at r3.
+    expect(gFamily.subtreeEndY).toBe(r3.y + r3.height);
   });
 
   test("collapsing a group hides its whole subtree from the rail/list", () => {
@@ -110,7 +143,7 @@ describe("computeLayout", () => {
     const { items } = computeLayout(fixture(), new Set());
     const rTop = items.find((i) => i.id === "r-top")!;
     expect(rTop.depth).toBe(0);
-    expect(rTop.y).toBe(ROW_GAP);
+    expect(rTop.y).toBe(0);
     expect(rTop.height).toBe(ROW_HEIGHT);
   });
 
