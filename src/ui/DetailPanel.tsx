@@ -1,7 +1,7 @@
 // The one detail panel (§1): viewing and editing are the same surface, no
 // modal create screen, no Save/Cancel — every field change autosaves (§6).
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { collectEntryCascade, describeCascade } from "../model/cascade";
 import { faviconUrl } from "../model/favicon";
 import { formatFuzzyDate } from "../model/fuzzyDate";
@@ -47,6 +47,20 @@ function EntryDetail() {
     appStore.setState({ pickedDate: undefined });
   }, [state.pickedDate, entry]);
 
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // Belt to the engine's `preventDefault` brace: in browsers where a canvas
+  // pointerdown still blurs the focused input, the chained start→end pick
+  // would otherwise leave the Title field un-focused while the user is
+  // mid-type. Scoped to an untitled draft — once the entry has a name the
+  // flow is over, and arming the ⌖ crosshair by hand on a saved entry must
+  // never yank focus out of whatever field the user was in.
+  useEffect(() => {
+    if (!state.draft || state.pickingField === undefined) return;
+    if (document.activeElement === titleInputRef.current) return;
+    titleInputRef.current?.focus();
+  }, [state.draft, state.pickingField]);
+
   if (!entry) return null;
 
   const isDraft = state.draft?.id === entry.id;
@@ -68,6 +82,7 @@ function EntryDetail() {
       <div className="field">
         <label className="field-label">Title</label>
         <input
+          ref={titleInputRef}
           type="text"
           value={entry.title}
           placeholder={isDraft ? "Name it to create it…" : "Title"}

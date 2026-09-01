@@ -22,6 +22,11 @@ nothing half-made to hold. Don't add one "for symmetry".
   guessing which array to look in, and the two are edited by different panels.
   `selectedRowClickMs` rides along with the row selection for one purpose: the
   add-event form opens on the instant that was clicked.
+- **`pickChain` is advanced only inside `commitPickedDate`'s single
+  `setState`.** Creating an entry from the canvas queues `["end"]` behind
+  `"start"` (in `startDraft`) so pointing out a span is one gesture instead of
+  two arm-the-crosshair round trips; `cancelDatePicking` and `clearSelection`
+  both clear the chain along with `pickingField`.
 - **`computeEmphasis` and `computeEventEmphasis` are two passes, not one set.**
   An event has one date instead of a range and no subtitle to search, the engine
   looks the two up in different loops, and an id from the wrong entity would

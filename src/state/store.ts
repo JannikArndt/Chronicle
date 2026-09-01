@@ -43,6 +43,10 @@ export interface AppState {
   // "date" is an event's single instant — it has no start/end to choose between.
   pickingField?: PickableDateField;
   pickedDate?: { ms: number; precision: Precision; field: PickableDateField };
+  // Fields still to be picked after the current one, in order. Creating an
+  // entry from the canvas queues ["end"] behind "start" so that pointing at a
+  // span is one gesture rather than two arm-the-crosshair round trips.
+  pickChain?: PickableDateField[];
   hiddenRowIds: string[];
   // Which optional public data the user has switched on. Nothing loads by
   // default — `publicDatasets` is rebuilt from these selections (see actions).

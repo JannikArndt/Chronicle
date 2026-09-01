@@ -217,6 +217,7 @@ export function clearSelection(): void {
     selectedRowClickMs: undefined,
     draft: undefined,
     pickingField: undefined,
+    pickChain: undefined,
   });
 }
 
@@ -229,7 +230,16 @@ export function startDraft(rowId: string, startMs: number): void {
     title: "",
     start: { ms: startMs, precision: "day" },
   };
-  appStore.setState({ draft, selectedEntryId: undefined, selectedRowId: rowId });
+  // The draft's `start` is already the + position, so the first pick simply
+  // lets the user re-point it; the chain then re-arms for `end` automatically.
+  appStore.setState({
+    draft,
+    selectedEntryId: undefined,
+    selectedRowId: rowId,
+    pickingField: "start",
+    pickChain: ["end"],
+    pickedDate: undefined,
+  });
 }
 
 export function updateDraft(patch: Partial<TimelineEntry>): void {
@@ -761,18 +771,25 @@ type AppStateFilters = ReturnType<typeof appStore.getState>["filters"];
 
 // ---------- date picking (§6 "pick on timeline") ----------
 
-export function armDatePicking(field: PickableDateField): void {
-  appStore.setState({ pickingField: field, pickedDate: undefined });
+export function armDatePicking(field: PickableDateField, chain: PickableDateField[] = []): void {
+  appStore.setState({ pickingField: field, pickChain: chain, pickedDate: undefined });
 }
 
 export function cancelDatePicking(): void {
-  appStore.setState({ pickingField: undefined });
+  appStore.setState({ pickingField: undefined, pickChain: undefined });
 }
 
 export function commitPickedDate(ms: number, precision: Precision): void {
-  const { pickingField } = appStore.getState();
+  const { pickingField, pickChain } = appStore.getState();
   if (!pickingField) return;
-  appStore.setState({ pickedDate: { ms, precision, field: pickingField }, pickingField: undefined });
+  // One setState, not two: the store notifies listeners on every call, and
+  // committing the pick separately from advancing the chain would repaint the
+  // canvas in a half-armed state between the two.
+  appStore.setState({
+    pickedDate: { ms, precision, field: pickingField },
+    pickingField: pickChain?.[0],
+    pickChain: pickChain?.slice(1),
+  });
 }
 
 // ---------- import ----------

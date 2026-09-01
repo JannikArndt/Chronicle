@@ -63,6 +63,11 @@ export function App() {
           // must still close the overlay (design spec §A) rather than only
           // blurring the field.
           if (onboardingOpen) setOnboardingOpen(false);
+          // The canvas + chains start→end picking while focus stays in the
+          // Title field (so the user can type while pointing at dates) —
+          // without this branch, cancelling that crosshair would require
+          // clicking away from the field first.
+          else if (appStore.getState().pickingField) cancelDatePicking();
           else target.blur();
         }
         return;
