@@ -10,6 +10,9 @@ local-first, statically hosted on GitHub Pages.
   you pan and zoom.
 - **Fuzzy dates**: "circa 1990" or "sometime in the 90s" are first-class, not just exact
   dates — precision fades visually the less certain a date is.
+- **Spans and moments**: a job or a flat is a bar; "first kiss" or "finished the big
+  project" is an event — a point on the same timeline, drawn once you zoom in far enough
+  for a day to mean something, with a band as wide as the date is vague.
 - **A conversational setup assistant** walks a new user through their identity, birth
   date, and places lived instead of a blank app.
 - **Public overlays**: world events, famous people (via Wikidata), and a growing set of
@@ -25,7 +28,8 @@ local-first, statically hosted on GitHub Pages.
   privacy section below.
 
 See [`docs/GLOSSARY.md`](./docs/GLOSSARY.md) for the core terms (`Group`,
-`TimelineRow`, `TimelineEntry`) and `CLAUDE.md` for the fuller architecture map.
+`TimelineRow`, `TimelineEntry`, `TimelineEvent`) and `CLAUDE.md` for the fuller
+architecture map.
 
 ## Privacy boundary (important)
 
