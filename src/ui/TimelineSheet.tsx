@@ -65,6 +65,7 @@ interface TimelineSheetProps {
   onOpenRowSettings: (rowId: string) => void;
   onCloseRowSettings: () => void;
   onAddEntry: (rowId: string, startMs: number) => void;
+  onAddEvent: (rowId: string) => void;
   onAddTimeline: () => void;
 }
 
@@ -88,6 +89,7 @@ export function TimelineSheet({
   onOpenRowSettings,
   onCloseRowSettings,
   onAddEntry,
+  onAddEvent,
   onAddTimeline,
 }: TimelineSheetProps) {
   const state = useAppState((s) => s);
@@ -244,6 +246,7 @@ export function TimelineSheet({
             onOpenEntry={selectEntry}
             onOpenEvent={selectEvent}
             onAddEntry={onAddEntry}
+            onAddEvent={onAddEvent}
           />
         )}
         {pane === "entry" && entry && <EntryPane entry={entry} />}

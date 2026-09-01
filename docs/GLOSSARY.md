@@ -162,6 +162,10 @@ just stop seeing the thing.
 
 **Precision** — how sharply a date is known: `exact` · `day` · `month` · `year` ·
 `circa`. It is not decoration — it decides how blurred the bar's edge is drawn.
+One stored field, but **two questions** to a user: *granularity* (a year, a
+month, a day) and *certainty* (exactly, around then, sometime around). The
+mobile add flow asks them separately and folds the pair back into this field —
+see `src/onboarding/dateAnswer.ts`.
 
 **Fuzz days** — the blur, in days, that a precision implies (`month` → 15,
 `year` → 182, `circa` → 365). An entry can override it with `fuzzDays` to say
@@ -425,6 +429,9 @@ accepted "now" meant two controls claiming one meaning.
 - **setup assistant** — name, birth date, places lived. Runs on a fresh dataset.
 - **add-entry assistant** — behind the FAB, and behind `＋ Add an entry` at the
   foot of a timeline, where it arrives already knowing the timeline and the year.
+  Its last question — "how long did it last?" — is what decides whether you get
+  an entry or an **event**: "It was a moment" is the third answer, beside "Still
+  ongoing" and "It ended", and `◆ Add an event` is the same flow opened on it.
 - **add-timeline assistant** — behind `＋ New timeline` at the foot of the list.
   Name it, style it, then fill it in.
 

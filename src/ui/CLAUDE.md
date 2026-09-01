@@ -13,9 +13,13 @@ into `EntryDetail` and `EventDetail` on desktop, `EventPane.tsx` is the mobile
 half. They are separate components rather than one with branches — an event has
 a single date, no fades, no short title and no ongoing state, and each of those
 would otherwise be an "unless this is an event" in the middle of a field list.
-Creating one is a two-field form, not an assistant: `AddEventForm` in
-`RowRail.tsx` (behind the row's ◆ button, opening on the instant last clicked on
-that row) and `AddEventRow` in `RowPane.tsx`.
+Creating one differs by shell, because the two shells' add idioms differ.
+Desktop: `AddEventForm` in `RowRail.tsx`, a two-field popover behind the row's ◆
+button, opening on the instant last clicked on that row — the same shape as the
+rail's other popovers. Mobile: the **add-entry assistant**, whose last question
+("How long did it last?") has "It was a moment" as its third answer; `◆ Add an
+event` in `RowPane.tsx` is that same flow opened with the answer pre-picked.
+There is deliberately no inline event form on mobile — one add idiom per shell.
 
 Sharing's contents live in `SharingPanel.tsx` (sign in, invite links, who can
 see what, the disclosures) and are rendered by two frames: `SharingMenu.tsx`,
@@ -149,11 +153,12 @@ is desktop-only now.
   extraction one — creating a group on a phone has no designed home) and 🌟
   Famous people (still private to `RowRail.tsx`; worth extracting together
   with gating its 🐞 debug panel — see `src/publicData/CLAUDE.md`).
-- **The FAB does not add events.** It opens the add-entry assistant, and an
-  event is reached through its timeline's pane instead. Deliberate for now:
-  "add something" would have to ask which of the two first, and that question
-  is worse than the extra tap for the rarer one. Revisit if events turn out to
-  be the more common thing to add.
+- **Bar or pin is the last question, not the first.** The FAB flow does not ask
+  what kind of thing you are adding up front — "an entry or an event?" is
+  vocabulary, not a question anyone has — it asks how long it lasted at the end,
+  where "It was a moment" sits beside "Still ongoing" and "It ended". Everything
+  before that step is identical for both, which is why the flow has no branch in
+  it until `commitAndFinish`.
 - **A co-owned mirror is still read-only.** `isForeignId` blocks the edit and
   there is no write-back path, so the "Shared with you" list says editing comes
   later rather than offering it. Don't loosen the `isForeignId` check to "fix"

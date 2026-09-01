@@ -1,36 +1,52 @@
-// Adding an entry on mobile: six chips, then three questions, then it's on the
-// timeline. Big targets, and a whole entry can be added without ever opening
-// the keyboard — the suggestions and the two sliders cover every answer.
+// Adding something on mobile: six chips, then three questions, and it's on the
+// timeline — as a bar if it lasted, as a pin if it was a moment. Big targets,
+// and the whole thing can be added without ever opening the keyboard: the
+// suggestions, the sliders and the chips cover every answer.
 //
 // It reuses the onboarding primitives (AssistantStepShell, useAssistantFlow)
 // because this *is* the app's conversational-input idiom, and it commits only
 // on the last step, so Back never crosses a commit boundary.
 
 import { useState } from "react";
-import { previewBar } from "./entryPreviewBar";
+import { previewBar, previewPin } from "./entryPreviewBar";
 import { ENTRY_CATEGORIES, rowsForCategory } from "./addEntryCategories";
 import type { EntryCategory } from "./addEntryCategories";
 import { AssistantStepShell } from "./AssistantStepShell";
 import { useAssistantFlow } from "./useAssistantFlow";
-import type { FuzzyDate, Precision, TimelineEntry, TimelineRow } from "../model/types";
-import { addEntry, addRow } from "../state/actions";
+import {
+  MONTH_LABELS,
+  answerFromMs,
+  clampDay,
+  daysInMonth,
+  formatAnswer,
+  toFuzzyDate,
+} from "./dateAnswer";
+import type { DateAnswer, DateCertainty, DateGranularity } from "./dateAnswer";
+import type { FuzzyDate, TimelineEntry, TimelineEvent, TimelineRow } from "../model/types";
+import { addEntry, addEvent, addRow } from "../state/actions";
 import { appStore, isPublicId } from "../state/store";
 
-type Phase = "category" | "name" | "row" | "start" | "ongoing" | "done";
+type Phase = "category" | "name" | "row" | "start" | "shape" | "done";
 
-// How precisely the year on the slider is meant. The wording is the feedback:
-// nobody has to learn what "circa" means, they just pick how sure they are.
-interface Vagueness {
-  label: string;
-  icon: string;
-  precision: Precision;
-  fuzzDays?: number;
-}
+// What is being added, decided on the shape step. A moment is an event — a pin
+// rather than a bar — and it is offered here rather than as a separate flow
+// because "was this a stretch of time or a single day?" is the same question
+// "does it still go on?" was already asking, with one more answer.
+type Shape = "ongoing" | "ended" | "moment";
 
-const VAGUENESS_OPTIONS: Vagueness[] = [
-  { label: "Exactly", icon: "📍", precision: "year" },
-  { label: "Around then", icon: "〰️", precision: "circa" },
-  { label: "Sometime around", icon: "🌫️", precision: "circa", fuzzDays: 730 },
+// How sure the answer is. The wording is the feedback: nobody has to learn what
+// "circa" means, they just pick how sure they are. What each one does to the
+// stored date depends on the granularity too — see dateAnswer.ts.
+const CERTAINTY_OPTIONS: { key: DateCertainty; label: string; icon: string }[] = [
+  { key: "exact", label: "Exactly", icon: "📍" },
+  { key: "around", label: "Around then", icon: "〰️" },
+  { key: "vague", label: "Sometime around", icon: "🌫️" },
+];
+
+const GRANULARITY_OPTIONS: { key: DateGranularity; label: string }[] = [
+  { key: "year", label: "Year" },
+  { key: "month", label: "Month" },
+  { key: "day", label: "Day" },
 ];
 
 // The lane the preview bar is drawn in, when the user's birth year is unknown.
@@ -46,16 +62,23 @@ interface AddEntryAssistantProps {
   startOnRowId?: string;
   // Where that timeline currently reaches to, as the year to open the slider on.
   startMs?: number;
-  // Called by "Done" with the id of the entry just created, so the shell can
-  // move the canvas to it. Without this you add something and never see it.
+  // Which answer the shape step opens on. "＋ Add an event" on a timeline is
+  // this flow with the moment already picked — still shown, and still
+  // changeable, because it is one step either way.
+  startShape?: Shape;
+  // Called by "Done" with what was just created, so the shell can move the
+  // canvas to it. Without these you add something and never see it.
   onShowEntry?: (entryId: string) => void;
+  onShowEvent?: (eventId: string) => void;
 }
 
 export function AddEntryAssistant({
   onFinished,
   startOnRowId,
   startMs,
+  startShape = "ongoing",
   onShowEntry,
+  onShowEvent,
 }: AddEntryAssistantProps) {
   const firstPhase: Phase = startOnRowId === undefined ? "category" : "name";
   const flow = useAssistantFlow<Phase>(firstPhase);
@@ -65,20 +88,29 @@ export function AddEntryAssistant({
 
   const [category, setCategory] = useState<EntryCategory | null>(null);
   const [title, setTitle] = useState("");
-  const [createdEntryId, setCreatedEntryId] = useState<string | null>(null);
+  // What the flow made, once it has. The kind decides which "show me" the shell
+  // is handed — a pin and a bar are found in different arrays.
+  const [created, setCreated] = useState<{ kind: "entry" | "event"; id: string } | null>(null);
   const [rowChoice, setRowChoice] = useState<RowChoice | null>(
     startOnRowId === undefined ? null : { kind: "existing", rowId: startOnRowId },
   );
-  const [startYear, setStartYear] = useState(
-    startMs === undefined
-      ? Math.round((firstYear + currentYear) / 2)
-      : new Date(startMs).getUTCFullYear(),
+  const [start, setStart] = useState<DateAnswer>(() =>
+    answerFromMs(startMs ?? Date.UTC(Math.round((firstYear + currentYear) / 2), 6, 1)),
   );
-  const [vagueness, setVagueness] = useState(VAGUENESS_OPTIONS[0]);
-  const [ongoing, setOngoing] = useState(true);
-  const [endYear, setEndYear] = useState(currentYear);
+  // One certainty for the whole thing, as before: "how sure are you" is asked
+  // once and applies to both ends. Granularity is per date, because knowing the
+  // day you started somewhere and only the year you left is ordinary.
+  const [certainty, setCertainty] = useState<DateCertainty>("exact");
+  const [shape, setShape] = useState<Shape>(startShape);
+  const [end, setEnd] = useState<DateAnswer>(() => answerFromMs(nowMs));
 
-  const pendingEntry = buildEntry({ title, startYear, vagueness, ongoing, endYear });
+  const startDate = toFuzzyDate(start, certainty);
+  const endDate = toFuzzyDate(notBefore(end, start), certainty);
+  const pendingEntry = buildEntry({ title, startDate, endDate, shape });
+  const pendingEvent: Omit<TimelineEvent, "id" | "rowId"> = {
+    title: title.trim() || "Untitled",
+    date: startDate,
+  };
 
   // The chosen category decides where this goes — but only when it decides it
   // unambiguously. One matching timeline is used silently; none or several is a
@@ -112,31 +144,42 @@ export function AddEntryAssistant({
   const commitAndFinish = () => {
     const rowId = resolveRowId(rowChoice, category);
     if (!rowId) return; // Nowhere to put it — the picker below always offers a row.
-    setCreatedEntryId(addEntry({ ...pendingEntry, rowId }));
+    setCreated(
+      shape === "moment"
+        ? { kind: "event", id: addEvent(rowId, pendingEvent.title, pendingEvent.date) }
+        : { kind: "entry", id: addEntry({ ...pendingEntry, rowId }) },
+    );
     flow.advance("done");
   };
 
   // Ending the flow on the thing you made rather than on an empty canvas. Falls
   // back to plain dismissal when the host has nothing to show it with.
   const finishAndShow = () => {
-    if (createdEntryId && onShowEntry) onShowEntry(createdEntryId);
+    if (created?.kind === "entry" && onShowEntry) onShowEntry(created.id);
+    else if (created?.kind === "event" && onShowEvent) onShowEvent(created.id);
     else onFinished();
   };
 
   const startOver = () => {
     setCategory(null);
     setTitle("");
-    setCreatedEntryId(null);
+    setCreated(null);
     // A flow started from a timeline stays on that timeline — "add another"
     // there means another one of these, not another one of anything.
     setRowChoice(startOnRowId === undefined ? null : { kind: "existing", rowId: startOnRowId });
-    setVagueness(VAGUENESS_OPTIONS[0]);
-    setOngoing(true);
+    setCertainty("exact");
+    setShape(startShape);
     flow.advance(firstPhase);
   };
 
   const preview = (
-    <PreviewStrip entry={pendingEntry} firstYear={firstYear} lastYear={currentYear + 1} nowMs={nowMs} />
+    <PreviewStrip
+      entry={shape === "moment" ? undefined : pendingEntry}
+      date={shape === "moment" ? startDate : undefined}
+      firstYear={firstYear}
+      lastYear={currentYear + 1}
+      nowMs={nowMs}
+    />
   );
 
   switch (flow.phase) {
@@ -144,7 +187,7 @@ export function AddEntryAssistant({
       return (
         <AssistantStepShell
           prompt="What do you want to remember?"
-          hint="It lands on your timeline as a bar — you can refine it any time."
+          hint="It lands on your timeline as a bar, or as a pin if it was a moment."
           stepIndex={flow.stepIndex}
           onSkip={onFinished}
           skipLabel="Cancel"
@@ -256,30 +299,32 @@ export function AddEntryAssistant({
     case "start":
       return (
         <AssistantStepShell
-          prompt="When did it start?"
+          // A moment has no start, it just happened — and the flow can already
+          // know that, when it was opened by "add an event".
+          prompt={shape === "moment" ? "When was it?" : "When did it start?"}
           hint="Roughly is fine — fuzzy edges are part of the picture."
           stepIndex={flow.stepIndex}
           onBack={flow.back}
           onSkip={onFinished}
           skipLabel="Cancel"
         >
-          <YearSlider
-            year={startYear}
+          <DateAnswerField
+            answer={start}
             firstYear={firstYear}
             lastYear={currentYear}
-            caption={ageCaption(startYear)}
-            onChange={(year) => {
-              setStartYear(year);
-              if (!ongoing && endYear < year) setEndYear(year);
-            }}
+            caption={ageCaption(start.year)}
+            onChange={setStart}
           />
+          {/* Two different questions, and the flow used to fold them into one:
+              how much of the date is known, and how sure you are of it. */}
+          <div className="answer-caption">How sure are you?</div>
           <div className="vagueness-row">
-            {VAGUENESS_OPTIONS.map((option) => (
+            {CERTAINTY_OPTIONS.map((option) => (
               <button
-                key={option.label}
+                key={option.key}
                 type="button"
-                className={`vagueness ${option === vagueness ? "vagueness-on" : ""}`}
-                onClick={() => setVagueness(option)}
+                className={`vagueness ${option.key === certainty ? "vagueness-on" : ""}`}
+                onClick={() => setCertainty(option.key)}
               >
                 <span>{option.icon}</span>
                 {option.label}
@@ -287,17 +332,23 @@ export function AddEntryAssistant({
             ))}
           </div>
           {preview}
-          <button type="button" className="small-button" onClick={() => flow.advance("ongoing")}>
+          <button type="button" className="small-button" onClick={() => flow.advance("shape")}>
             Next →
           </button>
         </AssistantStepShell>
       );
 
-    case "ongoing":
+    case "shape":
       return (
         <AssistantStepShell
-          prompt="Is it still part of your life?"
-          hint="Ongoing things grow with you — the bar keeps moving."
+          prompt="How long did it last?"
+          hint={
+            shape === "moment"
+              ? "A moment is pinned to its date — it appears as you zoom in."
+              : shape === "ended"
+                ? "The bar runs from when it started to when it stopped."
+                : "Ongoing things grow with you — the bar keeps moving."
+          }
           stepIndex={flow.stepIndex}
           onBack={flow.back}
           onSkip={onFinished}
@@ -306,29 +357,38 @@ export function AddEntryAssistant({
           <div className="vagueness-row">
             <button
               type="button"
-              className={`vagueness ${ongoing ? "vagueness-on" : ""}`}
-              onClick={() => setOngoing(true)}
+              className={`vagueness ${shape === "ongoing" ? "vagueness-on" : ""}`}
+              onClick={() => setShape("ongoing")}
             >
               <span>→</span> Still ongoing
             </button>
             <button
               type="button"
-              className={`vagueness ${ongoing ? "" : "vagueness-on"}`}
+              className={`vagueness ${shape === "ended" ? "vagueness-on" : ""}`}
               onClick={() => {
-                setOngoing(false);
-                setEndYear(Math.max(startYear, endYear));
+                setShape("ended");
+                setEnd(notBefore(end, start));
               }}
             >
               <span>⏹</span> It ended
             </button>
+            {/* The third answer, and the one that changes what is created: a
+                moment is an event, drawn as a pin rather than a bar. */}
+            <button
+              type="button"
+              className={`vagueness ${shape === "moment" ? "vagueness-on" : ""}`}
+              onClick={() => setShape("moment")}
+            >
+              <span>◆</span> It was a moment
+            </button>
           </div>
-          {!ongoing && (
-            <YearSlider
-              year={endYear}
-              firstYear={startYear}
+          {shape === "ended" && (
+            <DateAnswerField
+              answer={end}
+              firstYear={start.year}
               lastYear={currentYear}
               caption="when it ended"
-              onChange={setEndYear}
+              onChange={(next) => setEnd(notBefore(next, start))}
             />
           )}
           {preview}
@@ -342,7 +402,11 @@ export function AddEntryAssistant({
       return (
         <AssistantStepShell
           prompt={`“${title}” is on your timeline`}
-          hint="Saved on this device only — nothing leaves your phone unless you export it."
+          hint={
+            created?.kind === "event"
+              ? "Pinned to its date — zoom in and it appears. Saved on this device only."
+              : "Saved on this device only — nothing leaves your phone unless you export it."
+          }
           stepIndex={flow.stepIndex}
           onSkip={onFinished}
           skipLabel="Close"
@@ -390,27 +454,33 @@ function selfGroup() {
 // steps so the preview and the commit can never show different things.
 function buildEntry({
   title,
-  startYear,
-  vagueness,
-  ongoing,
-  endYear,
+  startDate,
+  endDate,
+  shape,
 }: {
   title: string;
-  startYear: number;
-  vagueness: Vagueness;
-  ongoing: boolean;
-  endYear: number;
+  startDate: FuzzyDate;
+  endDate: FuzzyDate;
+  shape: Shape;
 }): Omit<TimelineEntry, "id" | "rowId"> {
-  const asDate = (year: number): FuzzyDate => ({
-    ms: Date.UTC(year, 6, 1),
-    precision: vagueness.precision,
-    ...(vagueness.fuzzDays === undefined ? {} : { fuzzDays: vagueness.fuzzDays }),
-  });
   return {
     title: title.trim() || "Untitled",
-    start: asDate(startYear),
-    ...(ongoing ? {} : { end: asDate(Math.max(endYear, startYear)) }),
+    start: startDate,
+    // A moment never reaches this function's output — it becomes an event —
+    // but the preview asks for an entry until the moment is chosen, and an
+    // ongoing shape is simply one with no end.
+    ...(shape === "ended" ? { end: endDate } : {}),
   };
+}
+
+// An end can never sit before its start. The end answer keeps its own
+// granularity while being pulled forward, so "ended in May" does not silently
+// become "ended in 2014".
+function notBefore(end: DateAnswer, start: DateAnswer): DateAnswer {
+  const endMs = Date.UTC(end.year, end.monthIndex, clampDay(end.year, end.monthIndex, end.day));
+  const startMs = Date.UTC(start.year, start.monthIndex, clampDay(start.year, start.monthIndex, start.day));
+  if (endMs >= startMs) return end;
+  return { ...end, year: start.year, monthIndex: start.monthIndex, day: start.day };
 }
 
 // Creating the row is deferred to here, the moment of commit, for the same
@@ -425,66 +495,139 @@ function resolveRowId(choice: RowChoice | null, category: EntryCategory | null):
   return addRow(group.id, category.newRowLabel, category.icon);
 }
 
-function YearSlider({
-  year,
+// One date, answered without a keyboard: a year slider, then — if the answer is
+// finer than a year — twelve month chips and a day slider. The granularity row
+// is what the flow was missing: it used to ask only for a year, so "exactly"
+// could only ever mean "exactly this year".
+function DateAnswerField({
+  answer,
   firstYear,
   lastYear,
   caption,
   onChange,
 }: {
-  year: number;
+  answer: DateAnswer;
   firstYear: number;
   lastYear: number;
   caption: string;
-  onChange: (year: number) => void;
+  onChange: (answer: DateAnswer) => void;
 }) {
+  // Changing year or month can strand the day past the end of the new month —
+  // a 31st dragged into February — so every change re-clamps it.
+  const withDay = (next: DateAnswer): DateAnswer => ({
+    ...next,
+    day: clampDay(next.year, next.monthIndex, next.day),
+  });
+
   return (
-    <div className="year-slider">
-      <div className="year-readout">{year}</div>
+    <div className="date-answer">
+      <div className="year-readout">{formatAnswer(answer)}</div>
       {caption && <div className="year-caption">{caption}</div>}
-      <input
-        type="range"
-        min={firstYear}
-        max={lastYear}
-        step={1}
-        value={Math.min(Math.max(year, firstYear), lastYear)}
-        aria-label="Year"
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
+
+      <div className="granularity-row">
+        {GRANULARITY_OPTIONS.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            className={`granularity ${option.key === answer.granularity ? "granularity-on" : ""}`}
+            onClick={() => onChange({ ...answer, granularity: option.key })}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Named, because two bare sliders one above the other say nothing about
+          which is which. */}
+      <label className="answer-slider-row">
+        <span className="answer-slider-label">Year</span>
+        <input
+          type="range"
+          min={firstYear}
+          max={lastYear}
+          step={1}
+          value={Math.min(Math.max(answer.year, firstYear), lastYear)}
+          onChange={(event) => onChange(withDay({ ...answer, year: Number(event.target.value) }))}
+        />
+      </label>
+
+      {answer.granularity !== "year" && (
+        <div className="month-row">
+          {MONTH_LABELS.map((month, index) => (
+            <button
+              key={month}
+              type="button"
+              className={`month-pick ${index === answer.monthIndex ? "month-pick-on" : ""}`}
+              onClick={() => onChange(withDay({ ...answer, monthIndex: index }))}
+            >
+              {month}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {answer.granularity === "day" && (
+        <label className="answer-slider-row">
+          <span className="answer-slider-label">Day</span>
+          <input
+            type="range"
+            min={1}
+            max={daysInMonth(answer.year, answer.monthIndex)}
+            step={1}
+            value={clampDay(answer.year, answer.monthIndex, answer.day)}
+            onChange={(event) => onChange({ ...answer, day: Number(event.target.value) })}
+          />
+        </label>
+      )}
     </div>
   );
 }
 
-// The same bar the canvas will paint, before it exists: the edges visibly blur
-// as the answer gets vaguer, which is the whole point of asking that way.
+// The same mark the canvas will paint, before it exists: a bar whose edges
+// visibly blur as the answer gets vaguer, or — for a moment — the pin and its
+// precision band. Showing the actual shape is the whole point of asking that way.
 function PreviewStrip({
   entry,
+  date,
   firstYear,
   lastYear,
   nowMs,
 }: {
-  entry: Omit<TimelineEntry, "id" | "rowId">;
+  entry: Omit<TimelineEntry, "id" | "rowId"> | undefined;
+  date: FuzzyDate | undefined;
   firstYear: number;
   lastYear: number;
   nowMs: number;
 }) {
   const range = { startMs: Date.UTC(firstYear, 0, 1), endMs: Date.UTC(lastYear, 0, 1) };
-  const bar = previewBar({ ...entry, id: "preview", rowId: "preview" }, range, nowMs);
   const color = "var(--color-accent)";
+  const pin = date ? previewPin(date, range) : undefined;
+  const bar = entry ? previewBar({ ...entry, id: "preview", rowId: "preview" }, range, nowMs) : undefined;
   return (
     <div className="preview-strip">
       <div className="preview-caption">Your timeline</div>
       <div className="preview-lane">
-        <span
-          className="preview-bar"
-          style={{
-            left: `${bar.leftPercent}%`,
-            width: `${bar.widthPercent}%`,
-            // One gradient for the whole bar, never a solid rect butted against
-            // a gradient one — the same rule the canvas renderer follows.
-            background: `linear-gradient(to right, transparent 0%, ${color} ${bar.solidStartPercent}%, ${color} ${bar.solidEndPercent}%, ${bar.ongoing ? color : "transparent"} 100%)`,
-          }}
-        />
+        {bar && (
+          <span
+            className="preview-bar"
+            style={{
+              left: `${bar.leftPercent}%`,
+              width: `${bar.widthPercent}%`,
+              // One gradient for the whole bar, never a solid rect butted against
+              // a gradient one — the same rule the canvas renderer follows.
+              background: `linear-gradient(to right, transparent 0%, ${color} ${bar.solidStartPercent}%, ${color} ${bar.solidEndPercent}%, ${bar.ongoing ? color : "transparent"} 100%)`,
+            }}
+          />
+        )}
+        {pin && (
+          <>
+            <span
+              className="preview-band"
+              style={{ left: `${pin.bandLeftPercent}%`, width: `${pin.bandWidthPercent}%` }}
+            />
+            <span className="preview-pin" style={{ left: `${pin.leftPercent}%` }} />
+          </>
+        )}
       </div>
       <div className="preview-axis">
         <span>{firstYear}</span>

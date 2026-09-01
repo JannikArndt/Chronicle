@@ -7,10 +7,9 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { addEvent, moveRow, setRowShared, updateRow } from "../state/actions";
+import { moveRow, setRowShared, updateRow } from "../state/actions";
 import { describePublishImpact } from "../model/sharing";
-import { formatByPrecision, formatFuzzyDate } from "../model/fuzzyDate";
-import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateInput";
+import { formatByPrecision } from "../model/fuzzyDate";
 import { isForeignId, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { EditableLine } from "./EditableLine";
 import { nextEntryStartMs } from "./nextEntryStart";
@@ -32,6 +31,7 @@ export function RowPane({
   onOpenEntry,
   onOpenEvent,
   onAddEntry,
+  onAddEvent,
 }: {
   rowId: string;
   // The "Move to another group…" picker is opened from the sheet's ⋯ menu, but
@@ -41,6 +41,7 @@ export function RowPane({
   onOpenEntry: (entryId: string) => void;
   onOpenEvent: (eventId: string) => void;
   onAddEntry: (rowId: string, startMs: number) => void;
+  onAddEvent: (rowId: string) => void;
 }) {
   const state = useAppState((s) => s);
   const [picker, setPicker] = useState<OpenPicker>("none");
@@ -207,67 +208,18 @@ export function RowPane({
         </button>
       ))}
 
-      {!readOnly && <AddEventRow rowId={row.id} onAdded={onOpenEvent} />}
+      {/* Same flow as adding an entry, opened on the answer that makes it a
+          moment — one add idiom on mobile, not two. */}
+      {!readOnly && (
+        <button
+          type="button"
+          className="sheet-add-row"
+          onClick={() => onAddEvent(row.id)}
+        >
+          ◆ Add an event
+        </button>
+      )}
     </>
-  );
-}
-
-// Adding a moment, inline. Deliberately not an assistant like the entry flow:
-// an event is a name and a date, and two fields in place beat four screens for
-// something this small. It stays folded away until asked for, so the pane still
-// reads as a list of what is on this timeline.
-function AddEventRow({ rowId, onAdded }: { rowId: string; onAdded: (eventId: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [dateText, setDateText] = useState(() => formatFuzzyDate({ ms: Date.now(), precision: "day" }));
-  const parsed = parseDateInput(dateText);
-  const canSubmit = title.trim() !== "" && parsed.kind === "date";
-
-  if (!open) {
-    return (
-      <button type="button" className="sheet-add-row" onClick={() => setOpen(true)}>
-        ◆ Add an event
-      </button>
-    );
-  }
-
-  const submit = () => {
-    if (parsed.kind !== "date") return;
-    const id = addEvent(rowId, title.trim(), { ms: parsed.ms, precision: parsed.precision });
-    setOpen(false);
-    setTitle("");
-    // Straight into the event's own pane, where the date can be dragged and a
-    // note added — the same landing the desktop form gives.
-    onAdded(id);
-  };
-
-  return (
-    <div className="sheet-inline-form">
-      <input
-        type="text"
-        autoFocus
-        placeholder="What happened"
-        value={title}
-        onChange={(input) => setTitle(input.target.value)}
-      />
-      <input
-        type="text"
-        placeholder="When"
-        value={dateText}
-        onChange={(input) => setDateText(input.target.value)}
-      />
-      <div className="hint">
-        {parsed.kind === "date" ? "Events show up once you zoom in." : ACCEPTED_DATE_FORMATS_HINT}
-      </div>
-      <div className="sheet-inline-form-actions">
-        <button type="button" className="small-button" onClick={() => setOpen(false)}>
-          Cancel
-        </button>
-        <button type="button" className="small-button small-button-primary" disabled={!canSubmit} onClick={submit}>
-          Add
-        </button>
-      </div>
-    </div>
   );
 }
 

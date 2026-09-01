@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { previewBar } from "./entryPreviewBar";
+import { previewBar, previewPin } from "./entryPreviewBar";
 import type { TimelineEntry } from "../model/types";
 
 const NOW_MS = Date.UTC(2026, 6, 31);
@@ -71,5 +71,24 @@ describe("previewBar", () => {
       NOW_MS,
     );
     expect(bar.widthPercent).toBeGreaterThan(0);
+  });
+});
+
+describe("previewPin", () => {
+  test("stands at its own instant, in the middle of its band", () => {
+    const pin = previewPin({ ms: Date.UTC(2010, 6, 1), precision: "year" }, RANGE);
+    expect(pin.bandLeftPercent).toBeLessThan(pin.leftPercent);
+    expect(pin.bandLeftPercent + pin.bandWidthPercent).toBeGreaterThan(pin.leftPercent);
+  });
+
+  test("a day-precise moment has no band — nothing to be vague about", () => {
+    const pin = previewPin({ ms: Date.UTC(2010, 6, 1), precision: "day" }, RANGE);
+    expect(pin.bandWidthPercent).toBe(0);
+  });
+
+  test("the vaguer the date, the wider the band", () => {
+    const around = previewPin({ ms: Date.UTC(2010, 6, 1), precision: "circa" }, RANGE);
+    const vague = previewPin({ ms: Date.UTC(2010, 6, 1), precision: "circa", fuzzDays: 730 }, RANGE);
+    expect(vague.bandWidthPercent).toBeGreaterThan(around.bandWidthPercent);
   });
 });
