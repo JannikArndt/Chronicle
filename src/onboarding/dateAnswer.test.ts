@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { DEFAULT_FUZZ_DAYS, fuzzMs, DAY_MS } from "../model/fuzzyDate";
-import { answerFromMs, clampDay, daysInMonth, formatAnswer, toFuzzyDate } from "./dateAnswer";
+import { answerFromMs, answerMs, clampDay, daysInMonth, formatAnswer, toFuzzyDate } from "./dateAnswer";
 import type { DateAnswer } from "./dateAnswer";
 
 function answer(overrides: Partial<DateAnswer> = {}): DateAnswer {
@@ -104,5 +104,23 @@ describe("day clamping", () => {
     expect(clampDay(2014, 1, 31)).toBe(28);
     expect(clampDay(2014, 1, 0)).toBe(1);
     expect(clampDay(2014, 1, 12)).toBe(12);
+  });
+});
+
+// The comparison the end-date clamp is built on. It has to be about the
+// anchored instants, not the raw fields: a year answer stands in July, so
+// "2014" really is before "20 Nov 2014" however the parts compare.
+describe("answerMs", () => {
+  test("anchors each granularity where toFuzzyDate does", () => {
+    for (const granularity of ["year", "month", "day"] as const) {
+      const one = answer({ granularity });
+      expect(answerMs(one)).toBe(toFuzzyDate(one, "exact").ms);
+    }
+  });
+
+  test("a year answer sits mid-year, so it can precede a late date in that year", () => {
+    expect(answerMs(answer({ granularity: "year" }))).toBeLessThan(
+      answerMs(answer({ granularity: "day", monthIndex: 10, day: 20 })),
+    );
   });
 });
