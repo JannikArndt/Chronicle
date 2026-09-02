@@ -54,14 +54,24 @@ has nothing to say there.
 - **The minimap reads `--color-*` through the engine's own `readThemeColors()`.**
   That function and its `ColorTable` are exported for exactly this reason —
   there is no third color table, just as there is no second one in `engine.ts`.
-- **A collapsed group draws one summary bar, not nothing.** `computeLayout()`
-  (since v9) emits a synthetic `"group-summary"` `LayoutItem` for a collapsed
-  group — spanning the earliest start to the latest end across every entry and
-  event anywhere in its subtree, at any depth — and `engine.ts`'s
-  `drawGroupSummary()` paints it as one flattened bar in the group's own
-  color. No per-entry detail; that's the point of collapsing. The rail skips
-  this item kind entirely (`RailItem` returns `null` for it) — there is
-  nothing to click or edit on an aggregate.
+- **A collapsed group draws one summary bar per DIRECT child, not one band
+  and not nothing.** `computeLayout()` emits a synthetic `"group-summary"`
+  `LayoutItem` carrying `summaries: GroupSummaryBar[]` — one bar per child
+  timeline and one per child sub-group (that one aggregated recursively over
+  its whole subtree), each labelled and coloured as that child — and
+  `engine.ts`'s `drawGroupSummary()` paints them, reusing `barGeometry` so an
+  aggregate that is still ongoing gets the same open arrow a real entry does.
+  Per-*child* detail, never per-entry: that's still the point of collapsing.
+  This is what makes a broken-out timeline (`src/model/breakOut.ts`) collapse
+  back into the picture it came from. Two rules hold it together:
+  **overlapping children are lane-packed in time, not pixels** (`packLanes`;
+  `computeLayout` has no access to the scale, so lanes can never reshuffle
+  while zooming, and back-to-back children share a lane — which is exactly
+  the "Job A, Job B, Job C" case), and **hidden rows are excluded** from the
+  aggregate (as a labelled bar of its own, a row unchecked in the rail would
+  otherwise be visibly back). The item's height is `lanes × ROW_HEIGHT`. The
+  rail skips this item kind entirely (`RailItem` returns `null` for it) —
+  there is nothing to click or edit on an aggregate.
 - **Groups nest arbitrarily deep; `LayoutItem.depth` means "nesting depth of
   the container", for both `"group"` and `"row"` items.** `groupHeaderHeight()`
   and `groupFontSize()` in `layout.ts` step down with depth (with a floor) so

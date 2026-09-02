@@ -21,6 +21,14 @@ rail's other popovers. Mobile: the **add-entry assistant**, whose last question
 event` in `RowPane.tsx` is that same flow opened with the answer pre-picked.
 There is deliberately no inline event form on mobile — one add idiom per shell.
 
+**Break out** (a timeline into a group of timelines, one per entry) has four
+entry points, deliberately all sitting directly above the matching delete:
+`RowEditor` in `RowRail.tsx` and the mobile row menu in `TimelineSheet.tsx` for
+a whole timeline, `EntryDetail` in `DetailPanel.tsx` and the mobile entry menu
+for one entry. All four confirm first with `describeBreakOut()` — the same
+shape as `describeCascade()` on the deletes — because there is no undo and this
+restructures the tree.
+
 Sharing's contents live in `SharingPanel.tsx` (sign in, invite links, who can
 see what, the disclosures) and are rendered by two frames: `SharingMenu.tsx`,
 the desktop top-bar popover, and the mobile ⋯ menu's sharing sub-view in

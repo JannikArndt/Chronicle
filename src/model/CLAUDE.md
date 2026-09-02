@@ -34,6 +34,19 @@ have grown an "unless it is a point" branch. An event carries one `date`
 only makes sense for a duration. Nothing in the model points *at* an event —
 which is why `collectEventCascade` walks no tree.
 
+`breakOut.ts` is the one **structural** conversion in the model: a timeline
+becomes a group of timelines, one per entry ("break out" — the ask called it
+"exploding"; `plans/break-out-feature-design.md` §1 says why not *explode*,
+*expand* or *split*). Given a single entry id it peels just that entry off and
+leaves the rest of the row alone. It is pure and takes an injectable id factory
+so the tests get stable ids. Two rules are load-bearing rather than cosmetic:
+the new group takes the row's presentation (label, colour, icon, birth date)
+but is **never `shared`**, while the new rows inherit the row's own flag — so
+exactly the entries that were published stay published and nothing new becomes
+public, which `breakOut.test.ts` asserts against `syncSubset` itself. And
+events never move: the row keeps every one of them, because guessing which span
+owns a point in time is a guess.
+
 ## Invariants
 
 - **UTC everywhere**: every stored `ms` is a UTC instant; parsing, formatting,

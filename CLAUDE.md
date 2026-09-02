@@ -62,6 +62,15 @@ what's true across the whole codebase.
   when zoomed in* (`src/render/events.ts` owns that rule and nothing else may
   re-decide it). A zero-length entry is not an event and must not be used as
   one: it has no label anchor, no fade edges and no honest "ongoing".
+- **Breaking out and collapsing are inverses on screen** — a timeline breaks
+  out into a group of timelines, one per entry (`src/model/breakOut.ts`), and a
+  collapsed group draws one summary bar per *direct child* rather than one band
+  flattened over its whole subtree, so collapsing the new group gives back the
+  picture the single timeline had. Overlapping children stack into lanes packed
+  in time, never in pixels — the layout has no scale, and lanes that reshuffled
+  while zooming would be a different picture at every zoom level. Publishing is
+  unchanged by a break-out: the new group is private and the new rows inherit
+  the row's own `shared` flag.
 - **A person is a `Group` or a `TimelineRow` with a `birthDate`** — either can
   independently be a person now (a big family gets a group full of sub-groups
   and timelines; an acquaintance might get exactly one timeline). Both carry

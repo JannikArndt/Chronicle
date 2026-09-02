@@ -112,6 +112,30 @@ row. If you see "category" today it means only the *wording group* the add-entry
 assistant uses to phrase its questions — nothing is stored on the entry.
 → `src/onboarding/addEntryCategories.ts`
 
+**Break out** — turning one timeline into a group of timelines, **one per
+entry**: "Work" with Job A, Job B and Job C becomes a group "Work" holding three
+timelines, each carrying its original entry, so each can then be detailed into
+projects, locations or phases. Done to one entry instead, it peels just that
+entry onto its own timeline and leaves the rest of the row where it was. The
+row's presentation (label, colour, icon, birth date) moves up onto the new
+group; its events stay put — the row keeps every one of them, because guessing
+which span owns a point in time is a guess. Publishing survives untouched: the
+new group is private, the new timelines inherit the row's own `shared` flag.
+There is no inverse action, because **collapsing** the group is the inverse you
+actually want (see below). The ask called this "exploding"; `plans/break-out-feature-design.md` §1
+records why the word is *break out* and not *explode*, *expand* or *split*.
+→ `src/model/breakOut.ts`, `src/state/actions.ts` (`breakOutRow`, `breakOutEntry`)
+
+**Collapsed** — a group folded shut. It does not go blank and it does not
+flatten into one band: it draws **one summary bar per direct child** — per child
+timeline, and per child sub-group aggregated over its whole subtree — labelled
+and coloured as that child. That is what makes collapsing a broken-out group
+give back the picture the single timeline had. Children that overlap in time
+stack into **lanes**, packed by comparing milliseconds rather than pixels, so
+the lanes stay put while you zoom; children that sit back-to-back share a lane.
+A hidden timeline is left out of the aggregate entirely.
+→ `src/render/layout.ts` (`GroupSummaryBar`, `packLanes`), `src/render/engine.ts` (`drawGroupSummary`)
+
 **Public data** — read-only timelines shipped with the app (world events, famous
 people), loaded from `public-data/*.json` at build time. Every id is prefixed
 `pub:<file>:` so it can never collide with, or be written over, your own data.
