@@ -635,21 +635,30 @@ export class TimelineEngine {
 
     for (const item of visible) {
       if (item.kind === "group") {
-        // Every group gets a background band over its FULL extent — header
-        // plus everything nested under it (`subtreeEndY`), not just the
-        // header line. Items come in depth-first order, so a nested group's
-        // band is painted after (on top of) its ancestors' — the same low
-        // alpha stacking into a visibly stronger shade wherever nesting goes
-        // deeper, which is the whole of how depth reads here.
+        // A COLLAPSED group is drawn as the timeline it stands in for: its
+        // children's summary bars in its own band, a plated name like a row's
+        // — and no band behind it, because `computeLayout` leaves
+        // `subtreeEndY` unset while collapsed. `summaries` is set on exactly
+        // the collapsed groups, so it doubles as that test.
+        if (item.summaries) {
+          this.drawGroupSummary(item, nowMs);
+          if (this.input.showRowLabels && item.group) {
+            const text = item.group.icon ? `${item.group.icon} ${item.group.label}` : item.group.label;
+            this.drawPinnedLabel(item, text, item.group.color ?? "#888");
+          }
+          continue;
+        }
+        // An EXPANDED group gets a background band over its FULL extent —
+        // header plus everything nested under it (`subtreeEndY`), not just
+        // the header line. Items come in depth-first order, so a nested
+        // group's band is painted after (on top of) its ancestors' — the same
+        // low alpha stacking into a visibly stronger shade wherever nesting
+        // goes deeper, which is the whole of how depth reads here.
         if (item.subtreeEndY !== undefined) {
           ctx.fillStyle = this.colors.groupBand;
           ctx.fillRect(0, item.y, this.width, item.subtreeEndY - item.y);
         }
         if (this.input.showRowLabels) this.drawGroupLabel(item);
-        continue;
-      }
-      if (item.kind === "group-summary") {
-        this.drawGroupSummary(item, nowMs);
         continue;
       }
       if (item.row && !item.hidden) this.drawRow(item, nowMs, emphasis, relatedIds);
@@ -949,11 +958,16 @@ export class TimelineEngine {
   // mobile only). Plated like an event label: it is drawn over bars of any
   // colour, so a name at full opacity straight onto one would be unreadable.
   private drawRowLabel(item: LayoutItem, row: TimelineRow, color: string): void {
+    this.drawPinnedLabel(item, row.icon ? `${row.icon} ${row.label}` : row.label, color);
+  }
+
+  // The plate itself, shared with a collapsed group — which draws bars in its
+  // own band now, so its name needs the same protection a row's does.
+  private drawPinnedLabel(item: LayoutItem, text: string, color: string): void {
     const { ctx } = this;
     const indent = 8 + item.depth * 14;
     ctx.save();
     ctx.font = "600 12px -apple-system, system-ui, sans-serif";
-    const text = row.icon ? `${row.icon} ${row.label}` : row.label;
     const textWidth = ctx.measureText(text).width;
     const plateHeight = 16;
     const plateY = item.y + 4;
@@ -1000,8 +1014,8 @@ export class TimelineEngine {
     return undefined;
   }
 
-  // A collapsed group's direct children, one bar each (src/render/layout.ts
-  // aggregates and lane-packs them) — "Work" collapsed with "Job A"/"Job
+  // A collapsed group's direct children, one bar each, drawn in the group's
+  // own band (src/render/layout.ts aggregates and lane-packs them) — "Work" collapsed with "Job A"/"Job
   // B"/"Job C" underneath looks exactly like the single "Work" timeline with
   // three entries did before collapsing, not one flattened band. Lane `n`
   // sits at `item.y + n * ROW_HEIGHT`, same 6px inset and bar height as a

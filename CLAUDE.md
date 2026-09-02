@@ -66,7 +66,9 @@ what's true across the whole codebase.
   out into a group of timelines, one per entry (`src/model/breakOut.ts`), and a
   collapsed group draws one summary bar per *direct child* rather than one band
   flattened over its whole subtree, so collapsing the new group gives back the
-  picture the single timeline had. Overlapping children stack into lanes packed
+  picture the single timeline had — down to the presentation: collapsed, a
+  group is drawn *as* a timeline (one row height, no section band, no header
+  weight or colour), because it is standing in for one. Overlapping children stack into lanes packed
   in time, never in pixels — the layout has no scale, and lanes that reshuffled
   while zooming would be a different picture at every zoom level. Publishing is
   unchanged by a break-out: the new group is private and the new rows inherit

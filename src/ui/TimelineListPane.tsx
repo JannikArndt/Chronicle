@@ -34,8 +34,6 @@ export function TimelineListPane({
             </div>
           );
         }
-        // A collapsed group's summary bar is canvas-only.
-        if (item.kind === "group-summary") return null;
         const row = item.row!;
         // Everything on this timeline, spans and moments alike: a row holding
         // five events and no entries is not an empty timeline, and a bare "0"

@@ -494,14 +494,21 @@ function RailItem({
   onHoverLeave,
   dragController,
 }: RailItemProps) {
-  const style = { top: item.y, height: item.height, fontSize: groupFontSize(item.depth) };
+  // `summaries` is set on exactly the collapsed groups (src/render/layout.ts),
+  // so it answers "is this collapsed" without re-deriving the rule — and it
+  // covers a public group, whose collapse lives in `collapsedGroupIds` rather
+  // than on the group itself.
+  const collapsed = item.summaries !== undefined;
+  // Collapsed, a group stands in for the timelines it hides and is styled as
+  // one: the layout already gives it a row's height, and the rail drops the
+  // header's font-size step-down with it. Only the ▸ says it is a group.
+  const style = collapsed
+    ? { top: item.y, height: item.height }
+    : { top: item.y, height: item.height, fontSize: groupFontSize(item.depth) };
   const readOnly = isForeignId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
 
-  // A collapsed group's summary bar is canvas-only — there is nothing to
-  // click or edit on an aggregate, so the rail simply skips it.
-  if (item.kind === "group-summary") return null;
   const key = `${item.kind}:${item.id}`;
   const hoverReveal = (visible: boolean) => `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`;
 
@@ -515,7 +522,7 @@ function RailItem({
     const famous = item.depth === 0 ? parseFamousGroupId(group.id) : null;
     return (
       <div
-        className="rail-group"
+        className={`rail-group ${collapsed ? "rail-group-collapsed" : ""}`}
         style={{ ...style, paddingLeft: 8 + item.depth * 14 }}
         data-rail-kind="group"
         data-rail-id={group.id}
@@ -524,10 +531,10 @@ function RailItem({
         onMouseLeave={onHoverLeave}
       >
         <button type="button" className="collapse-button" onClick={() => toggleGroupCollapsed(group.id)}>
-          {group.collapsed ? "▸" : "▾"}
+          {collapsed ? "▸" : "▾"}
         </button>
         {group.icon && <span className="row-icon">{group.icon}</span>}
-        <span className="rail-group-label" title={group.label} style={{ color: group.color }}>
+        <span className="rail-group-label" title={group.label} style={collapsed ? undefined : { color: group.color }}>
           {group.label}
           {age !== null && <span className="age-badge">{age}</span>}
         </span>

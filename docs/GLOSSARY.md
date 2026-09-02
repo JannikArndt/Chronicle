@@ -126,14 +126,18 @@ actually want (see below). The ask called this "exploding"; `plans/break-out-fea
 records why the word is *break out* and not *explode*, *expand* or *split*.
 → `src/model/breakOut.ts`, `src/state/actions.ts` (`breakOutRow`, `breakOutEntry`)
 
-**Collapsed** — a group folded shut. It does not go blank and it does not
-flatten into one band: it draws **one summary bar per direct child** — per child
+**Collapsed** — a group folded shut, which makes it **a timeline**: the same
+row height, no section background, no header weight or colour on its name, only
+the ▸ saying it is still a group. It does not go blank and it does not flatten
+into one band — it draws **one summary bar per direct child** — per child
 timeline, and per child sub-group aggregated over its whole subtree — labelled
 and coloured as that child. That is what makes collapsing a broken-out group
 give back the picture the single timeline had. Children that overlap in time
 stack into **lanes**, packed by comparing milliseconds rather than pixels, so
 the lanes stay put while you zoom; children that sit back-to-back share a lane.
-A hidden timeline is left out of the aggregate entirely.
+Lanes are the one thing that makes a collapsed group taller than a row — the
+alternative would be hiding a child. A hidden timeline is left out of the
+aggregate entirely.
 → `src/render/layout.ts` (`GroupSummaryBar`, `packLanes`), `src/render/engine.ts` (`drawGroupSummary`)
 
 **Public data** — read-only timelines shipped with the app (world events, famous

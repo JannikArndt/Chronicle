@@ -54,11 +54,7 @@ export interface GroupSummaryBar {
 }
 
 export interface LayoutItem {
-  // "group-summary" is the synthetic item standing in for a collapsed group's
-  // direct children — one bar per child (see `summaries`), lane-packed for
-  // overlap — canvas-only, the rail skips it (there is nothing to click or
-  // edit on an aggregate).
-  kind: "group" | "row" | "group-summary";
+  kind: "group" | "row";
   id: string;
   y: number;
   height: number;
@@ -68,19 +64,22 @@ export interface LayoutItem {
   hidden: boolean; // row is unchecked in the rail (§2) — canvas skips its entries, rail keeps the row
   group?: Group;
   row?: TimelineRow;
-  // "group-summary" only. One bar per direct child (row or sub-group) that
-  // has anything dated, lane-packed for overlap — see packLanes(). Absent
-  // when every direct child is either empty or hidden, in which case no
-  // "group-summary" item is emitted for that group at all.
+  // Set on a COLLAPSED group and on nothing else — so its presence is also
+  // how a renderer knows a group is collapsed, without re-deriving the rule.
+  // One bar per direct child (row or sub-group) that has anything dated,
+  // lane-packed for overlap (see packLanes()); empty when every direct child
+  // is empty or hidden, which is a collapsed group that draws no bars rather
+  // than no item.
   summaries?: GroupSummaryBar[];
-  // "group" only — the y position where this group's whole subtree (header
-  // plus every row and nested group under it, at any depth) ends. Lets a
-  // renderer paint one background band over a group's full extent rather
-  // than just its header line; both the canvas and the rail stack these
-  // bands in the same depth-first paint order the items already come in, so
-  // a nested group's band overlays its ancestors' and reads as a softer
-  // shade layered inside a stronger one — hierarchy through paint order, not
-  // a hand-picked color per depth.
+  // "group" only, and only while EXPANDED — the y position where this group's
+  // whole subtree (header plus every row and nested group under it, at any
+  // depth) ends. Lets a renderer paint one background band over a group's
+  // full extent rather than just its header line; both the canvas and the
+  // rail stack these bands in the same depth-first paint order the items
+  // already come in, so a nested group's band overlays its ancestors' and
+  // reads as a softer shade layered inside a stronger one — hierarchy through
+  // paint order, not a hand-picked color per depth. Left unset when the group
+  // is collapsed, which is the whole of "a collapsed group has no band".
   subtreeEndY?: number;
 }
 
@@ -204,31 +203,28 @@ export function computeLayout(
 
   const pushGroup = (group: Group, depth: number, gapBefore: number): void => {
     y += gapBefore;
+
+    // Collapsed, a group IS a timeline: one item, one row height, the summary
+    // bars of its direct children drawn in that same band, and no
+    // `subtreeEndY` — so neither renderer paints a section background behind
+    // it. It stands in for the timelines it hides, so looking like a section
+    // header would be describing something the user can no longer see.
+    // Overlapping children are the one exception to "one row height": they
+    // need their lanes, and the item grows to hold them.
+    if (isCollapsed(group)) {
+      const summaries = groupSummaryBars(group.id);
+      const laneCount = summaries.length === 0 ? 1 : summaries[summaries.length - 1].lane + 1;
+      const height = laneCount * ROW_HEIGHT;
+      items.push({ kind: "group", id: group.id, y, height, depth, hidden: false, group, summaries });
+      y += height;
+      return;
+    }
+
     const height = groupHeaderHeight(depth);
     const item: LayoutItem = { kind: "group", id: group.id, y, height, depth, hidden: false, group };
     items.push(item);
     y += height;
-    if (isCollapsed(group)) {
-      const summaries = groupSummaryBars(group.id);
-      if (summaries.length > 0) {
-        const laneCount = summaries[summaries.length - 1].lane + 1;
-        const summaryHeight = laneCount * ROW_HEIGHT;
-        y += GROUP_HEADER_CHILD_GAP;
-        items.push({
-          kind: "group-summary",
-          id: group.id,
-          y,
-          height: summaryHeight,
-          depth: depth + 1,
-          hidden: false,
-          group,
-          summaries,
-        });
-        y += summaryHeight;
-      }
-    } else {
-      pushContainer(group.id, depth + 1, true);
-    }
+    pushContainer(group.id, depth + 1, true);
     item.subtreeEndY = y;
   };
 
@@ -248,7 +244,11 @@ export function computeLayout(
       index++;
     }
     for (const group of groups) {
-      const gapBefore = index === 0 ? (hasHeaderAbove ? GROUP_HEADER_CHILD_GAP : 0) : GROUP_GAP_BEFORE;
+      // A collapsed group is spaced like the timeline it stands in for, not
+      // like a section: GROUP_GAP_BEFORE exists to separate a header from
+      // whatever precedes it, and there is no header here to separate.
+      const sectionGap = isCollapsed(group) ? ROW_GAP : GROUP_GAP_BEFORE;
+      const gapBefore = index === 0 ? (hasHeaderAbove ? GROUP_HEADER_CHILD_GAP : 0) : sectionGap;
       pushGroup(group, depth, gapBefore);
       index++;
     }

@@ -54,24 +54,33 @@ has nothing to say there.
 - **The minimap reads `--color-*` through the engine's own `readThemeColors()`.**
   That function and its `ColorTable` are exported for exactly this reason —
   there is no third color table, just as there is no second one in `engine.ts`.
-- **A collapsed group draws one summary bar per DIRECT child, not one band
-  and not nothing.** `computeLayout()` emits a synthetic `"group-summary"`
-  `LayoutItem` carrying `summaries: GroupSummaryBar[]` — one bar per child
-  timeline and one per child sub-group (that one aggregated recursively over
-  its whole subtree), each labelled and coloured as that child — and
-  `engine.ts`'s `drawGroupSummary()` paints them, reusing `barGeometry` so an
-  aggregate that is still ongoing gets the same open arrow a real entry does.
-  Per-*child* detail, never per-entry: that's still the point of collapsing.
-  This is what makes a broken-out timeline (`src/model/breakOut.ts`) collapse
-  back into the picture it came from. Two rules hold it together:
-  **overlapping children are lane-packed in time, not pixels** (`packLanes`;
-  `computeLayout` has no access to the scale, so lanes can never reshuffle
-  while zooming, and back-to-back children share a lane — which is exactly
-  the "Job A, Job B, Job C" case), and **hidden rows are excluded** from the
-  aggregate (as a labelled bar of its own, a row unchecked in the rail would
-  otherwise be visibly back). The item's height is `lanes × ROW_HEIGHT`. The
-  rail skips this item kind entirely (`RailItem` returns `null` for it) —
-  there is nothing to click or edit on an aggregate.
+- **A collapsed group IS a timeline — same item, same height, no band.**
+  There is no `"group-summary"` item kind: `computeLayout()` gives a collapsed
+  group one `"group"` `LayoutItem` of `ROW_HEIGHT`, carrying
+  `summaries: GroupSummaryBar[]` — one bar per DIRECT child (one per child
+  timeline, one per child sub-group aggregated recursively over its subtree),
+  each labelled and coloured as that child — drawn by `engine.ts` in the
+  group's own band, reusing `barGeometry` so an aggregate that is still
+  ongoing gets the same open arrow a real entry does. Per-*child* detail,
+  never per-entry: that is still the point of collapsing. It stands in for the
+  timelines it hides, so it must not read as a section header:
+  **`subtreeEndY` is left unset while collapsed**, and that single fact is
+  what stops both renderers banding it (the canvas skips `groupBand`, the rail
+  emits no `.rail-group-band`); the rail additionally drops the header's
+  weight, colour and font-size step-down (`.rail-group-collapsed`), and
+  `pushContainer` spaces it with `ROW_GAP` instead of `GROUP_GAP_BEFORE`.
+  **`summaries` being set is also the test for "is this collapsed"** — both
+  renderers use it rather than re-deriving the `collapsedGroupIds ||
+  group.collapsed` rule, which is also what makes a *public* group (collapse
+  state lives outside the dataset) behave identically.
+  Two rules hold the bars together: **overlapping children are lane-packed in
+  time, not pixels** (`packLanes`; `computeLayout` has no access to the scale,
+  so lanes can never reshuffle while zooming, and back-to-back children share
+  a lane — which is exactly the "Job A, Job B, Job C" case), and **hidden rows
+  are excluded** from the aggregate (as a labelled bar of its own, a row
+  unchecked in the rail would otherwise be visibly back). Overlap is the one
+  thing that breaks "same height as a row": the item grows to
+  `lanes × ROW_HEIGHT`, because the alternative is hiding a child.
 - **Groups nest arbitrarily deep; `LayoutItem.depth` means "nesting depth of
   the container", for both `"group"` and `"row"` items.** `groupHeaderHeight()`
   and `groupFontSize()` in `layout.ts` step down with depth (with a floor) so

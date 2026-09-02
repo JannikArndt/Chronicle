@@ -125,7 +125,7 @@ describe("computeLayout", () => {
     ];
     ds.events = [{ id: "v1", rowId: "r3", title: "v1", date: { ms: Date.UTC(2020, 0, 1), precision: "year" } }];
     const { items } = computeLayout(ds, new Set(["g-family"]));
-    const item = items.find((i) => i.kind === "group-summary" && i.id === "g-family");
+    const item = items.find((i) => i.kind === "group" && i.id === "g-family");
     expect(item).toBeDefined();
     // "Family" holds no rows of its own — its only direct child is the
     // sub-group "Finn", so the collapsed summary is exactly one bar labelled
@@ -145,12 +145,63 @@ describe("computeLayout", () => {
     ]);
   });
 
-  test("collapsing a group with nothing dated in its subtree emits no summary item", () => {
+  test("collapsing a group with nothing dated in its subtree draws no bars", () => {
     const { items } = computeLayout(fixture(), new Set(["g-family"]));
-    expect(items.some((i) => i.kind === "group-summary")).toBe(false);
+    const item = items.find((i) => i.kind === "group" && i.id === "g-family")!;
+    expect(item.summaries).toEqual([]);
+    // Still one row tall: a collapsed group stands in for a timeline, and an
+    // empty timeline is a row with nothing on it, not a missing row.
+    expect(item.height).toBe(ROW_HEIGHT);
   });
 
-  describe("group-summary bars (one per direct child)", () => {
+  describe("a collapsed group is presented as a timeline", () => {
+    // "Me" holds one row; collapsing it should leave something the same shape
+    // as that row, not a section header with a band and a summary lane.
+    function collapsedFixture(): TimelineDataset {
+      const ds = fixture();
+      ds.entries = [
+        {
+          id: "e1",
+          rowId: "r1",
+          title: "e1",
+          start: { ms: Date.UTC(2010, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2012, 0, 1), precision: "exact" },
+        },
+      ];
+      return ds;
+    }
+
+    test("it is one row tall, not a header plus a lane", () => {
+      const { items } = computeLayout(collapsedFixture(), new Set(["g-me"]));
+      const gMe = items.find((i) => i.id === "g-me")!;
+      expect(gMe.height).toBe(ROW_HEIGHT);
+      expect(gMe.height).toBe(items.find((i) => i.id === "r-top")!.height);
+      // One item, carrying its own bars — there is no second item to find.
+      expect(items.filter((i) => i.id === "g-me")).toHaveLength(1);
+      expect(gMe.summaries).toHaveLength(1);
+    });
+
+    test("it has no subtreeEndY, which is what stops both renderers banding it", () => {
+      const { items } = computeLayout(collapsedFixture(), new Set(["g-me"]));
+      expect(items.find((i) => i.id === "g-me")!.subtreeEndY).toBeUndefined();
+      // Expanded, the same group still gets its band.
+      const expanded = computeLayout(collapsedFixture(), new Set());
+      expect(expanded.items.find((i) => i.id === "g-me")!.subtreeEndY).toBeDefined();
+    });
+
+    test("it is spaced like a sibling row, not like a section", () => {
+      const { items } = computeLayout(collapsedFixture(), new Set(["g-me"]));
+      const rTop = items.find((i) => i.id === "r-top")!;
+      const gMe = items.find((i) => i.id === "g-me")!;
+      expect(gMe.y - (rTop.y + rTop.height)).toBe(ROW_GAP);
+      // Expanded, that same group takes the wider section gap.
+      const expanded = computeLayout(collapsedFixture(), new Set());
+      const gMeExpanded = expanded.items.find((i) => i.id === "g-me")!;
+      expect(gMeExpanded.y - (rTop.y + rTop.height)).toBe(GROUP_GAP_BEFORE);
+    });
+  });
+
+  describe("collapsed-group bars (one per direct child)", () => {
     // A group "Work" holding sibling timelines "Job A"/"Job B" directly — the
     // simplest case the feature exists for: each direct child row gets its
     // own bar, not one flattened band.
@@ -182,7 +233,7 @@ describe("computeLayout", () => {
 
     test("one bar per direct child row, with that row's own label, colour and span", () => {
       const { items } = computeLayout(siblingRowsFixture(), new Set(["g-work"]));
-      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-work")!;
+      const item = items.find((i) => i.kind === "group" && i.id === "g-work")!;
       expect(item.summaries).toEqual([
         {
           kind: "row",
@@ -210,7 +261,7 @@ describe("computeLayout", () => {
     test("a hidden row is excluded from its own bar, and from an ancestor's aggregate", () => {
       const ds = siblingRowsFixture();
       const { items } = computeLayout(ds, new Set(["g-work"]), new Set(["r-b"]));
-      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-work")!;
+      const item = items.find((i) => i.kind === "group" && i.id === "g-work")!;
       // r-b is hidden — it must not reappear as a summary bar even though it
       // has a dated entry.
       expect(item.summaries).toEqual([
@@ -235,10 +286,10 @@ describe("computeLayout", () => {
         },
       ];
       const { items: items2 } = computeLayout(ds2, new Set(["g-outer"]), new Set(["r-only"]));
-      expect(items2.some((i) => i.kind === "group-summary")).toBe(false);
+      expect(items2.find((i) => i.kind === "group" && i.id === "g-outer")!.summaries).toEqual([]);
     });
 
-    test("a group whose direct children are all empty emits no summary item", () => {
+    test("a group whose direct children are all empty draws no bars", () => {
       const ds = emptyDataset();
       ds.groups = [{ id: "g-empty", label: "Empty", collapsed: false }];
       ds.rows = [
@@ -247,7 +298,7 @@ describe("computeLayout", () => {
       ];
       // No entries or events at all — both direct children have nothing dated.
       const { items } = computeLayout(ds, new Set(["g-empty"]));
-      expect(items.some((i) => i.kind === "group-summary")).toBe(false);
+      expect(items.find((i) => i.kind === "group" && i.id === "g-empty")!.summaries).toEqual([]);
     });
 
     test("ongoing propagates: a child with any open-ended entry reports ongoing, and endMs falls back to that entry's own start", () => {
@@ -273,7 +324,7 @@ describe("computeLayout", () => {
         { id: "e-og2", rowId: "r-og2", title: "e-og2", start: { ms: Date.UTC(2015, 0, 1), precision: "exact" } },
       ];
       const { items } = computeLayout(ds, new Set(["g-outer"]));
-      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-outer")!;
+      const item = items.find((i) => i.kind === "group" && i.id === "g-outer")!;
       expect(item.summaries).toEqual([
         {
           kind: "group",
@@ -307,7 +358,7 @@ describe("computeLayout", () => {
       const { items } = computeLayout(ds, new Set(["g-finn"]));
       expect(items.some((i) => i.id === "g-family" && i.kind === "group")).toBe(true);
       expect(items.some((i) => i.id === "g-finn" && i.kind === "group")).toBe(true);
-      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-finn")!;
+      const item = items.find((i) => i.kind === "group" && i.id === "g-finn")!;
       expect(item).toBeDefined();
       expect(item.summaries).toEqual([
         {
@@ -333,11 +384,11 @@ describe("computeLayout", () => {
       ]);
 
       // Collapsing BOTH levels instead: Finn is now unreachable (nested
-      // inside a collapsed ancestor), so only "Family"'s own summary exists —
-      // there is no separate "g-finn" group-summary item to find.
+      // inside a collapsed ancestor), so only "Family"'s own item exists —
+      // its subtree is not walked at all while it is collapsed.
       const { items: bothCollapsed } = computeLayout(ds, new Set(["g-family", "g-finn"]));
-      expect(bothCollapsed.some((i) => i.kind === "group-summary" && i.id === "g-finn")).toBe(false);
-      expect(bothCollapsed.some((i) => i.kind === "group-summary" && i.id === "g-family")).toBe(true);
+      expect(bothCollapsed.some((i) => i.kind === "group" && i.id === "g-finn")).toBe(false);
+      expect(bothCollapsed.some((i) => i.kind === "group" && i.id === "g-family")).toBe(true);
     });
 
     test("overlapping children land in separate lanes; back-to-back children share one", () => {
@@ -376,7 +427,7 @@ describe("computeLayout", () => {
         },
       ];
       const { items } = computeLayout(ds, new Set(["g-lanes"]));
-      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-lanes")!;
+      const item = items.find((i) => i.kind === "group" && i.id === "g-lanes")!;
       const laneOf = (id: string) => item.summaries!.find((b) => b.id === id)!.lane;
       expect(laneOf("r-x")).toBe(0);
       expect(laneOf("r-y")).toBe(1);
@@ -421,15 +472,12 @@ describe("computeLayout", () => {
         },
       ];
       const { items } = computeLayout(ds, new Set(["g-lanes"]));
-      const summaryItem = items.find((i) => i.kind === "group-summary" && i.id === "g-lanes")!;
       const gLanes = items.find((i) => i.id === "g-lanes" && i.kind === "group")!;
       const gAfter = items.find((i) => i.id === "g-after" && i.kind === "group")!;
-      expect(summaryItem.height).toBe(2 * ROW_HEIGHT);
-      // The group's subtree ends exactly where its (now taller) summary ends.
-      expect(gLanes.subtreeEndY).toBe(summaryItem.y + summaryItem.height);
-      // And the next top-level group starts GROUP_GAP_BEFORE past that —
-      // exactly like any other sibling, just measured from a taller item.
-      expect(gAfter.y).toBe(summaryItem.y + summaryItem.height + GROUP_GAP_BEFORE);
+      expect(gLanes.height).toBe(2 * ROW_HEIGHT);
+      // The next top-level group is expanded, so it still reads as its own
+      // section: GROUP_GAP_BEFORE past the taller collapsed item.
+      expect(gAfter.y).toBe(gLanes.y + gLanes.height + GROUP_GAP_BEFORE);
     });
   });
 

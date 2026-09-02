@@ -296,6 +296,16 @@ textarea {
   font-weight: 700;
 }
 
+/* Collapsed, a group stands in for the timelines it hides, so it is styled as
+   one rather than as a section header: row height and no font-size step-down
+   (both from the layout, applied inline), no `.rail-group-band` behind it
+   (computeLayout leaves `subtreeEndY` unset), no colour on the label, and the
+   header's weight dropped here. The ▸ is the only thing left saying it is a
+   group — which is the point: what you are looking at is its content. */
+.rail-group-collapsed {
+  font-weight: inherit;
+}
+
 /* One per group, positioned by JS from `subtreeEndY` and rendered BEFORE the
    rail items in DOM order so items paint on top of it and stay legible.
    Rendered in the same depth-first order `computeLayout()` already produces,

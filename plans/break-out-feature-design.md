@@ -85,6 +85,14 @@ direct child** — one per child timeline, one per child sub-group (aggregated
 recursively) — each labelled and coloured as that child, which is what makes a
 collapsed broken-out group look like the timeline it came from.
 
+And *look* like one it must, literally: a collapsed group is drawn as a
+timeline, not as a section header with a lane under it. One `LayoutItem` of
+`ROW_HEIGHT` carrying its own bars, `subtreeEndY` left unset so neither
+renderer paints a band behind it, `ROW_GAP` before it instead of
+`GROUP_GAP_BEFORE`, and a rail label with the header's weight, colour and
+font-size step-down dropped. It is standing in for the timelines it hides;
+looking like a section would be describing something you can no longer see.
+
 Overlap is the obvious consequence — two jobs at once, a sabbatical inside a
 career — and it is handled by **lane packing**: bars sorted by start, each
 assigned to the first lane whose previous bar ended at or before its start,
