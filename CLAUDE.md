@@ -67,8 +67,13 @@ what's true across the whole codebase.
   collapsed group draws one summary bar per *direct child* rather than one band
   flattened over its whole subtree, so collapsing the new group gives back the
   picture the single timeline had — down to the presentation: collapsed, a
-  group is drawn *as* a timeline (one row height, no section band, no header
-  weight or colour), because it is standing in for one. Overlapping children stack into lanes packed
+  group is drawn *as* a timeline (one row height, no section band), because it
+  is standing in for one. More generally, **every name in the rail is the same
+  name**: same size, same weight, no colour, group or timeline, at every depth,
+  collapsed or not. A group is said by its ▸/▾, by the indentation of what it
+  contains, and by its background band while expanded — saying it a fourth
+  time in the type was what made a collapsed group look like a section and a
+  deeply nested one look like a footnote. Overlapping children stack into lanes packed
   in time, never in pixels — the layout has no scale, and lanes that reshuffled
   while zooming would be a different picture at every zoom level. Publishing is
   unchanged by a break-out: the new group is private and the new rows inherit

@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { canBreakOut, describeBreakOut } from "../model/breakOut";
 import { collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
-import { groupFontSize } from "../render/layout";
 import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
 import {
@@ -497,14 +496,11 @@ function RailItem({
   // `summaries` is set on exactly the collapsed groups (src/render/layout.ts),
   // so it answers "is this collapsed" without re-deriving the rule — and it
   // covers a public group, whose collapse lives in `collapsedGroupIds` rather
-  // than on the group itself.
+  // than on the group itself. It decides the ▸/▾ glyph and nothing else about
+  // how this reads: a group's name looks the same collapsed or not, and the
+  // same as a timeline's.
   const collapsed = item.summaries !== undefined;
-  // Collapsed, a group stands in for the timelines it hides and is styled as
-  // one: the layout already gives it a row's height, and the rail drops the
-  // header's font-size step-down with it. Only the ▸ says it is a group.
-  const style = collapsed
-    ? { top: item.y, height: item.height }
-    : { top: item.y, height: item.height, fontSize: groupFontSize(item.depth) };
+  const style = { top: item.y, height: item.height };
   const readOnly = isForeignId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
@@ -522,7 +518,7 @@ function RailItem({
     const famous = item.depth === 0 ? parseFamousGroupId(group.id) : null;
     return (
       <div
-        className={`rail-group ${collapsed ? "rail-group-collapsed" : ""}`}
+        className="rail-group"
         style={{ ...style, paddingLeft: 8 + item.depth * 14 }}
         data-rail-kind="group"
         data-rail-id={group.id}
@@ -534,7 +530,7 @@ function RailItem({
           {collapsed ? "▸" : "▾"}
         </button>
         {group.icon && <span className="row-icon">{group.icon}</span>}
-        <span className="rail-group-label" title={group.label} style={collapsed ? undefined : { color: group.color }}>
+        <span className="rail-group-label" title={group.label}>
           {group.label}
           {age !== null && <span className="age-badge">{age}</span>}
         </span>

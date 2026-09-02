@@ -281,30 +281,23 @@ textarea {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* padding-left is overridden inline, per LayoutItem.depth — that indent is
+     the hierarchy. */
   padding: 0 4px 0 8px;
   overflow: hidden;
   white-space: nowrap;
+  /* Deliberately shared: a group's name and a timeline's name are the same
+     text at every depth. */
+  font-size: 13px;
 }
 
-/* Groups nest arbitrarily deep now — depth alone (set inline, from
-   groupFontSize()) drives font size, and indentation is inline padding-left.
-   The shaded background is `.rail-group-band` below, painted behind the
-   header (transparent itself) over the group's whole extent; a nested
-   group's band stacks on top of its ancestors', which is the whole of how
-   the hierarchy reads without a second visual language per level. */
-.rail-group {
-  font-weight: 700;
-}
-
-/* Collapsed, a group stands in for the timelines it hides, so it is styled as
-   one rather than as a section header: row height and no font-size step-down
-   (both from the layout, applied inline), no `.rail-group-band` behind it
-   (computeLayout leaves `subtreeEndY` unset), no colour on the label, and the
-   header's weight dropped here. The ▸ is the only thing left saying it is a
-   group — which is the point: what you are looking at is its content. */
-.rail-group-collapsed {
-  font-weight: inherit;
-}
+/* A group's name is styled exactly like a timeline's — same size, same
+   weight, no colour — at every depth and whether collapsed or not, which is
+   why `.rail-group` adds nothing to the shared block above. Three things say
+   "group" instead: the ▸/▾, the indentation of what it contains (inline
+   padding-left, from LayoutItem.depth), and `.rail-group-band` behind it
+   while expanded. Styling the name too said it a fourth time, and said it
+   differently at every depth. */
 
 /* One per group, positioned by JS from `subtreeEndY` and rendered BEFORE the
    rail items in DOM order so items paint on top of it and stay legible.
@@ -320,7 +313,6 @@ textarea {
 }
 
 .rail-row {
-  font-size: 13px;
   cursor: pointer;
   border-radius: 6px;
 }
@@ -334,10 +326,7 @@ textarea {
   margin: 0;
 }
 
-.rail-row-checkbox {
-  width: 14px;
-  height: 14px;
-}
+
 
 .rail-group-label,
 .rail-row-label {
@@ -371,8 +360,20 @@ textarea {
 .collapse-button {
   border: none;
   background: none;
-  padding: 2px;
   color: var(--color-text-muted);
+  padding: 0;
+  line-height: 1;
+  text-align: center;
+}
+
+/* The ▸/▾ and a timeline's checkbox occupy the SAME slot, so a group's name
+   and a timeline's name at the same depth start at the same x — which is what
+   lets the indentation carry the hierarchy on its own. */
+.collapse-button,
+.rail-row-checkbox {
+  flex: none;
+  width: 14px;
+  height: 14px;
 }
 
 .rail-footer {

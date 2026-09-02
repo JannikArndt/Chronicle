@@ -21,20 +21,15 @@ export const GROUP_GAP_BEFORE = 20;
 // content rather than floating an equal distance from both what precedes it
 // and what it owns.
 export const GROUP_HEADER_CHILD_GAP = 6;
-export const GROUP_FONT_SIZE = 13;
-export const GROUP_FONT_SIZE_FLOOR = 11;
-const GROUP_FONT_STEP_PX = 1; // font shrinks this much per nesting depth
-
-// A group's header height, stepping down with nesting depth so the hierarchy
-// reads at a glance, never below the floor where a label stops being legible.
+// A group's header height, stepping down with nesting depth, never below the
+// floor where a label stops being legible. This is spacing only: a group's
+// NAME is styled exactly like a timeline's at every depth — see the "every
+// label looks the same" invariant in CLAUDE.md. There was a matching
+// groupFontSize() shrinking the text per depth; it made a deeply nested
+// group's name a different thing from a timeline's name, which is precisely
+// what the hierarchy must not be carried by.
 export function groupHeaderHeight(depth: number): number {
   return Math.max(GROUP_HEADER_HEIGHT_FLOOR, GROUP_HEADER_HEIGHT - depth * GROUP_HEADER_STEP_PX);
-}
-
-// Same idea for the label's font size — used by the rail (canvas text sizes
-// are set per-draw-call, not from this).
-export function groupFontSize(depth: number): number {
-  return Math.max(GROUP_FONT_SIZE_FLOOR, GROUP_FONT_SIZE - depth * GROUP_FONT_STEP_PX);
 }
 
 // One summary bar standing in for one DIRECT child (row or sub-group) of a

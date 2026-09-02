@@ -82,10 +82,11 @@ has nothing to say there.
   thing that breaks "same height as a row": the item grows to
   `lanes × ROW_HEIGHT`, because the alternative is hiding a child.
 - **Groups nest arbitrarily deep; `LayoutItem.depth` means "nesting depth of
-  the container", for both `"group"` and `"row"` items.** `groupHeaderHeight()`
-  and `groupFontSize()` in `layout.ts` step down with depth (with a floor) so
-  the rail's indentation and shrinking font size *are* the hierarchy — there
-  is no separate two-tier "group vs. sub-group" styling any more.
+  the container", for both `"group"` and `"row"` items** — and it is what the
+  rail indents by, which is most of how the hierarchy reads. There is no
+  two-tier "group vs. sub-group" styling, and since the labels were unified
+  there is no per-depth type either: `groupFontSize()` is **gone**, and
+  `groupHeaderHeight()` is spacing only. A name is a name at every depth.
 - **A remembered empty-stretch click overrides the gap heuristic.** Clicking an
   empty stretch of a row remembers that instant (`emptyRowClick`); as long as it
   is still current for that row, `drawPlusAffordances` shows exactly one "+" at

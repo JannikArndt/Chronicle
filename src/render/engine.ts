@@ -5,7 +5,7 @@
 
 import { computeLayout } from "./layout";
 import type { Layout, LayoutItem } from "./layout";
-import { groupFontSize, ROW_HEIGHT } from "./layout";
+import { ROW_HEIGHT } from "./layout";
 import { barGeometry, gradientStops, labelAnchorX, labelLimitX, pickBarLabel, truncateToWidth } from "./bars";
 import type { BarGeometry } from "./bars";
 import { EVENT_PIN_RADIUS_PX, eventMarkerOpacity, layoutEventMarkers } from "./events";
@@ -642,10 +642,7 @@ export class TimelineEngine {
         // the collapsed groups, so it doubles as that test.
         if (item.summaries) {
           this.drawGroupSummary(item, nowMs);
-          if (this.input.showRowLabels && item.group) {
-            const text = item.group.icon ? `${item.group.icon} ${item.group.label}` : item.group.label;
-            this.drawPinnedLabel(item, text, item.group.color ?? "#888");
-          }
+          if (this.input.showRowLabels) this.drawGroupLabel(item);
           continue;
         }
         // An EXPANDED group gets a background band over its FULL extent —
@@ -980,23 +977,17 @@ export class TimelineEngine {
     ctx.restore();
   }
 
-  // A group header's own name — the canvas otherwise paints only the band
-  // behind it (`drawContent`). Same `showRowLabels` gate as `drawRowLabel`,
-  // and the same indent/font-size step-down the rail uses so nesting reads
-  // identically in both places.
+  // A group's own name — the canvas otherwise paints only the band behind it
+  // (`drawContent`). Same `showRowLabels` gate, same plate and same type as a
+  // timeline's name: a group is said by its indent and its band, not by
+  // giving its name a second look. It used to shrink one pixel per nesting
+  // depth, which made a deeply nested group's name a visibly different thing
+  // from the names around it.
   private drawGroupLabel(item: LayoutItem): void {
     const group = item.group;
     if (!group) return;
-    const { ctx } = this;
-    const indent = 8 + item.depth * 14;
-    const fontSize = groupFontSize(item.depth);
-    ctx.save();
-    ctx.font = `600 ${fontSize}px -apple-system, system-ui, sans-serif`;
-    ctx.fillStyle = group.color ?? this.colors.barText;
-    ctx.textBaseline = "middle";
     const text = group.icon ? `${group.icon} ${group.label}` : group.label;
-    ctx.fillText(text, indent, item.y + item.height / 2);
-    ctx.restore();
+    this.drawPinnedLabel(item, text, group.color ?? "#888");
   }
 
   // Lazily loads and caches a favicon image; returns undefined until it has

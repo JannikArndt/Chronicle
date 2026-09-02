@@ -142,6 +142,16 @@ is desktop-only now.
   (the co-owned case is checked against the mirror's `role` instead). Using
   `isPublicId` for a new read-only check makes someone else's data editable, and
   the edit then goes nowhere.
+- **Every label in the rail is the same label.** A group's name and a
+  timeline's name share one `font-size` declaration (on the `.rail-group,
+  .rail-row` block), carry no colour and no extra weight, and start at the same
+  x because the ▸/▾ and the visibility checkbox share one width rule. What says
+  "group" is the ▸/▾, the indent of its contents (inline `padding-left` from
+  `LayoutItem.depth`), and `.rail-group-band` while expanded. Every attempt to
+  say it in the type as well — bold, the group's colour, a size that shrank one
+  pixel per nesting level — made two things worse: a collapsed group read as a
+  section header when it is standing in for a timeline, and a name's appearance
+  depended on where it sat rather than on what it was.
 - **Rail drag-and-drop targets a container (a group id, or `null` for the
   root), not a fixed level.** `RowRail.tsx`'s `analyzeContainers()` rebuilds,
   purely from the rendered DOM's depth-first order (`data-rail-depth`), which

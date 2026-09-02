@@ -83,13 +83,16 @@ is the **self group** (`dataset.selfGroupId`), set during setup; it is how the
 app knows whose birth year to show and where new timelines go.
 → `types.ts` (`Group`)
 
-**Sub-group** — a group nested in another one, drawn with a progressively
-smaller header the deeper it sits (`groupHeaderHeight`/`groupFontSize` in
-`src/render/layout.ts`, with a floor). This is what a person inside "My
-family" is. Nests to any depth since schema v9; every group, at any depth,
-gets a shaded background over its whole extent (`LayoutItem.subtreeEndY`) —
-a nested group's band paints on top of its ancestors', so overlap (not a
-color per depth) is what makes deeper nesting read as a stronger shade.
+**Sub-group** — a group nested in another one. This is what a person inside
+"My family" is. Nests to any depth since schema v9. Its *name* is drawn exactly
+like every other name in the rail — same size, same weight, no colour, at every
+depth and whether collapsed or not. Three things say "group" instead: the ▸/▾,
+the indentation of what it contains, and, while expanded, a shaded background
+over its whole extent (`LayoutItem.subtreeEndY`) — a nested group's band paints
+on top of its ancestors', so overlap (not a colour per depth) is what makes
+deeper nesting read as a stronger shade. Headers still shrink slightly with
+depth (`groupHeaderHeight` in `src/render/layout.ts`, with a floor), but that
+is row spacing, not type: the matching `groupFontSize` is gone.
 
 **Person** — **not a thing in the model.** A person is a `Group` *or, since
 schema v9, a `TimelineRow`* with a birth date; that date is what greys out the
