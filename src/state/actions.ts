@@ -9,6 +9,7 @@ import {
   collectGroupCascade,
   collectRowCascade,
 } from "../model/cascade";
+import { breakOut } from "../model/breakOut";
 import { emptyDataset, newId } from "../model/dataset";
 import { defaultSharedFor } from "../model/sharing";
 import { initializeSharing, notifyDatasetChanged } from "../sharing/sync";
@@ -515,6 +516,51 @@ export function deleteRowWithCascade(rowId: string): void {
   const cascade = collectRowCascade(appStore.getState().dataset, rowId);
   updateDataset((dataset) => applyDelete(dataset, cascade));
   clearSelection();
+}
+
+// True when `rowId` is still selected but no longer among the dataset's rows —
+// unlike moveRow/moveGroup, which only ever change a row's `groupId` and so
+// never invalidate a row selection, a break-out can remove the original row
+// outright when nothing was left on it. An entry selection never goes stale
+// this way: a broken-out entry keeps its id, just a new `rowId`.
+function clearSelectionIfRowGone(dataset: TimelineDataset, rowId: string): void {
+  const { selectedRowId } = appStore.getState();
+  if (selectedRowId === rowId && !dataset.rows.some((row) => row.id === rowId)) clearSelection();
+}
+
+// Turns every entry on a timeline into its own timeline, grouped under a new
+// group named after the original row. Returns the new group's id, or
+// undefined if the row is foreign or has no entries to break out.
+export function breakOutRow(rowId: string): string | undefined {
+  if (isForeignId(rowId)) return undefined;
+  let groupId: string | undefined;
+  updateDataset((dataset) => {
+    const result = breakOut(dataset, rowId);
+    if (!result) return dataset;
+    groupId = result.groupId;
+    return result.dataset;
+  });
+  if (groupId !== undefined) clearSelectionIfRowGone(appStore.getState().dataset, rowId);
+  return groupId;
+}
+
+// Peels a single entry onto its own new timeline, inside a new group, leaving
+// everything else on its original row untouched. Returns the new row's id, or
+// undefined if the entry is foreign or doesn't exist.
+export function breakOutEntry(entryId: string): string | undefined {
+  if (isForeignId(entryId)) return undefined;
+  const entry = appStore.getState().dataset.entries.find((e) => e.id === entryId);
+  if (!entry) return undefined;
+  const sourceRowId = entry.rowId;
+  let newRowId: string | undefined;
+  updateDataset((dataset) => {
+    const result = breakOut(dataset, sourceRowId, [entryId]);
+    if (!result) return dataset;
+    [newRowId] = result.rowIds;
+    return result.dataset;
+  });
+  if (newRowId !== undefined) clearSelectionIfRowGone(appStore.getState().dataset, sourceRowId);
+  return newRowId;
 }
 
 // ---------- rail drag-and-drop (move groups and rows, at any depth) ----------

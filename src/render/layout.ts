@@ -37,17 +37,27 @@ export function groupFontSize(depth: number): number {
   return Math.max(GROUP_FONT_SIZE_FLOOR, GROUP_FONT_SIZE - depth * GROUP_FONT_STEP_PX);
 }
 
-// The aggregated span a collapsed group's summary bar covers — earliest start
-// to latest end across every entry/event anywhere in its subtree.
-export interface GroupSummary {
+// One summary bar standing in for one DIRECT child (row or sub-group) of a
+// collapsed group — see the "group-summary" LayoutItem below. A collapsed
+// group with children "Job A"/"Job B"/"Job C" gets three of these, not one
+// flattened band, so it reads exactly like those three timelines did before
+// collapsing.
+export interface GroupSummaryBar {
+  kind: "row" | "group"; // which kind of child this stands for
+  id: string; // that child's id
+  label: string;
+  color?: string;
   startMs: number;
-  endMs: number;
+  endMs: number; // === startMs when the child holds only one dated thing
+  ongoing: boolean; // some entry in this child's subtree has no end
+  lane: number; // 0-based stacking lane — see packLanes()
 }
 
 export interface LayoutItem {
-  // "group-summary" is the one synthetic bar standing in for a whole collapsed
-  // group's subtree — canvas-only, the rail skips it (there is nothing to
-  // click or edit on an aggregate).
+  // "group-summary" is the synthetic item standing in for a collapsed group's
+  // direct children — one bar per child (see `summaries`), lane-packed for
+  // overlap — canvas-only, the rail skips it (there is nothing to click or
+  // edit on an aggregate).
   kind: "group" | "row" | "group-summary";
   id: string;
   y: number;
@@ -58,9 +68,11 @@ export interface LayoutItem {
   hidden: boolean; // row is unchecked in the rail (§2) — canvas skips its entries, rail keeps the row
   group?: Group;
   row?: TimelineRow;
-  // "group-summary" only. Undefined if the subtree has nothing dated at all,
-  // in which case no summary item is emitted for that group.
-  summary?: GroupSummary;
+  // "group-summary" only. One bar per direct child (row or sub-group) that
+  // has anything dated, lane-packed for overlap — see packLanes(). Absent
+  // when every direct child is either empty or hidden, in which case no
+  // "group-summary" item is emitted for that group at all.
+  summaries?: GroupSummaryBar[];
   // "group" only — the y position where this group's whole subtree (header
   // plus every row and nested group under it, at any depth) ends. Lets a
   // renderer paint one background band over a group's full extent rather
@@ -101,27 +113,79 @@ export function computeLayout(
     return collected;
   };
 
-  // A collapsed group aggregates its whole subtree into one bar: earliest
-  // start to latest end across every entry and event on every timeline nested
-  // anywhere under it, at any depth.
-  const summarizeGroup = (groupId: string): GroupSummary | undefined => {
+  // Every row directly under `groupId`, at any depth, EXCLUDING hidden ones —
+  // a row the user unchecked in the rail must not resurface as part of a
+  // collapsed ancestor's summary.
+  const visibleSubtreeRowIds = (groupId: string): string[] => {
     const groupIds = new Set(subtreeGroupIds(groupId));
-    const rowIds = new Set(
-      dataset.rows.filter((r) => r.groupId !== undefined && groupIds.has(r.groupId)).map((r) => r.id),
-    );
+    return dataset.rows
+      .filter((r) => r.groupId !== undefined && groupIds.has(r.groupId) && !hiddenRowIds.has(r.id))
+      .map((r) => r.id);
+  };
+
+  // Earliest start / latest end / "does anything here lack an end" across
+  // every entry and event on the given rows. `undefined` when none of those
+  // rows have anything dated — the caller turns that into "no bar".
+  const aggregate = (
+    rowIds: ReadonlySet<string>,
+  ): { startMs: number; endMs: number; ongoing: boolean } | undefined => {
     let startMs = Number.POSITIVE_INFINITY;
     let endMs = Number.NEGATIVE_INFINITY;
+    let ongoing = false;
     for (const entry of dataset.entries) {
       if (!rowIds.has(entry.rowId)) continue;
       startMs = Math.min(startMs, entry.start.ms);
       endMs = Math.max(endMs, entry.end?.ms ?? entry.start.ms);
+      if (!entry.end) ongoing = true;
     }
     for (const event of dataset.events) {
       if (!rowIds.has(event.rowId)) continue;
       startMs = Math.min(startMs, event.date.ms);
       endMs = Math.max(endMs, event.date.ms);
     }
-    return Number.isFinite(startMs) ? { startMs, endMs } : undefined;
+    return Number.isFinite(startMs) ? { startMs, endMs, ongoing } : undefined;
+  };
+
+  // Overlap handling for a collapsed group's summary bars, and deliberately
+  // zoom-independent — computeLayout knows nothing about the time scale, so
+  // this packs purely by ms comparison, not pixels. Sorted by start; each bar
+  // takes the first lane whose last bar already ends at or before this bar's
+  // start, else opens a new lane. An ongoing bar occupies its lane to
+  // +Infinity. The `<=` (not `<`) is what lets back-to-back children —
+  // one ending exactly where the next starts — share a lane, which is what
+  // makes the collapsed group read like the one original timeline it stands
+  // in for.
+  const packLanes = (bars: Array<Omit<GroupSummaryBar, "lane">>): GroupSummaryBar[] => {
+    const laneEnds: number[] = []; // last bar's end in each lane so far
+    const withLanes = [...bars]
+      .sort((a, b) => a.startMs - b.startMs)
+      .map((bar) => {
+        let lane = laneEnds.findIndex((end) => end <= bar.startMs);
+        if (lane === -1) lane = laneEnds.length;
+        laneEnds[lane] = bar.ongoing ? Number.POSITIVE_INFINITY : bar.endMs;
+        return { ...bar, lane };
+      });
+    withLanes.sort((a, b) => a.lane - b.lane || a.startMs - b.startMs);
+    return withLanes;
+  };
+
+  // One bar per direct child (own rows first, then sub-groups — the same
+  // order pushContainer uses) that has anything dated, lane-packed for
+  // overlap. `[]` when every child is empty or hidden.
+  const groupSummaryBars = (groupId: string): GroupSummaryBar[] => {
+    const bars: Array<Omit<GroupSummaryBar, "lane">> = [];
+    for (const row of dataset.rows.filter((r) => r.groupId === groupId)) {
+      if (hiddenRowIds.has(row.id)) continue;
+      const agg = aggregate(new Set([row.id]));
+      if (!agg) continue;
+      bars.push({ kind: "row", id: row.id, label: row.label, color: row.color, ...agg });
+    }
+    for (const group of dataset.groups.filter((g) => g.parentGroupId === groupId)) {
+      const agg = aggregate(new Set(visibleSubtreeRowIds(group.id)));
+      if (!agg) continue;
+      bars.push({ kind: "group", id: group.id, label: group.label, color: group.color, ...agg });
+    }
+    return packLanes(bars);
   };
 
   const pushRow = (row: TimelineRow, depth: number, gapBefore: number): void => {
@@ -145,20 +209,22 @@ export function computeLayout(
     items.push(item);
     y += height;
     if (isCollapsed(group)) {
-      const summary = summarizeGroup(group.id);
-      if (summary) {
+      const summaries = groupSummaryBars(group.id);
+      if (summaries.length > 0) {
+        const laneCount = summaries[summaries.length - 1].lane + 1;
+        const summaryHeight = laneCount * ROW_HEIGHT;
         y += GROUP_HEADER_CHILD_GAP;
         items.push({
           kind: "group-summary",
           id: group.id,
           y,
-          height: ROW_HEIGHT,
+          height: summaryHeight,
           depth: depth + 1,
           hidden: false,
           group,
-          summary,
+          summaries,
         });
-        y += ROW_HEIGHT;
+        y += summaryHeight;
       }
     } else {
       pushContainer(group.id, depth + 1, true);

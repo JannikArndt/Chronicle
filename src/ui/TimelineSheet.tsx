@@ -15,12 +15,15 @@
 
 import { useState } from "react";
 import type { MutableRefObject } from "react";
+import { canBreakOut, describeBreakOut } from "../model/breakOut";
 import { collectEntryCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import { formatByPrecision } from "../model/fuzzyDate";
 import type { TimelineEntry, TimelineEvent } from "../model/types";
 import type { TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import {
+  breakOutEntry,
+  breakOutRow,
   clearSelection,
   deleteEntryWithCascade,
   deleteEvent,
@@ -147,6 +150,19 @@ export function TimelineSheet({
     leaveEntry();
   };
 
+  // Unlike leaveEntry, this can't reuse entry.rowId once the action has run —
+  // the entry has just moved off it. breakOutEntry hands back the timeline it
+  // moved to, and that (not the stale rowId in this closure) is where the
+  // sheet goes back to; with none, the group it left has nothing to reopen.
+  const breakOutCurrentEntry = () => {
+    if (!entry) return;
+    if (!window.confirm(describeBreakOut(state.dataset, entry.rowId, [entry.id]))) return;
+    const newRowId = breakOutEntry(entry.id);
+    if (newRowId !== undefined) onOpenRowSettings(newRowId);
+    else onCloseRowSettings();
+    clearSelection();
+  };
+
   const removeEvent = () => {
     if (!event) return;
     // No cascade line: nothing in the model points at an event, so there is
@@ -162,6 +178,15 @@ export function TimelineSheet({
     const cascade = collectRowCascade(state.dataset, row.id);
     if (!window.confirm(`Delete row “${row.label}”? ${describeCascade(cascade)}`)) return;
     deleteRowWithCascade(row.id);
+    onCloseRowSettings();
+  };
+
+  // Breaking out replaces this timeline with a group of new ones, so — like
+  // deleting it — there is no row left here to stay open on.
+  const breakOutCurrentRow = () => {
+    if (!row) return;
+    if (!window.confirm(describeBreakOut(state.dataset, row.id))) return;
+    breakOutRow(row.id);
     onCloseRowSettings();
   };
 
@@ -190,11 +215,14 @@ export function TimelineSheet({
     onRemoveEvent: removeEvent,
     rowIsReadOnly: row ? isForeignId(row.id) : true,
     rowIsVisible: row ? !state.hiddenRowIds.includes(row.id) : false,
+    rowCanBreakOut: row ? canBreakOut(state.dataset, row.id) : false,
     canMoveGroups: state.dataset.groups.filter((group) => !isPublicId(group.id)).length > 1,
     onToggleRowHidden: () => row && toggleRowHidden(row.id),
     onMoveToGroup: () => setMovingToGroup(true),
     onRemoveRow: removeRow,
     onRemoveEntry: removeEntry,
+    onBreakOutRow: breakOutCurrentRow,
+    onBreakOutEntry: breakOutCurrentEntry,
   });
 
   return (
@@ -333,12 +361,15 @@ function buildMenuItems({
   eventIsReadOnly,
   rowIsReadOnly,
   rowIsVisible,
+  rowCanBreakOut,
   canMoveGroups,
   onToggleRowHidden,
   onMoveToGroup,
   onRemoveRow,
   onRemoveEntry,
   onRemoveEvent,
+  onBreakOutRow,
+  onBreakOutEntry,
 }: {
   pane: PaneName;
   entryIsDraft: boolean;
@@ -346,18 +377,24 @@ function buildMenuItems({
   eventIsReadOnly: boolean;
   rowIsReadOnly: boolean;
   rowIsVisible: boolean;
+  rowCanBreakOut: boolean;
   canMoveGroups: boolean;
   onToggleRowHidden: () => void;
   onMoveToGroup: () => void;
   onRemoveRow: () => void;
   onRemoveEntry: () => void;
   onRemoveEvent: () => void;
+  onBreakOutRow: () => void;
+  onBreakOutEntry: () => void;
 }): SheetMenuItem[] {
   // A draft has nothing to remove yet — it is not in the dataset until titled.
   if (pane === "entry") {
     return entryIsReadOnly || entryIsDraft
       ? []
-      : [{ label: "Remove from timeline", onSelect: onRemoveEntry, danger: true }];
+      : [
+          { label: "Break out into its own timeline", onSelect: onBreakOutEntry },
+          { label: "Remove from timeline", onSelect: onRemoveEntry, danger: true },
+        ];
   }
   if (pane === "event") {
     return eventIsReadOnly ? [] : [{ label: "Remove event", onSelect: onRemoveEvent, danger: true }];
@@ -369,6 +406,7 @@ function buildMenuItems({
         ? []
         : [
             ...(canMoveGroups ? [{ label: "Move to another group…", onSelect: onMoveToGroup }] : []),
+            ...(rowCanBreakOut ? [{ label: "Break out into timelines", onSelect: onBreakOutRow }] : []),
             { label: "Remove timeline", onSelect: onRemoveRow, danger: true },
           ]),
     ];

@@ -112,23 +112,325 @@ describe("computeLayout", () => {
     expect(items.some((i) => i.id === "r3")).toBe(false);
   });
 
-  test("collapsing a group with dated entries anywhere in its subtree emits one summary bar", () => {
+  test("a sub-group child's bar aggregates its whole subtree recursively", () => {
     const ds = fixture();
     ds.entries = [
-      { id: "e1", rowId: "r2", title: "e1", start: { ms: Date.UTC(2010, 0, 1), precision: "year" }, end: { ms: Date.UTC(2015, 0, 1), precision: "year" } },
+      {
+        id: "e1",
+        rowId: "r2",
+        title: "e1",
+        start: { ms: Date.UTC(2010, 0, 1), precision: "year" },
+        end: { ms: Date.UTC(2015, 0, 1), precision: "year" },
+      },
     ];
     ds.events = [{ id: "v1", rowId: "r3", title: "v1", date: { ms: Date.UTC(2020, 0, 1), precision: "year" } }];
     const { items } = computeLayout(ds, new Set(["g-family"]));
-    const summary = items.find((i) => i.kind === "group-summary" && i.id === "g-family");
-    expect(summary).toBeDefined();
-    // The bar spans the earliest entry start to the latest event date, across
-    // both "Finn"'s own row and the grandchild "Finn's kid"'s row.
-    expect(summary!.summary).toEqual({ startMs: Date.UTC(2010, 0, 1), endMs: Date.UTC(2020, 0, 1) });
+    const item = items.find((i) => i.kind === "group-summary" && i.id === "g-family");
+    expect(item).toBeDefined();
+    // "Family" holds no rows of its own — its only direct child is the
+    // sub-group "Finn", so the collapsed summary is exactly one bar labelled
+    // "Finn", spanning the earliest start to the latest end across BOTH
+    // Finn's own row (r2) and the grandchild "Finn's kid"'s row (r3).
+    expect(item!.summaries).toEqual([
+      {
+        kind: "group",
+        id: "g-finn",
+        label: "Finn",
+        color: undefined,
+        startMs: Date.UTC(2010, 0, 1),
+        endMs: Date.UTC(2020, 0, 1),
+        ongoing: false,
+        lane: 0,
+      },
+    ]);
   });
 
-  test("collapsing a group with nothing dated in its subtree emits no summary bar", () => {
+  test("collapsing a group with nothing dated in its subtree emits no summary item", () => {
     const { items } = computeLayout(fixture(), new Set(["g-family"]));
     expect(items.some((i) => i.kind === "group-summary")).toBe(false);
+  });
+
+  describe("group-summary bars (one per direct child)", () => {
+    // A group "Work" holding sibling timelines "Job A"/"Job B" directly — the
+    // simplest case the feature exists for: each direct child row gets its
+    // own bar, not one flattened band.
+    function siblingRowsFixture(): TimelineDataset {
+      const ds = emptyDataset();
+      ds.groups = [{ id: "g-work", label: "Work", collapsed: false }];
+      ds.rows = [
+        { id: "r-a", groupId: "g-work", label: "Job A", color: "#111111" },
+        { id: "r-b", groupId: "g-work", label: "Job B", color: "#222222" },
+      ];
+      ds.entries = [
+        {
+          id: "e-a",
+          rowId: "r-a",
+          title: "e-a",
+          start: { ms: Date.UTC(2010, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2012, 0, 1), precision: "exact" },
+        },
+        {
+          id: "e-b",
+          rowId: "r-b",
+          title: "e-b",
+          start: { ms: Date.UTC(2015, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2016, 0, 1), precision: "exact" },
+        },
+      ];
+      return ds;
+    }
+
+    test("one bar per direct child row, with that row's own label, colour and span", () => {
+      const { items } = computeLayout(siblingRowsFixture(), new Set(["g-work"]));
+      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-work")!;
+      expect(item.summaries).toEqual([
+        {
+          kind: "row",
+          id: "r-a",
+          label: "Job A",
+          color: "#111111",
+          startMs: Date.UTC(2010, 0, 1),
+          endMs: Date.UTC(2012, 0, 1),
+          ongoing: false,
+          lane: 0,
+        },
+        {
+          kind: "row",
+          id: "r-b",
+          label: "Job B",
+          color: "#222222",
+          startMs: Date.UTC(2015, 0, 1),
+          endMs: Date.UTC(2016, 0, 1),
+          ongoing: false,
+          lane: 0,
+        },
+      ]);
+    });
+
+    test("a hidden row is excluded from its own bar, and from an ancestor's aggregate", () => {
+      const ds = siblingRowsFixture();
+      const { items } = computeLayout(ds, new Set(["g-work"]), new Set(["r-b"]));
+      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-work")!;
+      // r-b is hidden — it must not reappear as a summary bar even though it
+      // has a dated entry.
+      expect(item.summaries).toEqual([
+        expect.objectContaining({ id: "r-a" }),
+      ]);
+
+      // And when hiding a row leaves a whole sub-group child with nothing
+      // left dated, that child simply gets no bar of its own — the emptiness
+      // propagates up rather than showing a hollow bar.
+      const ds2 = emptyDataset();
+      ds2.groups = [
+        { id: "g-outer", label: "Outer", collapsed: false },
+        { id: "g-inner", parentGroupId: "g-outer", label: "Inner", collapsed: false },
+      ];
+      ds2.rows = [{ id: "r-only", groupId: "g-inner", label: "Only", color: "#333" }];
+      ds2.entries = [
+        {
+          id: "e-only",
+          rowId: "r-only",
+          title: "e-only",
+          start: { ms: Date.UTC(2010, 0, 1), precision: "exact" },
+        },
+      ];
+      const { items: items2 } = computeLayout(ds2, new Set(["g-outer"]), new Set(["r-only"]));
+      expect(items2.some((i) => i.kind === "group-summary")).toBe(false);
+    });
+
+    test("a group whose direct children are all empty emits no summary item", () => {
+      const ds = emptyDataset();
+      ds.groups = [{ id: "g-empty", label: "Empty", collapsed: false }];
+      ds.rows = [
+        { id: "r-x", groupId: "g-empty", label: "Undated X", color: "#111" },
+        { id: "r-y", groupId: "g-empty", label: "Undated Y", color: "#222" },
+      ];
+      // No entries or events at all — both direct children have nothing dated.
+      const { items } = computeLayout(ds, new Set(["g-empty"]));
+      expect(items.some((i) => i.kind === "group-summary")).toBe(false);
+    });
+
+    test("ongoing propagates: a child with any open-ended entry reports ongoing, and endMs falls back to that entry's own start", () => {
+      const ds = emptyDataset();
+      ds.groups = [
+        { id: "g-outer", label: "Outer", collapsed: false },
+        { id: "g-og", parentGroupId: "g-outer", label: "Ongoing group", collapsed: false },
+      ];
+      ds.rows = [
+        { id: "r-og1", groupId: "g-og", label: "Finished", color: "#333" },
+        { id: "r-og2", groupId: "g-og", label: "Still going", color: "#444" },
+      ];
+      ds.entries = [
+        {
+          id: "e-og1",
+          rowId: "r-og1",
+          title: "e-og1",
+          start: { ms: Date.UTC(2005, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2010, 0, 1), precision: "exact" },
+        },
+        // No `end` — ongoing. Its own start (2015) is later than the other
+        // entry's end (2010), so it also determines the aggregate's endMs.
+        { id: "e-og2", rowId: "r-og2", title: "e-og2", start: { ms: Date.UTC(2015, 0, 1), precision: "exact" } },
+      ];
+      const { items } = computeLayout(ds, new Set(["g-outer"]));
+      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-outer")!;
+      expect(item.summaries).toEqual([
+        {
+          kind: "group",
+          id: "g-og",
+          label: "Ongoing group",
+          color: undefined,
+          startMs: Date.UTC(2005, 0, 1),
+          endMs: Date.UTC(2015, 0, 1),
+          ongoing: true,
+          lane: 0,
+        },
+      ]);
+    });
+
+    test("nested collapsed groups: a collapsed sub-group emits its own summary while its open ancestor still shows its header", () => {
+      const ds = fixture();
+      ds.entries = [
+        {
+          id: "e1",
+          rowId: "r2",
+          title: "e1",
+          start: { ms: Date.UTC(2010, 0, 1), precision: "year" },
+          end: { ms: Date.UTC(2015, 0, 1), precision: "year" },
+        },
+      ];
+      ds.events = [{ id: "v1", rowId: "r3", title: "v1", date: { ms: Date.UTC(2020, 0, 1), precision: "year" } }];
+      // Only "Finn" is collapsed, not "Family" — "Family" and Finn's own
+      // group header stay in the layout, and Finn's summary bars sit right
+      // under Finn's header, one for Finn's own row (r2) and one for the
+      // "Finn's kid" sub-group (aggregating r3).
+      const { items } = computeLayout(ds, new Set(["g-finn"]));
+      expect(items.some((i) => i.id === "g-family" && i.kind === "group")).toBe(true);
+      expect(items.some((i) => i.id === "g-finn" && i.kind === "group")).toBe(true);
+      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-finn")!;
+      expect(item).toBeDefined();
+      expect(item.summaries).toEqual([
+        {
+          kind: "row",
+          id: "r2",
+          label: "School",
+          color: "#333",
+          startMs: Date.UTC(2010, 0, 1),
+          endMs: Date.UTC(2015, 0, 1),
+          ongoing: false,
+          lane: 0,
+        },
+        {
+          kind: "group",
+          id: "g-finn-kid",
+          label: "Finn's kid",
+          color: undefined,
+          startMs: Date.UTC(2020, 0, 1),
+          endMs: Date.UTC(2020, 0, 1),
+          ongoing: false,
+          lane: 0,
+        },
+      ]);
+
+      // Collapsing BOTH levels instead: Finn is now unreachable (nested
+      // inside a collapsed ancestor), so only "Family"'s own summary exists —
+      // there is no separate "g-finn" group-summary item to find.
+      const { items: bothCollapsed } = computeLayout(ds, new Set(["g-family", "g-finn"]));
+      expect(bothCollapsed.some((i) => i.kind === "group-summary" && i.id === "g-finn")).toBe(false);
+      expect(bothCollapsed.some((i) => i.kind === "group-summary" && i.id === "g-family")).toBe(true);
+    });
+
+    test("overlapping children land in separate lanes; back-to-back children share one", () => {
+      const ds = emptyDataset();
+      ds.groups = [{ id: "g-lanes", label: "Lanes", collapsed: false }];
+      ds.rows = [
+        { id: "r-x", groupId: "g-lanes", label: "X", color: "#111" },
+        { id: "r-y", groupId: "g-lanes", label: "Y", color: "#222" },
+        { id: "r-z", groupId: "g-lanes", label: "Z", color: "#333" },
+      ];
+      ds.entries = [
+        // X spans wide enough to overlap both Y and the start of Z.
+        {
+          id: "e-x",
+          rowId: "r-x",
+          title: "e-x",
+          start: { ms: Date.UTC(2010, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2014, 0, 1), precision: "exact" },
+        },
+        // Y overlaps X, so it cannot share X's lane.
+        {
+          id: "e-y",
+          rowId: "r-y",
+          title: "e-y",
+          start: { ms: Date.UTC(2011, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2013, 0, 1), precision: "exact" },
+        },
+        // Z starts exactly where Y ends (back-to-back) but X is still
+        // running at that instant, so Z must land in Y's lane, not X's.
+        {
+          id: "e-z",
+          rowId: "r-z",
+          title: "e-z",
+          start: { ms: Date.UTC(2013, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2015, 0, 1), precision: "exact" },
+        },
+      ];
+      const { items } = computeLayout(ds, new Set(["g-lanes"]));
+      const item = items.find((i) => i.kind === "group-summary" && i.id === "g-lanes")!;
+      const laneOf = (id: string) => item.summaries!.find((b) => b.id === id)!.lane;
+      expect(laneOf("r-x")).toBe(0);
+      expect(laneOf("r-y")).toBe(1);
+      expect(laneOf("r-z")).toBe(1); // shares Y's lane, back-to-back
+      // Sorted by (lane, startMs): X first (lane 0), then Y then Z (lane 1).
+      expect(item.summaries!.map((b) => b.id)).toEqual(["r-x", "r-y", "r-z"]);
+    });
+
+    test("the item's height grows with the lane count, and the y of the following sibling shifts accordingly", () => {
+      const ds = emptyDataset();
+      ds.groups = [
+        { id: "g-lanes", label: "Lanes", collapsed: false },
+        { id: "g-after", label: "After", collapsed: false },
+      ];
+      ds.rows = [
+        { id: "r-x", groupId: "g-lanes", label: "X", color: "#111" },
+        { id: "r-y", groupId: "g-lanes", label: "Y", color: "#222" },
+        { id: "r-after", groupId: "g-after", label: "After row", color: "#333" },
+      ];
+      ds.entries = [
+        // Overlapping, so g-lanes needs two lanes.
+        {
+          id: "e-x",
+          rowId: "r-x",
+          title: "e-x",
+          start: { ms: Date.UTC(2010, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2012, 0, 1), precision: "exact" },
+        },
+        {
+          id: "e-y",
+          rowId: "r-y",
+          title: "e-y",
+          start: { ms: Date.UTC(2011, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2013, 0, 1), precision: "exact" },
+        },
+        {
+          id: "e-after",
+          rowId: "r-after",
+          title: "e-after",
+          start: { ms: Date.UTC(2020, 0, 1), precision: "exact" },
+          end: { ms: Date.UTC(2021, 0, 1), precision: "exact" },
+        },
+      ];
+      const { items } = computeLayout(ds, new Set(["g-lanes"]));
+      const summaryItem = items.find((i) => i.kind === "group-summary" && i.id === "g-lanes")!;
+      const gLanes = items.find((i) => i.id === "g-lanes" && i.kind === "group")!;
+      const gAfter = items.find((i) => i.id === "g-after" && i.kind === "group")!;
+      expect(summaryItem.height).toBe(2 * ROW_HEIGHT);
+      // The group's subtree ends exactly where its (now taller) summary ends.
+      expect(gLanes.subtreeEndY).toBe(summaryItem.y + summaryItem.height);
+      // And the next top-level group starts GROUP_GAP_BEFORE past that —
+      // exactly like any other sibling, just measured from a taller item.
+      expect(gAfter.y).toBe(summaryItem.y + summaryItem.height + GROUP_GAP_BEFORE);
+    });
   });
 
   test("hidden rows stay in the layout, flagged hidden", () => {

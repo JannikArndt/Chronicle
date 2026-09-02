@@ -649,7 +649,7 @@ export class TimelineEngine {
         continue;
       }
       if (item.kind === "group-summary") {
-        this.drawGroupSummary(item);
+        this.drawGroupSummary(item, nowMs);
         continue;
       }
       if (item.row && !item.hidden) this.drawRow(item, nowMs, emphasis, relatedIds);
@@ -1000,39 +1000,76 @@ export class TimelineEngine {
     return undefined;
   }
 
-  // A collapsed group's whole subtree, flattened into one bar spanning its
-  // earliest start to its latest end (src/render/layout.ts computes the
-  // range). No per-entry detail — that is the point of collapsing.
-  private drawGroupSummary(item: LayoutItem): void {
+  // A collapsed group's direct children, one bar each (src/render/layout.ts
+  // aggregates and lane-packs them) — "Work" collapsed with "Job A"/"Job
+  // B"/"Job C" underneath looks exactly like the single "Work" timeline with
+  // three entries did before collapsing, not one flattened band. Lane `n`
+  // sits at `item.y + n * ROW_HEIGHT`, same 6px inset and bar height as a
+  // normal row bar.
+  private drawGroupSummary(item: LayoutItem, nowMs: number): void {
     const { ctx } = this;
-    const summary = item.summary;
-    if (!summary) return;
-    const x0 = msToX(this.scale, summary.startMs);
-    const x1 = msToX(this.scale, summary.endMs);
-    if (x1 < 0 || x0 > this.width) return;
-    const color = item.group?.color ?? "#888";
-    const top = item.y + 6;
-    const barHeight = item.height - 12;
-    const width = Math.max(x1 - x0, 2);
+    const bars = item.summaries;
+    if (!bars) return;
+    const groupColor = item.group?.color;
 
-    ctx.save();
-    roundRectPath(ctx, x0, top, width, barHeight, 5);
-    ctx.fillStyle = colorWithAlpha(color, 0.6);
-    ctx.fill();
+    for (const bar of bars) {
+      const laneTop = item.y + bar.lane * ROW_HEIGHT;
+      const top = laneTop + 6;
+      const barHeight = ROW_HEIGHT - 12;
 
-    const label = item.group?.label ?? "";
-    if (label !== "") {
-      ctx.font = "12px -apple-system, system-ui, sans-serif";
-      const labelX = Math.max(x0, 0) + 8;
-      const available = Math.min(x1, this.width) - labelX - LABEL_END_PADDING_PX;
-      const text = truncateToWidth(label, available, (candidate) => ctx.measureText(candidate).width);
-      if (text !== "") {
-        ctx.fillStyle = readableTextColor(colorToRgb(this.ctx, color), this.colors);
-        ctx.textBaseline = "middle";
-        ctx.fillText(text, labelX, top + barHeight / 2);
+      // Reuse the same fuzz/fade-free geometry a real entry gets — an
+      // aggregated bar carries no precision of its own, so "exact" (zero
+      // fuzz) is the honest choice — which is also what makes `ongoing` bars
+      // extend to `nowMs` for free, the same way a real ongoing entry does.
+      const geom = barGeometry(
+        {
+          id: bar.id,
+          rowId: bar.id,
+          title: bar.label,
+          start: { ms: bar.startMs, precision: "exact" },
+          end: bar.ongoing ? undefined : { ms: bar.endMs, precision: "exact" },
+        },
+        this.scale,
+        nowMs,
+      );
+      const x0 = geom.xVisualStart;
+      const x1 = geom.xVisualEnd;
+      if (x1 < 0 || x0 > this.width) continue;
+      const color = bar.color ?? groupColor ?? "#888";
+      const width = Math.max(x1 - x0, 2);
+
+      ctx.save();
+      if (geom.ongoing) {
+        // Same open arrow taper as a real ongoing entry (bars.ts/drawBar) —
+        // a hard right edge on a bar that has no known end reads as a false
+        // "it ended here".
+        const arrow = Math.min(14, width);
+        ctx.beginPath();
+        ctx.moveTo(x0, top);
+        ctx.lineTo(x1 - arrow, top);
+        ctx.lineTo(x1, top + barHeight / 2);
+        ctx.lineTo(x1 - arrow, top + barHeight);
+        ctx.lineTo(x0, top + barHeight);
+        ctx.closePath();
+      } else {
+        roundRectPath(ctx, x0, top, width, barHeight, 5);
       }
+      ctx.fillStyle = colorWithAlpha(color, 0.6);
+      ctx.fill();
+
+      if (bar.label !== "") {
+        ctx.font = "12px -apple-system, system-ui, sans-serif";
+        const labelX = Math.max(x0, 0) + 8;
+        const available = Math.min(x1, this.width) - labelX - LABEL_END_PADDING_PX;
+        const text = truncateToWidth(bar.label, available, (candidate) => ctx.measureText(candidate).width);
+        if (text !== "") {
+          ctx.fillStyle = readableTextColor(colorToRgb(this.ctx, color), this.colors);
+          ctx.textBaseline = "middle";
+          ctx.fillText(text, labelX, top + barHeight / 2);
+        }
+      }
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   private drawPlusAffordances(

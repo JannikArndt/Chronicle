@@ -6,6 +6,8 @@ import {
   addRow,
   addSubGroup,
   armDatePicking,
+  breakOutEntry,
+  breakOutRow,
   cancelDatePicking,
   clearSelection,
   commitPickedDate,
@@ -416,6 +418,88 @@ describe("rail drag-and-drop: copyRow / copyGroup (deep copy)", () => {
     setRowShared("r1", true);
     const newRowId = copyRow("r1");
     expect(appStore.getState().dataset.rows.find((r) => r.id === newRowId)?.shared).toBeUndefined();
+  });
+});
+
+describe("breakOutRow / breakOutEntry", () => {
+  function breakOutFixture(): TimelineDataset {
+    const ds = emptyDataset();
+    ds.groups = [{ id: "g1", label: "Family", collapsed: false }];
+    ds.rows = [{ id: "r1", groupId: "g1", label: "Work", color: "#333" }];
+    ds.entries = [
+      { id: "e1", rowId: "r1", title: "Job A", start: { ms: T0, precision: "day" } },
+      { id: "e2", rowId: "r1", title: "Job B", start: { ms: T0 + DAY_MS, precision: "day" } },
+    ];
+    return ds;
+  }
+
+  beforeEach(() => {
+    replaceDataset(breakOutFixture());
+  });
+
+  test("breakOutRow turns the row into a group of timelines and returns the new group id", () => {
+    const groupId = breakOutRow("r1");
+    expect(groupId).toBeDefined();
+    const state = appStore.getState();
+    expect(state.dataset.groups.find((g) => g.id === groupId)?.label).toBe("Work");
+    const newRows = state.dataset.rows.filter((r) => r.groupId === groupId);
+    expect(newRows.map((r) => r.label)).toEqual(["Job A", "Job B"]);
+    // Nothing was left on the original row, so it's gone.
+    expect(state.dataset.rows.find((r) => r.id === "r1")).toBeUndefined();
+  });
+
+  test("breakOutRow refuses a foreign row id and changes nothing", () => {
+    const before = appStore.getState().dataset;
+    expect(breakOutRow("pub:some-row")).toBeUndefined();
+    expect(appStore.getState().dataset).toEqual(before);
+  });
+
+  test("breakOutRow returns undefined for a row with no entries", () => {
+    const ds = breakOutFixture();
+    ds.entries = [];
+    replaceDataset(ds);
+    expect(breakOutRow("r1")).toBeUndefined();
+    expect(appStore.getState().dataset.rows.map((r) => r.id)).toEqual(["r1"]);
+  });
+
+  test("breakOutEntry peels one entry onto its own row and returns the new row id", () => {
+    const newRowId = breakOutEntry("e1");
+    expect(newRowId).toBeDefined();
+    const state = appStore.getState();
+    const newRow = state.dataset.rows.find((r) => r.id === newRowId)!;
+    expect(newRow.label).toBe("Job A");
+    // The original row survives, keeping the entry that wasn't broken out.
+    expect(state.dataset.rows.find((r) => r.id === "r1")).toBeDefined();
+    expect(state.dataset.entries.find((e) => e.id === "e2")!.rowId).toBe("r1");
+    expect(state.dataset.entries.find((e) => e.id === "e1")!.rowId).toBe(newRowId);
+  });
+
+  test("breakOutEntry refuses a foreign entry id and changes nothing", () => {
+    const before = appStore.getState().dataset;
+    expect(breakOutEntry("pub:some-entry")).toBeUndefined();
+    expect(appStore.getState().dataset).toEqual(before);
+  });
+
+  test("breakOutEntry returns undefined for an unknown entry id", () => {
+    expect(breakOutEntry("no-such-entry")).toBeUndefined();
+  });
+
+  test("breakOutRow clears a stale row selection once the original row disappears", () => {
+    selectRow("r1");
+    breakOutRow("r1"); // both entries move out; nothing is left on r1
+    expect(appStore.getState().selectedRowId).toBeUndefined();
+  });
+
+  test("breakOutEntry leaves the row selection alone when the original row survives", () => {
+    selectRow("r1");
+    breakOutEntry("e1"); // e2 stays behind on r1
+    expect(appStore.getState().selectedRowId).toBe("r1");
+  });
+
+  test("an entry selection survives its own break-out — the entry's id doesn't change", () => {
+    selectEntry("e1");
+    breakOutEntry("e1");
+    expect(appStore.getState().selectedEntryId).toBe("e1");
   });
 });
 

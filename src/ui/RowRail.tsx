@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from "react";
+import { canBreakOut, describeBreakOut } from "../model/breakOut";
 import { collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import { groupFontSize } from "../render/layout";
 import type { Layout, LayoutItem } from "../render/layout";
@@ -13,6 +14,7 @@ import {
   addGroup,
   addRow,
   addSubGroup,
+  breakOutRow,
   copyGroup,
   copyRow,
   deleteGroupWithCascade,
@@ -1255,6 +1257,20 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
           updateRow(rowId, { birthDate: value === "" ? undefined : Date.parse(`${value}T00:00:00Z`) });
         }}
       />
+      {canBreakOut(dataset, rowId) && (
+        <button
+          type="button"
+          className="small-button"
+          onClick={() => {
+            if (window.confirm(describeBreakOut(dataset, rowId))) {
+              breakOutRow(rowId);
+              close();
+            }
+          }}
+        >
+          Break out into timelines…
+        </button>
+      )}
       <button
         type="button"
         className="danger-button"

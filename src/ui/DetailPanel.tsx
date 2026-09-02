@@ -2,11 +2,13 @@
 // modal create screen, no Save/Cancel — every field change autosaves (§6).
 
 import { useEffect, useRef, useState } from "react";
+import { describeBreakOut } from "../model/breakOut";
 import { collectEntryCascade, describeCascade } from "../model/cascade";
 import { faviconUrl } from "../model/favicon";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import type { Place, TimelineEntry, TimelineEvent } from "../model/types";
 import {
+  breakOutEntry,
   clearSelection,
   deleteEntryWithCascade,
   deleteEvent,
@@ -187,6 +189,20 @@ function EntryDetail() {
           />
         </div>
       </div>
+
+      {!readOnly && !isDraft && (
+        <button
+          type="button"
+          className="small-button"
+          onClick={() => {
+            if (window.confirm(describeBreakOut(state.dataset, entry.rowId, [entry.id]))) {
+              breakOutEntry(entry.id);
+            }
+          }}
+        >
+          Break out into its own timeline…
+        </button>
+      )}
 
       {!readOnly && !isDraft && (
         <button
