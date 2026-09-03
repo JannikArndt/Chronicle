@@ -10,19 +10,23 @@ export const GROUP_HEADER_HEIGHT = 32;
 export const GROUP_HEADER_HEIGHT_FLOOR = 22;
 const GROUP_HEADER_STEP_PX = 3; // header shrinks this much per nesting depth
 export const ROW_HEIGHT = 40;
-export const ROW_GAP = 10; // between sibling rows within the same container
-// Space before a group, separating it from whatever precedes it at the same
-// level — bigger than ROW_GAP so a group reads as its own section, not as one
-// more row belonging to whatever came before it. Applies at every depth, not
-// just top-level, per the same "hierarchy through spacing" idea
-// GROUP_HEADER_CHILD_GAP applies going the other direction — and in BOTH
-// collapse states, so that expanding a group never shifts it on screen.
-export const GROUP_GAP_BEFORE = 20;
-// Tighter space from a group's own header down to its first child (row or
-// sub-group) — smaller than ROW_GAP, so a header binds visually to its own
-// content rather than floating an equal distance from both what precedes it
-// and what it owns.
-export const GROUP_HEADER_CHILD_GAP = 6;
+// The ONE vertical gap in this layout: between any two consecutive items,
+// whatever they are — two timelines, a timeline and a group, a group header
+// and its first child, the end of one group's subtree and the next thing at
+// the level above. There used to be three (a wider GROUP_GAP_BEFORE so a
+// group read as its own section, a tighter GROUP_HEADER_CHILD_GAP so a header
+// bound to its content), and each of them was defensible on its own. Together
+// with the row striping they were not: a stripe boundary falls halfway down a
+// gap, so an unstriped row with a 10px gap above and a 20px gap below sat
+// visibly off-centre in its own band, and no amount of tuning the stripes
+// fixes a rhythm that is uneven underneath them. Hierarchy is carried by the
+// indent, the ▸/▾ and the group's background band — none of which need the
+// spacing to be uneven to work.
+export const ROW_GAP = 10;
+// Half a gap of air above the first item and below the last, so the first and
+// last stripes are as tall as every other one instead of being cut off at the
+// edges of the content.
+const EDGE_PAD = ROW_GAP / 2;
 // A group's header height, stepping down with nesting depth, never below the
 // floor where a label stops being legible. This is spacing only: a group's
 // NAME is styled exactly like a timeline's at every depth — see the "every
@@ -91,7 +95,7 @@ export function computeLayout(
   hiddenRowIds: Set<string> = new Set(),
 ): Layout {
   const items: LayoutItem[] = [];
-  let y = 0;
+  let y = EDGE_PAD;
 
   const isCollapsed = (group: Group): boolean => collapsedGroupIds.has(group.id) || group.collapsed;
 
@@ -230,29 +234,23 @@ export function computeLayout(
   // (`orderedChildren`, schema v10) — the two kinds interleave freely, so a
   // group can sit above a timeline at any depth, including the root
   // (`parentGroupId`/`groupId` both undefined). `hasHeaderAbove` is true for a
-  // group's own body (this container's first item then sits right under that
-  // header, and gets the tight GROUP_HEADER_CHILD_GAP instead of the normal
-  // sibling/section gap).
+  // group's own body, i.e. this container's first item sits under that
+  // header rather than at the top of the layout.
   function pushContainer(parentGroupId: string | undefined, depth: number, hasHeaderAbove: boolean): void {
     orderedChildren(dataset, parentGroupId).forEach((child, index) => {
-      if (child.kind === "row") {
-        const gapBefore = index === 0 ? (hasHeaderAbove ? GROUP_HEADER_CHILD_GAP : 0) : ROW_GAP;
-        pushRow(child.row, depth, gapBefore);
-        return;
-      }
-      // The SAME gap whether this group is collapsed or expanded. It used to
-      // be the narrower ROW_GAP while collapsed, on the reasoning that a
-      // collapsed group is standing in for a timeline and should be spaced
-      // like one — but the two states are one click apart, so the difference
-      // read as the group (and everything below it) jumping ten pixels down
-      // the moment it was expanded. A gap that changes under a toggle is
-      // worse than a gap that is slightly generous in one of the two states.
-      const gapBefore = index === 0 ? (hasHeaderAbove ? GROUP_HEADER_CHILD_GAP : 0) : GROUP_GAP_BEFORE;
-      pushGroup(child.group, depth, gapBefore);
+      // ROW_GAP before everything, with one exception: the very first item in
+      // the whole layout, which has nothing above it to be separated from and
+      // already sits on EDGE_PAD. Kind and collapse state do not enter into
+      // it — a gap that changed under the ▸/▾ made the group jump on expand,
+      // and a gap that differs by kind puts the row above it off-centre in
+      // its stripe.
+      const gapBefore = index === 0 && !hasHeaderAbove && depth === 0 ? 0 : ROW_GAP;
+      if (child.kind === "row") pushRow(child.row, depth, gapBefore);
+      else pushGroup(child.group, depth, gapBefore);
     });
   }
 
   pushContainer(undefined, 0, false);
 
-  return { items, totalHeight: y };
+  return { items, totalHeight: y + EDGE_PAD };
 }

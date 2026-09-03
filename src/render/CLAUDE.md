@@ -66,9 +66,12 @@ has nothing to say there.
   timelines it hides, so it must not read as a section header:
   **`subtreeEndY` is left unset while collapsed**, and that single fact is
   what stops both renderers banding it (the canvas skips `groupBand`, the rail
-  emits no `.rail-group-band`); the rail additionally drops the header's
-  weight, colour and font-size step-down (`.rail-group-collapsed`), and
-  `pushContainer` spaces it with `ROW_GAP` instead of `GROUP_GAP_BEFORE`.
+  emits no `.rail-group-band`). The rail additionally sizes its box to the
+  height that group's HEADER would have had while expanded, not to the layout
+  item: the name then sits on the first line rather than floating in the
+  middle of bars it does not label, and — since `item.y` does not move under
+  the toggle either — at exactly the same pixel in both states. Collapsing a
+  group must not move its name.
   **`summaries` being set is also the test for "is this collapsed"** — both
   renderers use it rather than re-deriving the `collapsedGroupIds ||
   group.collapsed` rule, which is also what makes a *public* group (collapse
@@ -86,16 +89,31 @@ has nothing to say there.
   v10) rather than "every row, then every group", which is what lets a group
   sit above a timeline at any depth. `groupSummaryBars` walks the same list,
   so a collapsed group's bars come in the order its children were in.
+- **ONE gap between every pair of items, and every item takes a stripe slot.**
+  `ROW_GAP` is the only vertical gap `computeLayout` has: same value between
+  two timelines, between a timeline and a group, between a group header and
+  its first child, and at every depth and collapse state. There were three
+  (a wider `GROUP_GAP_BEFORE`, a tighter `GROUP_HEADER_CHILD_GAP`) and each
+  read well on its own, but a stripe boundary falls halfway down a gap, so an
+  unstriped row with 10px above and 20px below sat visibly off-centre in its
+  own band. For the same reason `rowStripes()` counts EVERY item, an expanded
+  header included: skipped, the header and the row above it were both
+  unstriped, their bands merged, and that row lost its boundary entirely.
+  Together the two rules give one property worth protecting — **every item has
+  exactly `ROW_GAP / 2` of air above and below it before the background
+  changes** — and `computeLayout` pads the top and bottom of the whole layout
+  by that same half-gap so the first and last bands are not cut off.
+  `ROW_STRIPES.scope` is `"all"` for the same reason: restarting the count per
+  group can put two striped items either side of a boundary.
 - **`rowStripes.ts` owns the alternating row backgrounds, and both renderers
   paint from it** — the canvas in `drawRowStripes` (over the WHOLE layout,
   then culled: counting only the virtualized visible items would flip every
   stripe as the user scrolls) and the rail as absolutely-positioned divs.
   `ROW_STRIPES.strength` is applied as `globalAlpha`/`opacity` over the single
-  `--color-row-stripe` token, so neither renderer parses a colour. An expanded
-  group's header is never striped; a collapsed one is, because collapsed a
-  group *is* the timeline it stands in for. `ROW_STRIPES` is a constant, not
-  state: the knobs were live controls in the rail long enough to settle them,
-  and what is left is the settled look plus the named fields that produced it.
+  `--color-row-stripe` token, so neither renderer parses a colour.
+  `ROW_STRIPES` is a constant, not state: the knobs were live controls in the
+  rail long enough to settle them, and what is left is the settled look plus
+  the named fields that produced it.
 - **Groups nest arbitrarily deep; `LayoutItem.depth` means "nesting depth of
   the container", for both `"group"` and `"row"` items** — and it is what the
   rail indents by, which is most of how the hierarchy reads. There is no

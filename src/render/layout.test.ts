@@ -1,7 +1,5 @@
 import { describe, expect, test } from "vitest";
 import {
-  GROUP_GAP_BEFORE,
-  GROUP_HEADER_CHILD_GAP,
   GROUP_HEADER_HEIGHT,
   ROW_GAP,
   ROW_HEIGHT,
@@ -95,29 +93,30 @@ describe("computeLayout", () => {
     expect(groupHeaderHeight(50)).toBeGreaterThan(0);
   });
 
-  test("a group header gets more space before it than a sibling row does, at every depth", () => {
-    const { items } = computeLayout(fixture(), new Set());
-    const r1 = items.find((i) => i.id === "r1")!;
-    const gFamily = items.find((i) => i.id === "g-family")!;
-    const r2 = items.find((i) => i.id === "r2")!;
-    const gFinnKid = items.find((i) => i.id === "g-finn-kid")!;
-    // g-me has no nested groups, so its content is just r1 — the gap before
-    // the next top-level group lands right after r1.
-    expect(gFamily.y - (r1.y + r1.height)).toBe(GROUP_GAP_BEFORE);
-    // Same rule one level down: "Finn's kid" is a sub-group sibling after
-    // "Finn"'s own row r2.
-    expect(gFinnKid.y - (r2.y + r2.height)).toBe(GROUP_GAP_BEFORE);
-    expect(GROUP_GAP_BEFORE).toBeGreaterThan(ROW_GAP);
+  // The rhythm the row striping rests on: consecutive bands meet halfway down
+  // a gap, so any gap that differs from the others leaves the item beside it
+  // off-centre in its own stripe. Kind, depth and collapse state must not
+  // enter into it.
+  test("every consecutive pair of items is separated by exactly ROW_GAP", () => {
+    const check = (layout: ReturnType<typeof computeLayout>) => {
+      for (let i = 1; i < layout.items.length; i++) {
+        const previous = layout.items[i - 1];
+        const item = layout.items[i];
+        // A group header is followed by its own first child, so "the previous
+        // item's bottom" is the header's own bottom, not its subtree's.
+        expect(item.y - (previous.y + previous.height)).toBe(ROW_GAP);
+      }
+    };
+    check(computeLayout(fixture(), new Set()));
+    check(computeLayout(fixture(), new Set(["g-finn"])));
   });
 
-  test("a group's header binds tighter to its own first child than to what precedes it", () => {
-    const { items } = computeLayout(fixture(), new Set());
-    const gMe = items.find((i) => i.id === "g-me")!;
-    const r1 = items.find((i) => i.id === "r1")!;
-    // r1 is g-me's only (and therefore first) child.
-    expect(r1.y - (gMe.y + gMe.height)).toBe(GROUP_HEADER_CHILD_GAP);
-    expect(GROUP_HEADER_CHILD_GAP).toBeLessThan(GROUP_GAP_BEFORE);
-    expect(GROUP_HEADER_CHILD_GAP).toBeLessThan(ROW_GAP);
+  test("the layout is padded by half a gap at the top and bottom", () => {
+    const layout = computeLayout(fixture(), new Set());
+    const first = layout.items[0];
+    const last = layout.items[layout.items.length - 1];
+    expect(first.y).toBe(ROW_GAP / 2);
+    expect(layout.totalHeight).toBe(last.y + last.height + ROW_GAP / 2);
   });
 
   test("a group's subtreeEndY spans its header and everything nested under it", () => {
@@ -222,8 +221,8 @@ describe("computeLayout", () => {
         const gMe = layout.items.find((i) => i.id === "g-me")!;
         return gMe.y - (rTop.y + rTop.height);
       };
-      expect(gapAbove(collapsed)).toBe(GROUP_GAP_BEFORE);
-      expect(gapAbove(expanded)).toBe(GROUP_GAP_BEFORE);
+      expect(gapAbove(collapsed)).toBe(ROW_GAP);
+      expect(gapAbove(expanded)).toBe(ROW_GAP);
       // And the group's own top is unchanged by the toggle — the whole point.
       expect(collapsed.items.find((i) => i.id === "g-me")!.y).toBe(
         expanded.items.find((i) => i.id === "g-me")!.y,
@@ -505,9 +504,9 @@ describe("computeLayout", () => {
       const gLanes = items.find((i) => i.id === "g-lanes" && i.kind === "group")!;
       const gAfter = items.find((i) => i.id === "g-after" && i.kind === "group")!;
       expect(gLanes.height).toBe(2 * ROW_HEIGHT);
-      // The next top-level group is expanded, so it still reads as its own
-      // section: GROUP_GAP_BEFORE past the taller collapsed item.
-      expect(gAfter.y).toBe(gLanes.y + gLanes.height + GROUP_GAP_BEFORE);
+      // The next top-level group follows one gap past the taller collapsed
+      // item — the same gap everything else gets.
+      expect(gAfter.y).toBe(gLanes.y + gLanes.height + ROW_GAP);
     });
   });
 
@@ -523,7 +522,8 @@ describe("computeLayout", () => {
     const { items } = computeLayout(fixture(), new Set());
     const rTop = items.find((i) => i.id === "r-top")!;
     expect(rTop.depth).toBe(0);
-    expect(rTop.y).toBe(0);
+    expect(rTop.y).toBe(ROW_GAP / 2); // the layout's top pad, nothing above it
+
     expect(rTop.height).toBe(ROW_HEIGHT);
   });
 

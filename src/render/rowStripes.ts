@@ -34,7 +34,10 @@ export interface RowStripeSettings {
 export const ROW_STRIPES: RowStripeSettings = {
   enabled: true,
   strength: 0.7,
-  scope: "group",
+  // "all", not "group": see the counter comment in `rowStripes` — restarting
+  // per group is what puts two striped bands next to each other at a group
+  // boundary, and a merged band is a row that is no longer centred in one.
+  scope: "all",
   offset: 0,
   includeGaps: true,
 };
@@ -42,15 +45,6 @@ export const ROW_STRIPES: RowStripeSettings = {
 export interface RowStripe {
   y: number;
   height: number;
-}
-
-// Which layout items get a stripe of their own. A timeline does; so does a
-// COLLAPSED group, because collapsed a group *is* the timeline it stands in
-// for (see src/render/CLAUDE.md) and skipping it would drop one row out of the
-// alternation. An expanded group's header does not: it labels a section, and
-// striping it would band the section title rather than a row.
-function isStripeable(item: LayoutItem): boolean {
-  return item.kind === "row" || item.summaries !== undefined;
 }
 
 // The stripes to paint behind `items`, in layout coordinates. Empty whenever
@@ -62,10 +56,19 @@ export function rowStripes(
 ): RowStripe[] {
   if (!settings.enabled || settings.strength <= 0) return [];
   const stripes: RowStripe[] = [];
+  // EVERY item is counted, an expanded group's header included. It is the
+  // header that makes this necessary rather than tidy: skipped, it left two
+  // unstriped items adjacent, which merged into one band and put the timeline
+  // above the group visibly off-centre in it. Counted, the bands strictly
+  // alternate down the whole layout and every item — timeline, collapsed
+  // group, header — sits centred in its own.
+  //
   // One counter per nesting depth, so "restart in each group" is exact:
   // entering a group zeroes the counter one level down, and coming back out
   // resumes the container's own count where it left off. In "all" scope every
-  // item shares the depth-0 counter instead.
+  // item shares the depth-0 counter instead — which is the only scope that
+  // guarantees the strict alternation above, since restarting at 0 inside a
+  // group can put two striped items next to each other at the boundary.
   const counters: number[] = [0];
   for (const item of items) {
     const depth = settings.scope === "group" ? item.depth : 0;
@@ -73,18 +76,16 @@ export function rowStripes(
       // An expanded group opens a container: its children start a fresh count.
       counters[item.depth + 1] = 0;
     }
-    if (!isStripeable(item)) continue;
     const index = counters[depth] ?? 0;
     counters[depth] = index + 1;
     if (index % 2 !== settings.offset) continue;
+    // Half a gap on each side, so consecutive bands meet exactly halfway
+    // between two items and every item has the same amount of air above and
+    // below it before the background changes. `computeLayout` pads the top
+    // and bottom of the whole layout by the same half-gap, so this never
+    // reaches outside the content.
     const pad = settings.includeGaps ? ROW_GAP / 2 : 0;
-    // The top pad is clamped at the top of the layout: the first row starts at
-    // y 0, so unclamped it would open the whole rail with a stripe hanging
-    // five pixels above everything, which reads as a misalignment rather than
-    // as banding. The bottom edge is left where it was, so the stripe only
-    // ever loses the part that had nothing to band against.
-    const top = Math.max(0, item.y - pad);
-    stripes.push({ y: top, height: item.y + item.height + pad - top });
+    stripes.push({ y: item.y - pad, height: item.height + pad * 2 });
   }
   return stripes;
 }
