@@ -20,6 +20,10 @@ import { faviconUrl } from "../model/favicon";
 import type { Precision, TimelineDataset, TimelineEntry, TimelineEvent, TimelineRow } from "../model/types";
 import { birthDateForRow } from "../model/dataset";
 
+// How far past the last row the view may be scrolled, as a fraction of the
+// visible content height. See setScrollY().
+const OVERSCROLL_FRACTION = 0.5;
+
 const FAVICON_SIZE_PX = 12;
 const FAVICON_GAP_PX = 4;
 
@@ -329,8 +333,16 @@ export class TimelineEngine {
     return (this.input.axisTop ?? 0) + AXIS_HEIGHT;
   }
 
+  // Half a viewport of empty space below the last row, always — not only when
+  // the content is taller than the screen. The bottom row is where new things
+  // get added, and a row pinned to the very bottom edge has no room under it
+  // for the detail panel, the mobile sheet at peek, or simply for looking at.
+  // It is deliberately additive rather than a bigger bottom margin: the layout
+  // itself stays exactly as tall as its items, so stripes, drops and hit tests
+  // are unaffected.
   private setScrollY(value: number): void {
-    const maxScroll = Math.max(0, this.input.layout.totalHeight - (this.height - this.contentTop()) + 40);
+    const viewportHeight = this.height - this.contentTop();
+    const maxScroll = Math.max(0, this.input.layout.totalHeight - viewportHeight) + viewportHeight * OVERSCROLL_FRACTION;
     this.scrollY = Math.min(maxScroll, Math.max(0, value));
     this.callbacks.onScrollSync(this.scrollY);
   }
