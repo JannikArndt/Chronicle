@@ -826,11 +826,6 @@ export function setShowTreeLines(showTreeLines: boolean): void {
   persistOverlaysSoon();
 }
 
-export function unhideAll(): void {
-  appStore.setState({ hiddenRowIds: [], hiddenGroupIds: [] });
-  persistOverlaysSoon();
-}
-
 export function setSearch(search: string): void {
   appStore.setState({ search });
 }

@@ -38,7 +38,7 @@ import {
   updateGroup,
   updateRow,
 } from "../state/actions";
-import { isForeignId, useAppState, userBirthMs } from "../state/store";
+import { isForeignId, mergedDataset, useAppState, userBirthMs } from "../state/store";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateInput";
 import type { Group, TimelineRow } from "../model/types";
@@ -375,7 +375,7 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
   // Hidden top-level timelines and groups are offered back in the footer —
   // there is no container header at the root to hang them under.
   const hiddenAtRoot = hiddenChildrenOf(
-    state.dataset,
+    mergedDataset(state),
     undefined,
     hiddenIdsOf(state.hiddenRowIds, state.hiddenGroupIds),
   );
@@ -549,7 +549,7 @@ function RailItem({
   // rebuilds the list when it opens.
   const hiddenChildCount = useAppState((s) =>
     item.kind === "group"
-      ? hiddenChildrenOf(s.dataset, item.id, hiddenIdsOf(s.hiddenRowIds, s.hiddenGroupIds)).length
+      ? hiddenChildrenOf(mergedDataset(s), item.id, hiddenIdsOf(s.hiddenRowIds, s.hiddenGroupIds)).length
       : 0,
   );
 
@@ -1098,7 +1098,10 @@ function WikidataDebugPanel({ debug, onClose }: { debug: WikidataDebug; onClose:
 // one back. There is no "hide all", so there is no "show all" either — the
 // list is short by construction, because it is per container.
 function HiddenChildrenList({ groupId, close }: { groupId: string | undefined; close: () => void }) {
-  const dataset = useAppState((s) => s.dataset);
+  // The MERGED dataset, not just the user's own: a public or mirrored timeline
+  // can be hidden too (from the mobile row menu), and it has to be offered
+  // back from the container it is actually drawn in.
+  const dataset = useAppState((s) => mergedDataset(s));
   const hiddenRowIds = useAppState((s) => s.hiddenRowIds);
   const hiddenGroupIds = useAppState((s) => s.hiddenGroupIds);
   const children = hiddenChildrenOf(dataset, groupId, hiddenIdsOf(hiddenRowIds, hiddenGroupIds));

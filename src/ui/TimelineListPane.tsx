@@ -26,7 +26,7 @@ export function TimelineListPane({
   // cannot show them greyed out — it offers them back at the foot instead,
   // which is the mobile counterpart of the rail's per-container unhide lists.
   const hiddenChildren = hiddenChildrenEverywhere(
-    state.dataset,
+    merged,
     hiddenIdsOf(state.hiddenRowIds, state.hiddenGroupIds),
   );
 
