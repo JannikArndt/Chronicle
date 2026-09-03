@@ -5,7 +5,7 @@
 // A date like "2020-05-14" always means 2020-05-14T00:00:00Z regardless of the
 // viewer's local timezone, so a dataset renders identically on every device.
 
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 export type Precision = "exact" | "day" | "month" | "year" | "circa";
 
@@ -35,6 +35,14 @@ export interface Group {
   // birthDate too — see there for why a person isn't only ever a group.)
   birthDate?: number;
   collapsed: boolean;
+  // Where this group sits among its container's children (v10). Groups and
+  // timelines share ONE ordering sequence per container, so the two can be
+  // mixed in any order — before v10 the layout drew every row first and every
+  // group after, which made "a group above a timeline" unreachable by drag.
+  // Normalized to 0..n-1 per container by `normalizeChildOrder()`; a record
+  // that arrives without one (an older export, a public dataset) sorts after
+  // the ordered ones, which reproduces the pre-v10 picture exactly.
+  order?: number;
   // --- sharing (v7) ---
   // Absent/false is private. NOT called `visibility`: v1–v3 had a field by that
   // name, v4 removed it, and old exports still carry it — a new field reusing
@@ -59,6 +67,9 @@ export interface TimelineRow {
   // fade. If unset, birthDateForRow() falls back to the nearest ancestor
   // group's birthDate.
   birthDate?: number;
+  // Where this timeline sits among its container's children (v10) — the same
+  // single sequence a sibling Group is placed in. See Group.order.
+  order?: number;
   // --- sharing (v7) ---
   // The publish switch for one timeline, and the finest granularity there is:
   // entries have no flag of their own, they follow their row.

@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { canBreakOut, describeBreakOut } from "../model/breakOut";
 import { collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
+import { ROW_HEIGHT } from "../render/layout";
+import { rowStripes } from "../render/rowStripes";
 import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
 import {
@@ -25,20 +27,24 @@ import {
   addFamousPerson,
   removeFamousRow,
   removePublicGroup,
+  resetRowStripes,
   setFamousAlignment,
   toggleGroupCollapsed,
   setRowShared,
   toggleRowHidden,
   updateGroup,
   updateRow,
+  updateRowStripes,
 } from "../state/actions";
 import { isForeignId, useAppState, userBirthMs } from "../state/store";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateInput";
 import type { Group, TimelineRow } from "../model/types";
+import type { RailChildRef } from "../model/dataset";
 import { describePublishImpact } from "../model/sharing";
 import { importDatasetWithConfirmation } from "./importFlow";
 import { WorldEventsPicker } from "./WorldEventsPicker";
+import { PillSelector } from "./PillSelector";
 import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
 import { fetchWikidataBiography, searchWikidataCandidates } from "../publicData/famous/wikidata";
 import type { SparqlBinding, WikidataCandidate } from "../publicData/famous/wikidata";
@@ -54,12 +60,13 @@ type PopoverState =
   | { kind: "add-group"; top: number }
   | { kind: "add-row"; top: number }
   | { kind: "rail-add-menu"; top: number }
+  | { kind: "row-stripes"; top: number }
   | null;
 
 // Popovers anchored to the rail footer's "+" button open upward from the
 // bottom of the rail rather than downward from a click point.
 function isFooterPopover(kind: NonNullable<PopoverState>["kind"]): boolean {
-  return kind === "add-group" || kind === "add-row" || kind === "rail-add-menu";
+  return kind === "add-group" || kind === "add-row" || kind === "rail-add-menu" || kind === "row-stripes";
 }
 
 // ---------- drag-and-drop (move or, with Alt/Option held, copy) ----------
@@ -70,14 +77,18 @@ function isFooterPopover(kind: NonNullable<PopoverState>["kind"]): boolean {
 // CONTAINER (a group id, or null for the root) rather than assuming one fixed
 // level — the same shape computeLayout() itself uses.
 
-// What the pressed handle belongs to.
-type DragDescriptor = { kind: "group"; groupId: string } | { kind: "row"; rowId: string };
+// What the pressed handle belongs to — a rail child of either kind, since
+// groups and timelines share one ordered sequence per container (schema v10).
+type DragDescriptor = RailChildRef;
 
-// Where releasing the pointer would drop it. `null` in either "target"
-// position means the root — no group at all.
-type DropTarget =
-  | { kind: "group"; targetParentGroupId: string | null; beforeGroupId: string | null }
-  | { kind: "row"; targetGroupId: string | null; beforeRowId: string | null };
+// Where releasing the pointer would drop it: a container (`null` = the root,
+// no group at all) and the sibling to land in front of — of EITHER kind, which
+// is what lets a group be dropped between two timelines and a timeline between
+// two groups. `before: null` appends at the end of that container.
+interface DropTarget {
+  parentGroupId: string | null;
+  before: RailChildRef | null;
+}
 
 // One candidate insertion line: the drop it stands for and its on-screen Y.
 interface DropSlot {
@@ -189,22 +200,13 @@ function useRailDragController(railContentRef: RefObject<HTMLDivElement>): RailD
 }
 
 function applyDrop(descriptor: DragDescriptor, drop: DropTarget, copy: boolean): void {
-  if (descriptor.kind === "group" && drop.kind === "group") {
-    if (copy) {
-      const newGroupId = copyGroup(descriptor.groupId);
-      if (newGroupId) moveGroup(newGroupId, drop.targetParentGroupId, drop.beforeGroupId);
-    } else {
-      moveGroup(descriptor.groupId, drop.targetParentGroupId, drop.beforeGroupId);
-    }
+  if (descriptor.kind === "group") {
+    const groupId = copy ? copyGroup(descriptor.id) : descriptor.id;
+    if (groupId) moveGroup(groupId, drop.parentGroupId, drop.before);
+    return;
   }
-  if (descriptor.kind === "row" && drop.kind === "row") {
-    if (copy) {
-      const newRowId = copyRow(descriptor.rowId);
-      if (newRowId) moveRow(newRowId, drop.targetGroupId, drop.beforeRowId);
-    } else {
-      moveRow(descriptor.rowId, drop.targetGroupId, drop.beforeRowId);
-    }
-  }
+  const rowId = copy ? copyRow(descriptor.id) : descriptor.id;
+  if (rowId) moveRow(rowId, drop.parentGroupId, drop.before);
 }
 
 // A rail item as read back from the live DOM. Hit-testing works on client
@@ -235,11 +237,7 @@ function resolveDropSlot(
 ): DropSlot | null {
   if (!isPointerInsideRailBounds(railContent, clientX, clientY)) return null;
   const elements = readRailElements(railContent);
-  const slots =
-    descriptor.kind === "group"
-      ? computeGroupDropSlots(elements, descriptor.groupId)
-      : computeRowDropSlots(elements, descriptor.rowId);
-  return nearestDropSlot(slots, clientY);
+  return nearestDropSlot(computeDropSlots(elements, descriptor), clientY);
 }
 
 function isPointerInsideRailBounds(railContent: HTMLElement, clientX: number, clientY: number): boolean {
@@ -286,47 +284,32 @@ function analyzeContainers(elements: RailElementInfo[]): {
   return { containerId, groupBottom };
 }
 
-// Group drag: one "before this group" slot per private group at any depth,
-// one "append as the last child" slot per private group (from `groupBottom`),
-// and one final "append at the very end" slot for the root itself.
-function computeGroupDropSlots(elements: RailElementInfo[], draggedGroupId: string): DropSlot[] {
+// One "before this child" slot per private rail item at any depth — of either
+// kind, whatever is being dragged, which is the whole of "any order of groups
+// and timelines mixed". Plus one "append as the last child" slot per private
+// group (from `groupBottom`) and one "append at the very end" for the root.
+// A group being dragged contributes no slots for itself; its DESCENDANTS still
+// do, and `moveGroup`'s cycle guard is what refuses those.
+function computeDropSlots(elements: RailElementInfo[], dragged: DragDescriptor): DropSlot[] {
   const { containerId, groupBottom } = analyzeContainers(elements);
   const slots: DropSlot[] = [];
   elements.forEach((element, index) => {
-    if (element.kind !== "group" || isForeignId(element.id) || element.id === draggedGroupId) return;
+    if (isForeignId(element.id)) return;
+    if (element.kind === dragged.kind && element.id === dragged.id) return;
     slots.push({
-      drop: { kind: "group", targetParentGroupId: containerId[index], beforeGroupId: element.id },
+      drop: {
+        parentGroupId: containerId[index],
+        before: { kind: element.kind, id: element.id },
+      },
       clientY: element.rect.top,
     });
   });
   for (const [groupId, bottom] of groupBottom) {
-    if (groupId === draggedGroupId) continue;
-    slots.push({ drop: { kind: "group", targetParentGroupId: groupId, beforeGroupId: null }, clientY: bottom });
+    if (dragged.kind === "group" && groupId === dragged.id) continue;
+    slots.push({ drop: { parentGroupId: groupId, before: null }, clientY: bottom });
   }
   const last = elements[elements.length - 1];
-  if (last) {
-    slots.push({ drop: { kind: "group", targetParentGroupId: null, beforeGroupId: null }, clientY: last.rect.bottom });
-  }
-  return slots;
-}
-
-// Row drag: one "before this row" slot per private row at any depth, one
-// "append as the last row" slot per private group, and one for the root.
-function computeRowDropSlots(elements: RailElementInfo[], draggedRowId: string): DropSlot[] {
-  const { containerId, groupBottom } = analyzeContainers(elements);
-  const slots: DropSlot[] = [];
-  elements.forEach((element, index) => {
-    if (element.kind !== "row" || isForeignId(element.id) || element.id === draggedRowId) return;
-    slots.push({
-      drop: { kind: "row", targetGroupId: containerId[index], beforeRowId: element.id },
-      clientY: element.rect.top,
-    });
-  });
-  for (const [groupId, bottom] of groupBottom) {
-    slots.push({ drop: { kind: "row", targetGroupId: groupId, beforeRowId: null }, clientY: bottom });
-  }
-  const last = elements[elements.length - 1];
-  if (last) slots.push({ drop: { kind: "row", targetGroupId: null, beforeRowId: null }, clientY: last.rect.bottom });
+  if (last) slots.push({ drop: { parentGroupId: null, before: null }, clientY: last.rect.bottom });
   return slots;
 }
 
@@ -390,6 +373,7 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
   // mouse-exit from these absolutely-positioned, transitioned rows, but real
   // mouseenter/mouseleave events don't have that failure mode.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const stripeSettings = state.settings.rowStripes;
   const dragController = useRailDragController(railContentRef);
 
   const closePopover = () => setPopover(null);
@@ -398,6 +382,18 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
     <div className="rail" onPointerDown={(e) => e.stopPropagation()}>
       <div className="rail-scroll">
         <div className="rail-content" ref={railContentRef} style={{ height: layout.totalHeight }}>
+          {/* Behind the bands and the items, and from the same pure
+              `rowStripes()` the canvas paints — the rail and the canvas share
+              one scroll position, so a stripe that disagreed would be visible
+              as a step at the rail's edge. Opacity carries `strength`, which
+              is the same trick the canvas plays with globalAlpha. */}
+          {rowStripes(layout.items, stripeSettings).map((stripe, index) => (
+            <div
+              key={`stripe:${index}`}
+              className="rail-row-stripe"
+              style={{ top: stripe.y, height: stripe.height, opacity: stripeSettings.strength }}
+            />
+          ))}
           {layout.items
             .filter((item) => item.kind === "group" && item.subtreeEndY !== undefined)
             .map((item) => (
@@ -435,6 +431,14 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
             ✨ Set up your timeline
           </button>
         )}
+        <button
+          type="button"
+          className="rail-add-button"
+          title="Row striping…"
+          onClick={() => setPopover({ kind: "row-stripes", top: 0 })}
+        >
+          ☰
+        </button>
         <button
           type="button"
           className="rail-add-button"
@@ -500,7 +504,13 @@ function RailItem({
   // how this reads: a group's name looks the same collapsed or not, and the
   // same as a timeline's.
   const collapsed = item.summaries !== undefined;
-  const style = { top: item.y, height: item.height };
+  // A collapsed group whose children overlap is `lanes × ROW_HEIGHT` tall so
+  // the canvas can stack their summary bars — but the rail shows no bars, only
+  // the name, and centring that name over the whole stack floated it in the
+  // middle of rows it does not label. The rail box stays ONE row tall, which
+  // puts the name on the first line, level with the first lane and with the
+  // plate the canvas draws it on.
+  const style = { top: item.y, height: collapsed ? ROW_HEIGHT : item.height };
   const readOnly = isForeignId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
@@ -573,7 +583,7 @@ function RailItem({
               <RailDragHandle
                 className={hoverReveal(visible)}
                 dragController={dragController}
-                descriptor={{ kind: "group", groupId: group.id }}
+                descriptor={{ kind: "group", id: group.id }}
               />
               <button
                 type="button"
@@ -640,7 +650,7 @@ function RailItem({
             <RailDragHandle
               className={hoverReveal(visible)}
               dragController={dragController}
-              descriptor={{ kind: "row", rowId: row.id }}
+              descriptor={{ kind: "row", id: row.id }}
             />
             <button
               type="button"
@@ -717,6 +727,7 @@ function Popover({
         {popover.kind === "rail-add-menu" && (
           <RailAddMenu open={open} close={close} onStartOnboarding={onStartOnboarding} />
         )}
+        {popover.kind === "row-stripes" && <RowStripeSettingsForm />}
         {popover.kind === "add-group" && <AddGroupForm close={close} />}
         {popover.kind === "add-row" && <AddTopLevelRowForm close={close} />}
         {popover.kind === "add-menu" && <AddMenu groupId={popover.groupId} close={close} />}
@@ -725,6 +736,69 @@ function Popover({
         {popover.kind === "add-event" && <AddEventForm rowId={popover.rowId} close={close} />}
       </div>
     </>
+  );
+}
+
+// Row striping, and every knob that shapes it — kept as live controls rather
+// than a fixed look because the right strength depends on the palette, the
+// screen and how dense this particular timeline is. Every change is applied
+// and saved immediately: there are no Save buttons anywhere in this app.
+function RowStripeSettingsForm() {
+  const stripes = useAppState((state) => state.settings.rowStripes);
+  return (
+    <div className="popover-form">
+      <div className="popover-title">Row striping</div>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={stripes.enabled}
+          onChange={(e) => updateRowStripes({ enabled: e.target.checked })}
+        />
+        Alternate row backgrounds
+      </label>
+      <div className="field-label">Strength — {Math.round(stripes.strength * 100)}%</div>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={stripes.strength}
+        disabled={!stripes.enabled}
+        onChange={(e) => updateRowStripes({ strength: Number(e.target.value) })}
+      />
+      <div className="field-label">Count rows</div>
+      <PillSelector
+        options={[
+          { value: "group", icon: "🗂️", label: "Per group" },
+          { value: "all", icon: "📜", label: "Continuous" },
+        ]}
+        value={stripes.scope}
+        disabled={!stripes.enabled}
+        onChange={(scope) => updateRowStripes({ scope })}
+      />
+      <div className="field-label">Start with</div>
+      <PillSelector
+        options={[
+          { value: "0", icon: "▪️", label: "1st row" },
+          { value: "1", icon: "▫️", label: "2nd row" },
+        ]}
+        value={String(stripes.offset)}
+        disabled={!stripes.enabled}
+        onChange={(offset) => updateRowStripes({ offset: offset === "1" ? 1 : 0 })}
+      />
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={stripes.includeGaps}
+          disabled={!stripes.enabled}
+          onChange={(e) => updateRowStripes({ includeGaps: e.target.checked })}
+        />
+        Cover the gaps between rows
+      </label>
+      <button type="button" className="small-button" onClick={resetRowStripes}>
+        Reset to defaults
+      </button>
+    </div>
   );
 }
 

@@ -3,6 +3,7 @@
 // dataset; both the canvas and the DOM rail render from the same LayoutItem
 // list so they can never drift apart.
 
+import { orderedChildren } from "../model/dataset";
 import type { Group, TimelineDataset, TimelineRow } from "../model/types";
 
 export const GROUP_HEADER_HEIGHT = 32;
@@ -163,21 +164,22 @@ export function computeLayout(
     return withLanes;
   };
 
-  // One bar per direct child (own rows first, then sub-groups — the same
-  // order pushContainer uses) that has anything dated, lane-packed for
-  // overlap. `[]` when every child is empty or hidden.
+  // One bar per direct child that has anything dated, in the same single
+  // ordered sequence pushContainer walks, lane-packed for overlap. `[]` when
+  // every child is empty or hidden.
   const groupSummaryBars = (groupId: string): GroupSummaryBar[] => {
     const bars: Array<Omit<GroupSummaryBar, "lane">> = [];
-    for (const row of dataset.rows.filter((r) => r.groupId === groupId)) {
-      if (hiddenRowIds.has(row.id)) continue;
-      const agg = aggregate(new Set([row.id]));
-      if (!agg) continue;
-      bars.push({ kind: "row", id: row.id, label: row.label, color: row.color, ...agg });
-    }
-    for (const group of dataset.groups.filter((g) => g.parentGroupId === groupId)) {
-      const agg = aggregate(new Set(visibleSubtreeRowIds(group.id)));
-      if (!agg) continue;
-      bars.push({ kind: "group", id: group.id, label: group.label, color: group.color, ...agg });
+    for (const child of orderedChildren(dataset, groupId)) {
+      if (child.kind === "row") {
+        if (hiddenRowIds.has(child.row.id)) continue;
+        const agg = aggregate(new Set([child.row.id]));
+        if (!agg) continue;
+        bars.push({ kind: "row", id: child.row.id, label: child.row.label, color: child.row.color, ...agg });
+      } else {
+        const agg = aggregate(new Set(visibleSubtreeRowIds(child.group.id)));
+        if (!agg) continue;
+        bars.push({ kind: "group", id: child.group.id, label: child.group.label, color: child.group.color, ...agg });
+      }
     }
     return packLanes(bars);
   };
@@ -223,30 +225,27 @@ export function computeLayout(
     item.subtreeEndY = y;
   };
 
-  // A container's own timelines, in dataset order, before its sub-groups —
-  // "Family"'s own shared timelines sit above each family member's, at every
-  // depth, including the root (`parentGroupId`/`groupId` both undefined).
-  // `hasHeaderAbove` is true for a group's own body (this container's first
-  // item then sits right under that header, and gets the tight
-  // GROUP_HEADER_CHILD_GAP instead of the normal sibling/section gap).
+  // A container's timelines and sub-groups in ONE ordered sequence
+  // (`orderedChildren`, schema v10) — the two kinds interleave freely, so a
+  // group can sit above a timeline at any depth, including the root
+  // (`parentGroupId`/`groupId` both undefined). `hasHeaderAbove` is true for a
+  // group's own body (this container's first item then sits right under that
+  // header, and gets the tight GROUP_HEADER_CHILD_GAP instead of the normal
+  // sibling/section gap).
   function pushContainer(parentGroupId: string | undefined, depth: number, hasHeaderAbove: boolean): void {
-    const rows = dataset.rows.filter((r) => r.groupId === parentGroupId);
-    const groups = dataset.groups.filter((g) => g.parentGroupId === parentGroupId);
-    let index = 0;
-    for (const row of rows) {
-      const gapBefore = index === 0 ? (hasHeaderAbove ? GROUP_HEADER_CHILD_GAP : 0) : ROW_GAP;
-      pushRow(row, depth, gapBefore);
-      index++;
-    }
-    for (const group of groups) {
+    orderedChildren(dataset, parentGroupId).forEach((child, index) => {
+      if (child.kind === "row") {
+        const gapBefore = index === 0 ? (hasHeaderAbove ? GROUP_HEADER_CHILD_GAP : 0) : ROW_GAP;
+        pushRow(child.row, depth, gapBefore);
+        return;
+      }
       // A collapsed group is spaced like the timeline it stands in for, not
       // like a section: GROUP_GAP_BEFORE exists to separate a header from
       // whatever precedes it, and there is no header here to separate.
-      const sectionGap = isCollapsed(group) ? ROW_GAP : GROUP_GAP_BEFORE;
+      const sectionGap = isCollapsed(child.group) ? ROW_GAP : GROUP_GAP_BEFORE;
       const gapBefore = index === 0 ? (hasHeaderAbove ? GROUP_HEADER_CHILD_GAP : 0) : sectionGap;
-      pushGroup(group, depth, gapBefore);
-      index++;
-    }
+      pushGroup(child.group, depth, gapBefore);
+    });
   }
 
   pushContainer(undefined, 0, false);

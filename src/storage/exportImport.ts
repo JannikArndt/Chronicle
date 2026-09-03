@@ -2,6 +2,7 @@
 // Import validates schemaVersion and shape and REJECTS mismatches with a
 // message instead of silently corrupting IndexedDB (§9).
 
+import { normalizeChildOrder } from "../model/dataset";
 import { SCHEMA_VERSION } from "../model/types";
 import type { TimelineDataset } from "../model/types";
 
@@ -20,10 +21,10 @@ const ARRAY_FIELDS = ["groups", "rows", "entries"] as const;
 // Oldest export shape this importer still reads. v1/v2/v3/v4 files are
 // structurally valid as-is: v2 only added the optional selfPersonId, v3
 // dropped the (now-ignored) `entities`/`linkedEntityIds` fields, and v4
-// dropped `visibility`/`defaultVisibility`. Four versions carry a real data
+// dropped `visibility`/`defaultVisibility`. Five versions carry a real data
 // step: v5 folded each category's color and icon onto the row, v6 folded the
-// whole Person entity into Group, v7 added sharing, and v8 added events (all
-// below).
+// whole Person entity into Group, v7 added sharing, v8 added events and v10 made
+// sibling order explicit (all below).
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
 
 export function validateImport(raw: unknown): ImportResult {
@@ -77,6 +78,7 @@ export function validateImport(raw: unknown): ImportResult {
     if (Array.isArray(candidate.people)) foldPeopleIntoGroups(candidate);
     dropDeadVisibilityFields(candidate);
     flattenSubRows(candidate);
+    assignSiblingOrder(candidate);
     candidate.schemaVersion = SCHEMA_VERSION;
   }
   return { ok: true, dataset: candidate as unknown as TimelineDataset };
@@ -105,6 +107,16 @@ function dropDeadVisibilityFields(candidate: Record<string, unknown>): void {
       delete record.visibility;
     }
   }
+}
+
+// v10 migration: sibling order becomes explicit. Before v10 a container drew
+// every one of its timelines and then every one of its sub-groups, each in
+// array order; `normalizeChildOrder` sorts un-ordered records exactly that way
+// before numbering them, so an older file keeps the arrangement it had — the
+// difference is only that the arrangement is now writable, and a group can be
+// dragged above a timeline.
+function assignSiblingOrder(candidate: Record<string, unknown>): void {
+  normalizeChildOrder(candidate as unknown as TimelineDataset);
 }
 
 // v9 migration: a timeline can no longer nest inside another timeline —

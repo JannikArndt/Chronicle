@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { breakOut, canBreakOut, describeBreakOut } from "./breakOut";
-import { emptyDataset } from "./dataset";
+import { emptyDataset, normalizeChildOrder, orderedChildren } from "./dataset";
 import { syncSubset } from "./sharing";
 import type { TimelineDataset, TimelineEntry, TimelineEvent } from "./types";
 
@@ -192,9 +192,15 @@ describe("breakOut — refusal cases", () => {
   });
 });
 
-describe("breakOut — group placement (array order is render order)", () => {
-  test("the new group is inserted right after the last existing sibling sharing its parentGroupId", () => {
-    const dataset = emptyDataset();
+describe("breakOut — group placement (the new group takes the row's own slot)", () => {
+  // Breaking out and collapsing are inverses on screen, so the group has to
+  // appear exactly where the timeline it replaces sat among its siblings —
+  // `order` (schema v10), not array position, is what says so.
+  const childIdsOf = (dataset: TimelineDataset, parentGroupId?: string): string[] =>
+    orderedChildren(normalizeChildOrder(dataset), parentGroupId).map((child) => child.id);
+
+  test("the new group lands in the row's place among its siblings", () => {
+    const dataset = normalizeChildOrder(emptyDataset());
     dataset.groups = [
       { id: "family", label: "Family", collapsed: false },
       { id: "family-sub", parentGroupId: "family", label: "Existing sub-group", collapsed: false },
@@ -202,31 +208,34 @@ describe("breakOut — group placement (array order is render order)", () => {
     ];
     dataset.rows = [{ id: "r1", groupId: "family", label: "Work" }];
     dataset.entries = [makeEntry("e1", "r1", 0, "Job A")];
+    normalizeChildOrder(dataset); // r1 sits ahead of family-sub inside family
     const { dataset: out, groupId } = breakOut(dataset, "r1", undefined, idFactory())!;
-    expect(out.groups.map((g) => g.id)).toEqual(["family", "family-sub", groupId, "friends"]);
+    expect(childIdsOf(out, "family")).toEqual([groupId, "family-sub"]);
+    expect(childIdsOf(out)).toEqual(["family", "friends"]);
   });
 
-  test("with no existing sibling, the new group is appended at the very end", () => {
+  test("a row that sat last among its siblings breaks out last", () => {
     const dataset = emptyDataset();
     dataset.groups = [
       { id: "family", label: "Family", collapsed: false },
-      { id: "friends", label: "Friends", collapsed: false },
+      { id: "family-sub", parentGroupId: "family", label: "Existing sub-group", collapsed: false, order: 0 },
     ];
-    dataset.rows = [{ id: "r1", groupId: "family", label: "Work" }];
+    dataset.rows = [{ id: "r1", groupId: "family", label: "Work", order: 1 }];
     dataset.entries = [makeEntry("e1", "r1", 0, "Job A")];
     const { dataset: out, groupId } = breakOut(dataset, "r1", undefined, idFactory())!;
-    expect(out.groups.map((g) => g.id)).toEqual(["family", "friends", groupId]);
+    expect(childIdsOf(out, "family")).toEqual(["family-sub", groupId]);
   });
 
-  test("a top-level row (no group at all) produces a top-level new group, sibling to other top-level groups", () => {
+  test("a top-level row (no group at all) produces a top-level new group in that row's place", () => {
     const dataset = emptyDataset();
     dataset.groups = [{ id: "gA", label: "Some other top-level group", collapsed: false }];
     dataset.rows = [{ id: "r1", label: "Work" }]; // groupId undefined: a top-level timeline
     dataset.entries = [makeEntry("e1", "r1", 0, "Job A")];
+    normalizeChildOrder(dataset);
     const { dataset: out, groupId } = breakOut(dataset, "r1", undefined, idFactory())!;
     const newGroup = out.groups.find((g) => g.id === groupId)!;
     expect(newGroup.parentGroupId).toBeUndefined();
-    expect(out.groups.map((g) => g.id)).toEqual(["gA", groupId]);
+    expect(childIdsOf(out)).toEqual([groupId, "gA"]);
   });
 });
 

@@ -81,6 +81,19 @@ has nothing to say there.
   unchecked in the rail would otherwise be visibly back). Overlap is the one
   thing that breaks "same height as a row": the item grows to
   `lanes × ROW_HEIGHT`, because the alternative is hiding a child.
+- **A container's rows and sub-groups are ONE ordered sequence.**
+  `pushContainer` walks `orderedChildren()` (`src/model/dataset.ts`, schema
+  v10) rather than "every row, then every group", which is what lets a group
+  sit above a timeline at any depth. `groupSummaryBars` walks the same list,
+  so a collapsed group's bars come in the order its children were in.
+- **`rowStripes.ts` owns the alternating row backgrounds, and both renderers
+  paint from it** — the canvas in `drawRowStripes` (over the WHOLE layout,
+  then culled: counting only the virtualized visible items would flip every
+  stripe as the user scrolls) and the rail as absolutely-positioned divs.
+  `strength` is applied as `globalAlpha`/`opacity` over the single
+  `--color-row-stripe` token, so neither renderer parses a colour. An expanded
+  group's header is never striped; a collapsed one is, because collapsed a
+  group *is* the timeline it stands in for.
 - **Groups nest arbitrarily deep; `LayoutItem.depth` means "nesting depth of
   the container", for both `"group"` and `"row"` items** — and it is what the
   rail indents by, which is most of how the hierarchy reads. There is no

@@ -47,6 +47,31 @@ describe("computeLayout", () => {
     ]);
   });
 
+  test("without any `order`, a container still draws its rows before its sub-groups", () => {
+    // The pre-v10 arrangement, and what an older export or a public dataset
+    // (whose records carry no order at all) still gets.
+    const { items } = computeLayout(fixture(), new Set());
+    expect(items.filter((i) => i.depth === 0).map((i) => i.id)).toEqual(["r-top", "g-me", "g-family"]);
+  });
+
+  test("`order` interleaves groups and rows freely — a group can sit above a timeline", () => {
+    const ds = fixture();
+    ds.groups.find((g) => g.id === "g-me")!.order = 0;
+    ds.groups.find((g) => g.id === "g-family")!.order = 1;
+    ds.rows.find((r) => r.id === "r-top")!.order = 2;
+    const { items } = computeLayout(ds, new Set());
+    expect(items.map((i) => `${i.kind}:${i.id}`)).toEqual([
+      "group:g-me",
+      "row:r1",
+      "group:g-family",
+      "group:g-finn",
+      "row:r2",
+      "group:g-finn-kid",
+      "row:r3",
+      "row:r-top",
+    ]);
+  });
+
   test("depth tracks nesting all the way down, not just one level", () => {
     const { items } = computeLayout(fixture(), new Set());
     const depthOf = (id: string) => items.find((i) => i.id === id)!.depth;

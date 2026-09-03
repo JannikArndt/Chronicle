@@ -32,7 +32,8 @@ import {
 import { appStore, mergedDataset } from "./store";
 import { serializeDataset } from "../storage/exportImport";
 import { SCHEMA_VERSION } from "../model/types";
-import { emptyDataset } from "../model/dataset";
+import { emptyDataset, orderedChildren } from "../model/dataset";
+import type { RailChildRef } from "../model/dataset";
 import { DAY_MS } from "../model/fuzzyDate";
 import type { TimelineDataset } from "../model/types";
 
@@ -208,12 +209,20 @@ function dragFixture(): TimelineDataset {
   return ds;
 }
 
-function groupOrder(): string[] {
-  return appStore.getState().dataset.groups.map((g) => g.id);
+// Rendered sibling order of one container. Array position stopped deciding
+// anything at schema v10 — `order` does — so every assertion below reads the
+// same ordered child list the layout draws from, and it holds groups and rows
+// interleaved rather than one list per kind.
+function childIds(parentGroupId?: string): string[] {
+  return orderedChildren(appStore.getState().dataset, parentGroupId).map((child) => child.id);
 }
 
-function rowOrder(): string[] {
-  return appStore.getState().dataset.rows.map((r) => r.id);
+function beforeRow(id: string): RailChildRef {
+  return { kind: "row", id };
+}
+
+function beforeGroup(id: string): RailChildRef {
+  return { kind: "group", id };
 }
 
 function rowById(rowId: string) {
@@ -226,41 +235,42 @@ describe("rail drag-and-drop: moveGroup", () => {
   });
 
   test("moves a group to the front, same level", () => {
-    moveGroup("g3", null, "g1");
-    expect(groupOrder()).toEqual(["g3", "g1", "g2"]);
+    moveGroup("g3", null, beforeGroup("g1"));
+    expect(childIds()).toEqual(["g3", "g1", "g2"]);
   });
 
   test("moves a group to the middle, same level", () => {
-    moveGroup("g1", null, "g3");
-    expect(groupOrder()).toEqual(["g2", "g1", "g3"]);
+    moveGroup("g1", null, beforeGroup("g3"));
+    expect(childIds()).toEqual(["g2", "g1", "g3"]);
   });
 
   test("moves a group to the end with a null sibling", () => {
     moveGroup("g1", null, null);
-    expect(groupOrder()).toEqual(["g2", "g3", "g1"]);
+    expect(childIds()).toEqual(["g2", "g3", "g1"]);
   });
 
   test("dropping a group onto itself is a no-op", () => {
-    moveGroup("g2", null, "g2");
-    expect(groupOrder()).toEqual(["g1", "g2", "g3"]);
+    moveGroup("g2", null, beforeGroup("g2"));
+    expect(childIds()).toEqual(["g1", "g2", "g3"]);
   });
 
   test("an unknown group id is a no-op", () => {
-    moveGroup("no-such-group", null, "g1");
-    expect(groupOrder()).toEqual(["g1", "g2", "g3"]);
+    moveGroup("no-such-group", null, beforeGroup("g1"));
+    expect(childIds()).toEqual(["g1", "g2", "g3"]);
   });
 
-  test("an unknown beforeGroupId is a no-op", () => {
-    moveGroup("g1", null, "no-such-group");
-    expect(groupOrder()).toEqual(["g1", "g2", "g3"]);
+  test("an unknown sibling to drop before is a no-op", () => {
+    moveGroup("g1", null, beforeGroup("no-such-group"));
+    expect(childIds()).toEqual(["g1", "g2", "g3"]);
   });
 
   test("nests a top-level group inside another, at arbitrary depth", () => {
     moveGroup("g3", "g2", null);
     const g3 = appStore.getState().dataset.groups.find((g) => g.id === "g3");
     expect(g3?.parentGroupId).toBe("g2");
-    // g1's own children stay at the front of g2's, ahead of the newly nested g3.
-    expect(groupOrder()).toEqual(["g1", "g2", "g3"]);
+    expect(childIds()).toEqual(["g1", "g2"]);
+    // g2's own timeline stays ahead of the newly nested group.
+    expect(childIds("g2")).toEqual(["r3", "g3"]);
   });
 
   test("un-nests a sub-group back to the root", () => {
@@ -283,6 +293,16 @@ describe("rail drag-and-drop: moveGroup", () => {
     moveGroup("g2", "g2", null);
     expect(appStore.getState().dataset.groups.find((g) => g.id === "g2")?.parentGroupId).toBeUndefined();
   });
+
+  test("drops a group ABOVE a timeline — the two kinds share one order", () => {
+    moveGroup("g3", "g1", beforeRow("r1"));
+    expect(childIds("g1")).toEqual(["g3", "r1", "r2"]);
+  });
+
+  test("drops a group between two timelines", () => {
+    moveGroup("g3", "g1", beforeRow("r2"));
+    expect(childIds("g1")).toEqual(["r1", "g3", "r2"]);
+  });
 });
 
 describe("rail drag-and-drop: moveRow", () => {
@@ -291,31 +311,33 @@ describe("rail drag-and-drop: moveRow", () => {
   });
 
   test("reorders within a group (to the front)", () => {
-    moveRow("r2", "g1", "r1");
-    expect(rowOrder()).toEqual(["r2", "r1", "r3"]);
+    moveRow("r2", "g1", beforeRow("r1"));
+    expect(childIds("g1")).toEqual(["r2", "r1"]);
     expect(rowById("r2")?.groupId).toBe("g1");
   });
 
   test("reorders within a group (to the end via null sibling)", () => {
     moveRow("r1", "g1", null);
-    expect(rowOrder()).toEqual(["r2", "r1", "r3"]);
+    expect(childIds("g1")).toEqual(["r2", "r1"]);
   });
 
   test("moves a row into another group before a sibling", () => {
-    moveRow("r1", "g2", "r3");
-    expect(rowOrder()).toEqual(["r2", "r1", "r3"]);
+    moveRow("r1", "g2", beforeRow("r3"));
+    expect(childIds("g2")).toEqual(["r1", "r3"]);
+    expect(childIds("g1")).toEqual(["r2"]);
     expect(rowById("r1")?.groupId).toBe("g2");
   });
 
   test("moves a row to the end of another group with a null sibling", () => {
     moveRow("r1", "g2", null);
-    expect(rowOrder()).toEqual(["r2", "r3", "r1"]);
+    expect(childIds("g2")).toEqual(["r3", "r1"]);
     expect(rowById("r1")?.groupId).toBe("g2");
   });
 
   test("moves a row into an empty group", () => {
     moveRow("r1", "g3", null);
     expect(rowById("r1")?.groupId).toBe("g3");
+    expect(childIds("g3")).toEqual(["r1"]);
   });
 
   test("moves a row into a sub-group, which is how it changes person", () => {
@@ -327,30 +349,31 @@ describe("rail drag-and-drop: moveRow", () => {
   });
 
   test("dropping a row onto itself is a no-op", () => {
-    moveRow("r1", "g1", "r1");
-    expect(rowOrder()).toEqual(["r1", "r2", "r3"]);
+    moveRow("r1", "g1", beforeRow("r1"));
+    expect(childIds("g1")).toEqual(["r1", "r2"]);
   });
 
   test("an unknown row id is a no-op", () => {
     moveRow("no-such-row", "g1", null);
-    expect(rowOrder()).toEqual(["r1", "r2", "r3"]);
+    expect(childIds("g1")).toEqual(["r1", "r2"]);
   });
 
   test("an unknown target group is a no-op", () => {
     moveRow("r1", "no-such-group", null);
-    expect(rowOrder()).toEqual(["r1", "r2", "r3"]);
+    expect(childIds("g1")).toEqual(["r1", "r2"]);
     expect(rowById("r1")?.groupId).toBe("g1");
   });
 
-  test("a beforeRowId outside the target group is a no-op", () => {
-    moveRow("r1", "g2", "r2"); // r2 lives in g1, not g2
-    expect(rowOrder()).toEqual(["r1", "r2", "r3"]);
+  test("a sibling outside the target group is a no-op", () => {
+    moveRow("r1", "g2", beforeRow("r2")); // r2 lives in g1, not g2
+    expect(childIds("g1")).toEqual(["r1", "r2"]);
     expect(rowById("r1")?.groupId).toBe("g1");
   });
 
   test("moves a row out to the top level, no group at all", () => {
     moveRow("r1", null, null);
     expect(rowById("r1")?.groupId).toBeUndefined();
+    expect(childIds()).toEqual(["g1", "g2", "g3", "r1"]);
   });
 
   test("moves a top-level row into a group", () => {
@@ -359,6 +382,22 @@ describe("rail drag-and-drop: moveRow", () => {
     replaceDataset(ds);
     moveRow("r-top", "g1", null);
     expect(rowById("r-top")?.groupId).toBe("g1");
+  });
+
+  test("drops a timeline ABOVE a group at the top level", () => {
+    const ds = dragFixture();
+    ds.rows.push({ id: "r-top", label: "Top-level", color: "#333" });
+    replaceDataset(ds);
+    moveRow("r-top", null, beforeGroup("g1"));
+    expect(childIds()).toEqual(["r-top", "g1", "g2", "g3"]);
+  });
+
+  test("drops a timeline between two groups", () => {
+    const ds = dragFixture();
+    ds.rows.push({ id: "r-top", label: "Top-level", color: "#333" });
+    replaceDataset(ds);
+    moveRow("r-top", null, beforeGroup("g3"));
+    expect(childIds()).toEqual(["g1", "g2", "r-top", "g3"]);
   });
 });
 

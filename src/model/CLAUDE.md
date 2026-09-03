@@ -49,6 +49,14 @@ owns a point in time is a guess.
 
 ## Invariants
 
+- **Sibling order is `order`, never array position.** `orderedChildren()` is
+  the single answer to "what does this container hold, top to bottom", and
+  `normalizeChildOrder()` (run from `updateDataset`) renumbers each container
+  to 0..n-1. That is what lets a caller say "put this between those two" by
+  writing a fractional order — `breakOut` gives the new group the row's own
+  order, the copy actions use `source.order + 0.5` — and leave the tidying to
+  one place.
+
 - **UTC everywhere**: every stored `ms` is a UTC instant; parsing, formatting,
   and ticks all use `Date.UTC`/`getUTC*`. Never introduce local-time methods.
   This is enforced across `model`, `storage`, `render`, and `ui` — not just here.

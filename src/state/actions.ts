@@ -10,16 +10,19 @@ import {
   collectRowCascade,
 } from "../model/cascade";
 import { breakOut } from "../model/breakOut";
-import { emptyDataset, newId } from "../model/dataset";
+import { emptyDataset, newId, normalizeChildOrder, orderForInsert } from "../model/dataset";
 import { defaultSharedFor } from "../model/sharing";
 import { initializeSharing, notifyDatasetChanged } from "../sharing/sync";
-import { loadDataset, loadOverlays, saveDataset, saveOverlays } from "../storage/db";
+import { loadDataset, loadOverlays, loadSettings, saveDataset, saveOverlays, saveSettings } from "../storage/db";
 import { loadPublicCatalog } from "../publicData/loader";
 import { buildFamousDataset, parseFamousGroupId, remainingRowKeys } from "../publicData/famous/alignToAge";
 import { isMirrorId } from "../sharing/mirror";
 import { appStore, isForeignId, userBirthMs } from "./store";
-import type { AppState, PickableDateField } from "./store";
+import type { AppSettings, AppState, PickableDateField } from "./store";
+import { DEFAULT_ROW_STRIPES } from "../render/rowStripes";
+import type { RowStripeSettings } from "../render/rowStripes";
 import type { FamousPerson } from "../publicData/famous/types";
+import type { RailChildRef } from "../model/dataset";
 import type {
   FuzzyDate,
   Group,
@@ -54,22 +57,33 @@ function persistOverlaysSoon(): void {
   }, 250);
 }
 
+// Every mutation of the user's dataset goes through here, which is also the
+// one place sibling `order` is tidied (schema v10): a caller may leave a new
+// record without an order at all (it lands at the end of its container) or
+// write a fractional one to mean "between these two", and
+// `normalizeChildOrder` turns both back into 0..n-1 before anything renders.
 function updateDataset(mutate: (dataset: TimelineDataset) => TimelineDataset): void {
-  appStore.setState({ dataset: mutate(structuredClone(appStore.getState().dataset)) });
+  const dataset = normalizeChildOrder(mutate(structuredClone(appStore.getState().dataset)));
+  appStore.setState({ dataset });
   persistSoon();
 }
 
 export async function initializeApp(): Promise<void> {
-  const dataset = (await loadDataset()) ?? emptyDataset();
+  const dataset = normalizeChildOrder((await loadDataset()) ?? emptyDataset());
   // Public data is opt-in: nothing is merged until picked from the rail's "+"
   // menu — but a previous session's picks are restored here so the overlay
   // survives a reload.
   const overlays = await loadOverlays();
+  const stored = await loadSettings();
   appStore.setState({
     dataset,
     publicDatasets: [],
     activeWorldKeys: overlays?.activeWorldKeys ?? [],
     activeFamous: overlays?.activeFamous ?? [],
+    // Merged field by field over the defaults, so a settings record written by
+    // an older build (or one missing a key that was added since) restores what
+    // it does hold instead of being thrown away whole.
+    settings: { rowStripes: { ...DEFAULT_ROW_STRIPES, ...stored?.rowStripes } },
     loaded: true,
   });
   rebuildPublicDatasets(appStore.getState());
@@ -77,6 +91,26 @@ export async function initializeApp(): Promise<void> {
   // configured — a fresh clone, or any build without the Supabase env vars —
   // this sets `configured: false` and returns without touching the network.
   void initializeSharing();
+}
+
+// ---------- presentation settings ----------
+
+// Row striping and anything else that only describes how the timeline is
+// drawn. Written straight through to IndexedDB: these are single-field
+// switches on a settings panel, so there is nothing to debounce.
+export function updateRowStripes(patch: Partial<RowStripeSettings>): void {
+  const settings: AppSettings = {
+    ...appStore.getState().settings,
+    rowStripes: { ...appStore.getState().settings.rowStripes, ...patch },
+  };
+  appStore.setState({ settings });
+  void saveSettings(settings);
+}
+
+export function resetRowStripes(): void {
+  const settings: AppSettings = { ...appStore.getState().settings, rowStripes: DEFAULT_ROW_STRIPES };
+  appStore.setState({ settings });
+  void saveSettings(settings);
 }
 
 // ---------- optional public data (world events + famous people) ----------
@@ -431,19 +465,9 @@ export function addSubGroup(parentGroupId: string, label: string, birthDate?: nu
     const parent = dataset.groups.find((g) => g.id === parentGroupId);
     if (!parent) return dataset;
     const id = newId("group");
-    // Insert directly after the parent's existing children so siblings stay
-    // together; array order is what the layout draws.
-    const lastChildIndex = lastIndexWhere(dataset.groups, (g) => g.parentGroupId === parentGroupId);
-    const parentIndex = dataset.groups.findIndex((g) => g.id === parentGroupId);
-    dataset.groups.splice(Math.max(lastChildIndex, parentIndex) + 1, 0, {
-      id,
-      parentGroupId,
-      label,
-      birthDate,
-      color,
-      icon,
-      collapsed: false,
-    });
+    // No `order`: `updateDataset` gives it the next one in the parent, i.e.
+    // last among that parent's children — array position draws nothing.
+    dataset.groups.push({ id, parentGroupId, label, birthDate, color, icon, collapsed: false });
     // A group needs at least one timeline to be visible; start with a generic one.
     dataset.rows.push({
       id: newId("row"),
@@ -565,8 +589,10 @@ export function breakOutEntry(entryId: string): string | undefined {
 
 // ---------- rail drag-and-drop (move groups and rows, at any depth) ----------
 
-// Order is array position — no explicit order field exists (deliberate: no
-// schema change for drag-and-drop).
+// A container's children are one ordered sequence shared by both kinds
+// (`order`, schema v10), so "before" names a row OR a group and every move is
+// the same two writes: re-parent, then take an order that lands in the right
+// slot. `updateDataset` renumbers straight after.
 
 // Every group at or under `groupId`, `groupId` itself included — used to
 // refuse a drop that would nest a group inside its own descendant.
@@ -581,16 +607,28 @@ function subtreeGroupIds(dataset: TimelineDataset, groupId: string): Set<string>
   return collected;
 }
 
+// Whether `before` is a real child of `parentGroupId` right now. A drop
+// naming a sibling that lives somewhere else is a stale target, not a move.
+function isChildOf(dataset: TimelineDataset, parentGroupId: string | null, before: RailChildRef): boolean {
+  const container = parentGroupId ?? undefined;
+  if (before.kind === "row") {
+    return dataset.rows.some((r) => r.id === before.id && r.groupId === container);
+  }
+  return dataset.groups.some((g) => g.id === before.id && g.parentGroupId === container);
+}
+
 // Moves a group anywhere in the tree: under `targetParentGroupId` (null = the
-// root), immediately before `beforeGroupId` (a sibling already at that
-// target — null appends at the end). Self-drops, unknown ids, and drops that
-// would nest a group inside its own descendant are no-ops.
+// root), immediately before `before` — a sibling already at that target, of
+// either kind, since groups and timelines share one order. `null` appends at
+// the end. Self-drops, unknown ids, and drops that would nest a group inside
+// its own descendant are no-ops.
 export function moveGroup(
   groupId: string,
   targetParentGroupId: string | null,
-  beforeGroupId: string | null,
+  before: RailChildRef | null,
 ): void {
-  if (groupId === beforeGroupId || groupId === targetParentGroupId) return;
+  if (groupId === targetParentGroupId) return;
+  if (before !== null && before.kind === "group" && before.id === groupId) return;
   updateDataset((dataset) => {
     const movingGroup = dataset.groups.find((g) => g.id === groupId);
     if (!movingGroup) return dataset;
@@ -598,50 +636,25 @@ export function moveGroup(
       if (!dataset.groups.some((g) => g.id === targetParentGroupId)) return dataset;
       if (subtreeGroupIds(dataset, groupId).has(targetParentGroupId)) return dataset; // cycle guard
     }
-    const beforeGroup = beforeGroupId === null ? undefined : dataset.groups.find((g) => g.id === beforeGroupId);
-    if (beforeGroupId !== null && (beforeGroup === undefined || beforeGroup.parentGroupId !== (targetParentGroupId ?? undefined))) {
-      return dataset;
-    }
-    const remainingGroups = dataset.groups.filter((g) => g.id !== groupId);
-    let insertIndex: number;
-    if (beforeGroup !== undefined) {
-      insertIndex = remainingGroups.findIndex((g) => g.id === beforeGroup.id);
-    } else {
-      const lastIndexAtTarget = lastIndexWhere(remainingGroups, (g) => g.parentGroupId === (targetParentGroupId ?? undefined));
-      insertIndex = lastIndexAtTarget === -1 ? remainingGroups.length : lastIndexAtTarget + 1;
-    }
+    if (before !== null && !isChildOf(dataset, targetParentGroupId, before)) return dataset;
     movingGroup.parentGroupId = targetParentGroupId ?? undefined;
-    remainingGroups.splice(insertIndex, 0, movingGroup);
-    dataset.groups = remainingGroups;
+    movingGroup.order = orderForInsert(dataset, targetParentGroupId ?? undefined, before);
     return dataset;
   });
 }
 
-// Moves a row anywhere in the tree: into `targetGroupId` (null = top-level,
-// no group at all), immediately before `beforeRowId` (a sibling already in
-// that target group — null appends at the end). Same-group reorder is the
-// same code path.
-export function moveRow(rowId: string, targetGroupId: string | null, beforeRowId: string | null): void {
-  if (rowId === beforeRowId) return;
+// Moves a row anywhere in the tree: into `targetGroupId` (null = top-level, no
+// group at all), immediately before `before` — again a sibling of either kind.
+// Same-group reorder is the same code path.
+export function moveRow(rowId: string, targetGroupId: string | null, before: RailChildRef | null): void {
+  if (before !== null && before.kind === "row" && before.id === rowId) return;
   updateDataset((dataset) => {
     const movingRow = dataset.rows.find((r) => r.id === rowId);
     if (!movingRow) return dataset;
     if (targetGroupId !== null && !dataset.groups.some((g) => g.id === targetGroupId)) return dataset;
-    const beforeRow = beforeRowId === null ? undefined : dataset.rows.find((r) => r.id === beforeRowId);
-    if (beforeRowId !== null && (beforeRow === undefined || beforeRow.groupId !== (targetGroupId ?? undefined))) {
-      return dataset;
-    }
-    const remainingRows = dataset.rows.filter((r) => r.id !== rowId);
-    let insertIndex: number;
-    if (beforeRow !== undefined) {
-      insertIndex = remainingRows.findIndex((r) => r.id === beforeRow.id);
-    } else {
-      const lastIndexInTargetGroup = lastIndexWhere(remainingRows, (r) => r.groupId === (targetGroupId ?? undefined));
-      insertIndex = lastIndexInTargetGroup === -1 ? remainingRows.length : lastIndexInTargetGroup + 1;
-    }
+    if (before !== null && !isChildOf(dataset, targetGroupId, before)) return dataset;
     movingRow.groupId = targetGroupId ?? undefined;
-    remainingRows.splice(insertIndex, 0, movingRow);
-    dataset.rows = remainingRows;
+    movingRow.order = orderForInsert(dataset, targetGroupId ?? undefined, before);
     return dataset;
   });
 }
@@ -697,10 +710,13 @@ export function copyGroup(groupId: string): string | undefined {
     });
 
     newGroupId = groupIdMap.get(groupId)!;
-    // Inserted directly after the source group so the copy appears right next
-    // to what it was copied from.
-    const sourceIndex = dataset.groups.findIndex((g) => g.id === groupId);
-    dataset.groups.splice(sourceIndex + 1, 0, ...newGroups);
+    // Ordered directly after the source group so the copy appears right next
+    // to what it was copied from — half a step, which `updateDataset` rounds
+    // back to a whole one. Only the copy's ROOT needs it: every other new
+    // group keeps the order it had inside its own (also copied) parent.
+    const copyRoot = newGroups.find((g) => g.id === newGroupId)!;
+    copyRoot.order = (source.order ?? 0) + 0.5;
+    dataset.groups.push(...newGroups);
     dataset.rows.push(...newRows);
     dataset.entries.push(...newEntries);
     dataset.events.push(...newEvents);
@@ -736,21 +752,13 @@ export function copyRow(rowId: string): string | undefined {
       return { ...event, id: newId("event"), rowId: id };
     });
 
-    const sourceIndex = dataset.rows.findIndex((r) => r.id === rowId);
-    dataset.rows.splice(sourceIndex + 1, 0, { ...source, id, shared: undefined });
+    // Half a step after the original, so the copy lands right beside it.
+    dataset.rows.push({ ...source, id, order: (source.order ?? 0) + 0.5, shared: undefined });
     dataset.entries.push(...newEntries);
     dataset.events.push(...newEvents);
     return dataset;
   });
   return newRowId;
-}
-
-// Array.prototype.findLastIndex needs ES2023; the build targets ES2022.
-function lastIndexWhere<T>(items: T[], matches: (item: T) => boolean): number {
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (matches(items[i])) return i;
-  }
-  return -1;
 }
 
 export function updateGroup(groupId: string, patch: Partial<Group>): void {
@@ -841,7 +849,10 @@ export function commitPickedDate(ms: number, precision: Precision): void {
 // ---------- import ----------
 
 export function replaceDataset(dataset: TimelineDataset): void {
-  appStore.setState({ dataset });
+  // Normalized on the way in, like every other write: a dataset can arrive
+  // from an import, a test fixture or an older schema with no sibling `order`
+  // on it at all.
+  appStore.setState({ dataset: normalizeChildOrder(dataset) });
   persistSoon();
   clearSelection();
 }

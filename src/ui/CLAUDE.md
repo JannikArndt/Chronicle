@@ -152,6 +152,11 @@ is desktop-only now.
   pixel per nesting level — made two things worse: a collapsed group read as a
   section header when it is standing in for a timeline, and a name's appearance
   depended on where it sat rather than on what it was.
+- **A drop target names a container AND a sibling of either kind.** Since
+  groups and timelines share one `order` per container (schema v10),
+  `computeDropSlots()` emits one "before this child" slot per private rail
+  item whatever is being dragged — so a group drops between two timelines and
+  a timeline between two groups. There is no longer a per-kind slot function.
 - **Rail drag-and-drop targets a container (a group id, or `null` for the
   root), not a fixed level.** `RowRail.tsx`'s `analyzeContainers()` rebuilds,
   purely from the rendered DOM's depth-first order (`data-rail-depth`), which
@@ -164,6 +169,16 @@ is desktop-only now.
   with positioning: `copyGroup`/`copyRow` create the duplicate, then
   `moveGroup`/`moveRow` place it at the drop target — a copy is always
   private, regardless of whether the original was shared.
+
+## Presentation settings
+
+`state.settings` holds how the timeline is *drawn* — row striping, so far —
+persisted under its own IndexedDB key, never inside the dataset: it describes
+this device's view, so it must not ride along in an export or through sharing.
+The controls are `RowStripeSettingsForm` in `RowRail.tsx`, behind the ☰ button
+in the rail footer, and follow the house rules — pills rather than dropdowns,
+no Save button, each change written straight through. The striping itself is
+`src/render/rowStripes.ts`, shared by the canvas and the rail.
 
 ## Still open / untested
 

@@ -11,6 +11,8 @@ import type { BarGeometry } from "./bars";
 import { EVENT_PIN_RADIUS_PX, eventMarkerOpacity, layoutEventMarkers } from "./events";
 import type { EventMarker } from "./events";
 import { PLUS_RADIUS, plusSpots } from "./plusSpots";
+import { DEFAULT_ROW_STRIPES, rowStripes } from "./rowStripes";
+import type { RowStripeSettings } from "./rowStripes";
 import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
 import type { TimeScale } from "./timeScale";
 import { computeTicks, snapForScale } from "./timeAxis";
@@ -56,6 +58,7 @@ const FALLBACK_COLORS = {
   gridline: "#eceae5",
   gridlineCoarse: "#dedcd5",
   groupBand: "rgba(41, 37, 34, 0.035)",
+  rowStripe: "rgba(41, 37, 34, 0.06)",
   rowSelected: "rgba(120, 140, 200, 0.10)",
   barText: "#292524",
   barTextInverse: "#ffffff",
@@ -88,6 +91,7 @@ export function readThemeColors(): ColorTable {
     gridline: read("--color-canvas-gridline", FALLBACK_COLORS.gridline),
     gridlineCoarse: read("--color-canvas-gridline-strong", FALLBACK_COLORS.gridlineCoarse),
     groupBand: read("--color-group-band", FALLBACK_COLORS.groupBand),
+    rowStripe: read("--color-row-stripe", FALLBACK_COLORS.rowStripe),
     rowSelected: read("--color-canvas-row-selected", FALLBACK_COLORS.rowSelected),
     barText: read("--color-text", FALLBACK_COLORS.barText),
     barTextInverse: FALLBACK_COLORS.barTextInverse, // white-on-accent stays white in both themes
@@ -146,6 +150,9 @@ export interface EngineInput {
   // this stays false there; the mobile shell has no rail at all, and without
   // it the entries drawn on screen have no name to hang off.
   showRowLabels?: boolean;
+  // Alternating row backgrounds. Absent means the defaults — the engine is
+  // framework-agnostic and must draw sensibly without a settings store.
+  rowStripes?: RowStripeSettings;
 }
 
 interface EntryHit {
@@ -633,6 +640,10 @@ export class TimelineEngine {
       (this.input.draft?.id === this.input.selectedEntryId ? this.input.draft : undefined);
     const relatedIds = selectedEntry ? this.relatedEntryIds(selectedEntry) : null;
 
+    // Behind everything: the alternating row backgrounds. Painted first so a
+    // group's band, the selection tint and every bar sit on top of them.
+    this.drawRowStripes();
+
     for (const item of visible) {
       if (item.kind === "group") {
         // A COLLAPSED group is drawn as the timeline it stands in for: its
@@ -665,6 +676,29 @@ export class TimelineEngine {
     if (this.input.draft) this.drawDraft(this.input.draft, visible, nowMs);
   }
 
+
+  // Computed over the WHOLE layout and culled afterwards, never over the
+  // virtualized `visibleRowItems()`: the alternation counts rows, so starting
+  // the count at whatever happens to be on screen would flip every stripe as
+  // the user scrolls. `strength` is applied as globalAlpha rather than by
+  // rewriting the colour, so the token stays a plain CSS custom property that
+  // both themes define for themselves.
+  private drawRowStripes(): void {
+    const settings = this.input.rowStripes ?? DEFAULT_ROW_STRIPES;
+    const stripes = rowStripes(this.input.layout.items, settings);
+    if (stripes.length === 0) return;
+    const top = this.scrollY;
+    const bottom = this.scrollY + this.height - this.contentTop();
+    const { ctx } = this;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, settings.strength);
+    ctx.fillStyle = this.colors.rowStripe;
+    for (const stripe of stripes) {
+      if (stripe.y + stripe.height < top || stripe.y > bottom) continue;
+      ctx.fillRect(0, stripe.y, this.width, stripe.height);
+    }
+    ctx.restore();
+  }
 
   private drawRow(
     item: LayoutItem,

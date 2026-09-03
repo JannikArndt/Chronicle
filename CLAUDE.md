@@ -62,6 +62,14 @@ what's true across the whole codebase.
   when zoomed in* (`src/render/events.ts` owns that rule and nothing else may
   re-decide it). A zero-length entry is not an event and must not be used as
   one: it has no label anchor, no fade edges and no honest "ongoing".
+- **A container's timelines and sub-groups are one ordered list** — `order` on
+  both `Group` and `TimelineRow` (schema v10), resolved by `orderedChildren()`
+  in `src/model/dataset.ts` and renumbered per container by
+  `normalizeChildOrder()` after every mutation. Nothing may go back to reading
+  array position as render order, and nothing may draw all the rows before all
+  the groups: a group above a timeline was literally unrepresentable that way.
+  A record with no `order` (an older export, a public dataset) still sorts
+  last, rows before groups, which is exactly the pre-v10 picture.
 - **Breaking out and collapsing are inverses on screen** — a timeline breaks
   out into a group of timelines, one per entry (`src/model/breakOut.ts`), and a
   collapsed group draws one summary bar per *direct child* rather than one band

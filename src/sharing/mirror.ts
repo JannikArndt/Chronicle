@@ -41,6 +41,13 @@ export function mirrorOwnerOfId(id: string): string | undefined {
 export function buildMirror(snapshot: MirrorSnapshot): Mirror {
   const rebuilt = datasetToRecordsRoundTrip(snapshot.records);
   const dataset: TimelineDataset = { schemaVersion: SCHEMA_VERSION, ...rebuilt };
+  // Somebody else's sibling `order` is dropped: it numbers slots in THEIR
+  // rail, and carrying it over would let a mirrored group interleave among
+  // the user's own top-level rows. Un-ordered records sort after every
+  // ordered one (see `orderedChildren`), which is the rule that keeps other
+  // people's timelines below your own — the same way public data sits below.
+  dataset.groups = dataset.groups.map(({ order: _order, ...group }) => group);
+  dataset.rows = dataset.rows.map(({ order: _order, ...row }) => row);
   return {
     ownerAccountId: snapshot.ownerAccountId,
     ownerName: snapshot.ownerName,

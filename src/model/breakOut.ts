@@ -26,16 +26,6 @@ function entriesToBreakOut(dataset: TimelineDataset, rowId: string, entryIds?: s
   return [...selected].sort((a, b) => a.start.ms - b.start.ms);
 }
 
-// Array.prototype.findLastIndex needs ES2023; the build targets ES2022 (same
-// helper as src/state/actions.ts — kept local here since this file may not
-// import from state).
-function lastIndexWhere<T>(items: T[], matches: (item: T) => boolean): number {
-  for (let i = items.length - 1; i >= 0; i--) {
-    if (matches(items[i])) return i;
-  }
-  return -1;
-}
-
 function titleOf(entry: TimelineEntry): string {
   return entry.title.trim() || "Untitled";
 }
@@ -71,6 +61,11 @@ export function breakOut(
     icon: sourceRow.icon,
     birthDate: sourceRow.birthDate,
     collapsed: false,
+    // The new group takes the row's own slot among its siblings — breaking
+    // out and collapsing are inverses on screen, so the group has to appear
+    // exactly where the timeline it replaces was. The row itself moves inside
+    // it, so nothing is left holding this order.
+    order: sourceRow.order,
   };
 
   // One new row per broken-out entry, in the chronological order already
@@ -108,15 +103,10 @@ export function breakOut(
     keptRow.groupId = newGroup.id;
   }
 
-  // Groups have no order field — array position is render order — so the new
-  // group goes right after its last sibling (same parentGroupId), or at the
-  // very end if it has none.
-  const siblingIndex = lastIndexWhere(result.groups, (group) => group.parentGroupId === newGroup.parentGroupId);
-  if (siblingIndex === -1) result.groups.push(newGroup);
-  else result.groups.splice(siblingIndex + 1, 0, newGroup);
-
-  // Appending keeps the kept original row (untouched in array position)
-  // ahead of the freshly created ones, as required.
+  // Array position no longer decides anything (schema v10) — `newGroup.order`
+  // above is what places it, and `normalizeChildOrder` numbers the new rows
+  // inside it in the order they are appended.
+  result.groups.push(newGroup);
   result.rows.push(...newRows);
 
   return { dataset: result, groupId: newGroup.id, rowIds: newRows.map((row) => row.id) };

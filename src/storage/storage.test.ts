@@ -239,4 +239,34 @@ describe("import validation", () => {
     expect(result.dataset.entries).toHaveLength(1);
     expect(result.dataset.entries[0].rowId).toBe("r1-sub");
   });
+
+  // v10: sibling order becomes explicit, and an older file must keep exactly
+  // the arrangement it was drawn with — every timeline of a container first,
+  // then every sub-group, each in array order.
+  test("numbers a v9 file's siblings, preserving the rows-then-groups order it was drawn in", () => {
+    const legacy = {
+      schemaVersion: 9,
+      groups: [
+        { id: "g1", label: "Me", collapsed: false },
+        { id: "g1a", parentGroupId: "g1", label: "Work", collapsed: false },
+        { id: "g2", label: "Family", collapsed: false },
+      ],
+      rows: [
+        { id: "r-top", label: "Top-level" },
+        { id: "r1", groupId: "g1", label: "Homes" },
+        { id: "r2", groupId: "g1", label: "Education" },
+      ],
+      entries: [],
+      events: [],
+    };
+    const result = validateImport(legacy);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const orderOf = (id: string) =>
+      result.dataset.rows.find((r) => r.id === id)?.order ?? result.dataset.groups.find((g) => g.id === id)?.order;
+    // Root: the top-level timeline, then the two groups.
+    expect([orderOf("r-top"), orderOf("g1"), orderOf("g2")]).toEqual([0, 1, 2]);
+    // Inside g1: both of its timelines, then its sub-group.
+    expect([orderOf("r1"), orderOf("r2"), orderOf("g1a")]).toEqual([0, 1, 2]);
+  });
 });

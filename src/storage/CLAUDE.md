@@ -40,3 +40,19 @@ never reach an export, and revoking has to be a delete that cannot take your own
 records with it. Signing out clears it.
 
 Tests import `fake-indexeddb/auto`.
+
+## Keys in the `datasets` store
+
+`main` (the user's dataset), `overlays` (which public data is switched on),
+`mirrors` (other people's shared timelines — deliberately never part of `main`,
+so revoking access cannot take the user's own records with it) and `settings`
+(presentation preferences: row striping). Only `main` is ever exported.
+
+## Migrations
+
+`validateImport` upgrades an older file in place and is also what `loadDataset`
+runs on whatever IndexedDB is holding. v10 is `assignSiblingOrder`: it numbers
+each container's children through `normalizeChildOrder()`, which sorts
+un-ordered records rows-before-groups — exactly how a pre-v10 file was drawn —
+so an old export keeps the arrangement it had, and only gains the ability to
+have that arrangement changed.

@@ -51,6 +51,12 @@
      what makes deeper nesting read as a slightly stronger shade. */
   --color-group-band: rgba(41, 37, 34, 0.035);
 
+  /* The alternating row background, at FULL strength — the `strength` setting
+     (src/render/rowStripes.ts) scales it down from here, so this value is the
+     ceiling a user can dial up to, not the default look. Same token for the
+     canvas and the rail; ink-on-paper, so it works under bars of any colour. */
+  --color-row-stripe: rgba(41, 37, 34, 0.06);
+
   /* Canvas-only tokens — read at paint time by src/render/engine.ts. */
   --color-canvas-gridline: #eceae5;
   --color-canvas-gridline-strong: #dedcd5;
@@ -107,6 +113,7 @@
 
     /* Lighter-on-dark rather than darker-on-light, same low alpha. */
     --color-group-band: rgba(255, 255, 255, 0.035);
+    --color-row-stripe: rgba(255, 255, 255, 0.055);
 
     --color-canvas-gridline: #322e27;
     --color-canvas-gridline-strong: #3e392f;
@@ -304,6 +311,17 @@ textarea {
    Rendered in the same depth-first order `computeLayout()` already produces,
    so a nested group's band (added later in that order) paints over its
    ancestors' — see --color-group-band in :root. */
+/* One per stripe, positioned by JS from `rowStripes()` and rendered before
+   every other rail child so items and group bands paint on top of it. The
+   inline `opacity` is the user's `strength` setting. */
+.rail-row-stripe {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: var(--color-row-stripe);
+  pointer-events: none;
+}
+
 .rail-group-band {
   position: absolute;
   left: 0;
@@ -358,12 +376,20 @@ textarea {
 }
 
 .collapse-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   color: var(--color-text-muted);
   padding: 0;
   line-height: 1;
   text-align: center;
+  /* ▸/▾ are U+25B8/U+25BE, the *small* triangles: at 1em they draw about half
+     the height of the name beside them and read as a speck. Scaled to match
+     the label's cap height instead — the glyph is the only thing that grows,
+     the slot below stays the checkbox's width so the names still line up. */
+  font-size: 1.55em;
 }
 
 /* The ▸/▾ and a timeline's checkbox occupy the SAME slot, so a group's name
@@ -856,6 +882,20 @@ textarea {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* A checkbox and its wording on one line — the settings popover's shape, as
+   opposed to `.field-label`, which titles a control sitting underneath it. */
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.settings-check input[type="checkbox"] {
+  width: auto;
+  margin: 0;
 }
 
 .field-pair {
