@@ -134,6 +134,12 @@ is desktop-only now.
   End block hugs the right, above the handle it controls; an event has one date,
   and a lone block sitting hard right reads as a layout bug — hence
   `:last-child:not(:first-child)`.
+- **The unhide affordance is never hover-revealed**, for the same reason the
+  share toggle is not: it is the only way back for something the user took out
+  of the picture, and a control found only by hovering is how a hidden timeline
+  stays hidden. It exists only while its container is actually holding
+  something back — `🙈 n` on the group header, the same in the rail footer for
+  the top level, `👁 Show …` at the foot of the mobile list.
 - **The share toggle stays visible while it is on**, unlike every other
   hover-revealed rail action. "Who can see this" has to be legible at a glance;
   a share control that hides itself is how someone forgets what they published.
@@ -145,7 +151,8 @@ is desktop-only now.
 - **Every label in the rail is the same label.** A group's name and a
   timeline's name share one `font-size` declaration (on the `.rail-group,
   .rail-row` block), carry no colour and no extra weight, and start at the same
-  x because the ▸/▾ and the visibility checkbox share one width rule. What says
+  x because the ▸/▾ and a timeline's empty `.rail-row-spacer` share one width
+  rule (that slot held a visibility checkbox until hiding moved into ⚙). What says
   "group" is the ▸/▾, the indent of its contents (inline `padding-left` from
   `LayoutItem.depth`), and `.rail-group-band` while expanded. Every attempt to
   say it in the type as well — bold, the group's colour, a size that shrank one

@@ -81,7 +81,7 @@ has nothing to say there.
   so lanes can never reshuffle while zooming, and back-to-back children share
   a lane — which is exactly the "Job A, Job B, Job C" case), and **hidden rows
   are excluded** from the aggregate (as a labelled bar of its own, a row
-  unchecked in the rail would otherwise be visibly back). Overlap is the one
+  hidden by the user would otherwise be visibly back). Overlap is the one
   thing that breaks "same height as a row": the item grows to
   `lanes × ROW_HEIGHT`, because the alternative is hiding a child.
 - **A container's rows and sub-groups are ONE ordered sequence.**
@@ -139,3 +139,18 @@ has nothing to say there.
   has no rail at all (`MobileShell`'s `railContentRef` is a permanent no-op),
   so without this the entries drawn on screen have nothing naming the
   timeline they belong to.
+- **Hidden rows and groups are not in the layout at all.** `computeLayout`
+  takes a `HiddenIds` (`src/model/hidden.ts`) and emits no item for anything in
+  it, a hidden group taking its whole subtree with it — so `engine.ts` and
+  `miniMap.ts` have no visibility concept to check, and `LayoutItem.hidden` no
+  longer exists. Don't reintroduce it: a row that is drawn but faded is the
+  behaviour this replaced, and the thing that remembers what was hidden is the
+  app store, not the layout.
+- **`treeLines.ts` is the optional tree overlay, and it is derived, not
+  stored.** One trunk per EXPANDED group (a collapsed one has no children on
+  screen — same `subtreeEndY`-is-unset test both renderers already use for the
+  band) plus one elbow per direct child, read back out of the flat item list by
+  depth. It shares the rail's indent arithmetic (`indentOf`), so the rail's
+  divs and the canvas's strokes land on the same pixels. The canvas draws it
+  only together with `showRowLabels`: the tree connects names to the group
+  holding them, and on desktop the rail has both.

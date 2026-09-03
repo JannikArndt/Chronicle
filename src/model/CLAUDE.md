@@ -34,6 +34,13 @@ have grown an "unless it is a point" branch. An event carries one `date`
 only makes sense for a duration. Nothing in the model points *at* an event —
 which is why `collectEventCascade` walks no tree.
 
+`favicon.ts` answers "what mark goes in front of a name": `faviconUrl()` for a
+site, and `nameIcon()` which picks the favicon over the emoji for an entry, a
+row or a group. One mark, never two — see the invariant in the root
+`CLAUDE.md`. `hidden.ts` is the other DOM-free view helper: which rows and
+groups are hidden, and what each container is holding back so the UI can offer
+it again.
+
 `breakOut.ts` is the one **structural** conversion in the model: a timeline
 becomes a group of timelines, one per entry ("break out" — the ask called it
 "exploding"; `plans/break-out-feature-design.md` §1 says why not *explode*,

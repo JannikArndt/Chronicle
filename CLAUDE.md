@@ -58,6 +58,21 @@ what's true across the whole codebase.
   (see `src/sharing/CLAUDE.md`).
 - **No dropdowns under ~7 options** — use `PillSelector`. No Save/Cancel buttons —
   autosave per field change. No browse/edit mode toggle, no modal create screen.
+- **A favicon replaces the emoji, it never joins it** — an entry, a timeline and
+  a group all carry an optional `website`, and `nameIcon()` in
+  `src/model/favicon.ts` is the single place that turns "site or emoji" into one
+  mark. Two coloured things in front of a name is exactly what the rail's "every
+  name is the same name" rule exists to prevent, and the emoji has a second job
+  as the fallback when the icon cannot be fetched.
+- **Hiding is a view preference, and it hides completely** — `hiddenRowIds` /
+  `hiddenGroupIds` live in the app store and the IndexedDB `overlays` record,
+  never in the dataset (they must not travel with an export or be published),
+  and `computeLayout` emits no item at all for a hidden row or group. There is
+  no `LayoutItem.hidden` and nothing may bring one back: a dimmed-but-present
+  row is what this replaced. What keeps "gone" from meaning "lost" is that every
+  container offers its own hidden children back — `hiddenChildrenOf()` in
+  `src/model/hidden.ts`, shown on the group header, in the rail footer for the
+  top level, and at the foot of the mobile list.
 - **An entry is a span, an event is a point** — and the point is *only drawn
   when zoomed in* (`src/render/events.ts` owns that rule and nothing else may
   re-decide it). A zero-length entry is not an event and must not be used as
@@ -94,6 +109,11 @@ what's true across the whole codebase.
   "whose life is this" — a row's own date first, else the nearest ancestor
   group's — and every consumer (the pre-birth hatch, the age badge, name
   suggestions) goes through it rather than re-deriving the walk.
+- **The tree overlay adds strokes and nothing else** — `treeLines()`
+  (`src/render/treeLines.ts`) is pure, derived from the layout items, and off by
+  default; both the rail and the canvas paint from it. Turning it on must never
+  move an item: the hierarchy is carried by the indent, the ▸/▾ and the group
+  band, and this only draws the connection those already imply.
 
 ## Testing conventions
 

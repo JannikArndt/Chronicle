@@ -42,3 +42,10 @@ nothing half-made to hold. Don't add one "for symmetry".
   in terms of that object — an export is literally `state.dataset` — so nothing
   foreign may be merged into it. Use `isForeignId` (public **or** mirrored) for
   read-only checks in the UI, not `isPublicId`.
+- **View preferences are not data.** `hiddenRowIds`, `hiddenGroupIds` and
+  `showTreeLines` live in the store and are persisted in the IndexedDB
+  `overlays` record beside the public-data picks — never in `state.dataset`. An
+  export is literally that dataset, and publishing a timeline must not tell
+  anyone else what you have hidden or how you like the rail drawn. They do
+  persist across reloads: hiding now removes a row from the picture entirely,
+  and a hide that undid itself overnight would read as the app forgetting.

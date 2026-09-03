@@ -143,6 +143,30 @@ alternative would be hiding a child. A hidden timeline is left out of the
 aggregate entirely.
 → `src/render/layout.ts` (`GroupSummaryBar`, `packLanes`), `src/render/engine.ts` (`drawGroupSummary`)
 
+**Hidden** — a timeline or a group you have taken out of the view. Not deleted
+and not dimmed: it produces **no layout item at all**, so it is gone from the
+rail, the canvas and the minimap alike, and a hidden group takes everything
+inside it along. It is a **view preference** — it lives in the app store and in
+the IndexedDB `overlays` record, never in the dataset, so it is not exported and
+not published. What keeps it findable is that **the container it sits in offers
+it back**: `🙈 n` on the group's header, the same in the rail footer for the top
+level, `👁 Show …` at the foot of the mobile list.
+→ `src/model/hidden.ts`, `src/state/actions.ts` (`setRowHidden`, `setGroupHidden`,
+`unhideChild`)
+
+**Tree lines** — the optional overlay drawing a line from each group down to the
+timelines and sub-groups it holds, with an elbow into each. Off by default
+(switched on in the rail's ＋ menu or the mobile ⋯ menu), derived purely from the
+layout, and drawn by both the rail and the canvas from the same numbers. It adds
+strokes and moves nothing.
+→ `src/render/treeLines.ts`
+
+**Website** — an optional site on an entry, a timeline or a group, kept only so
+its **favicon** can be drawn in front of the name. The favicon **replaces** the
+emoji rather than sitting beside it — one coloured mark per name — and the emoji
+remains as the fallback when the icon cannot be fetched.
+→ `src/model/favicon.ts` (`faviconUrl`, `nameIcon`)
+
 **Public data** — read-only timelines shipped with the app (world events, famous
 people), loaded from `public-data/*.json` at build time. Every id is prefixed
 `pub:<file>:` so it can never collide with, or be written over, your own data.
