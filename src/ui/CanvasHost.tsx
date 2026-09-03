@@ -48,7 +48,6 @@ function engineInputFor(layout: Layout, axisTop: number, showRowLabels: boolean)
     picking: state.pickingField !== undefined,
     axisTop,
     showRowLabels,
-    rowStripes: state.settings.rowStripes,
   };
 }
 

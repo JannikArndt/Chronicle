@@ -13,14 +13,12 @@ import { breakOut } from "../model/breakOut";
 import { emptyDataset, newId, normalizeChildOrder, orderForInsert } from "../model/dataset";
 import { defaultSharedFor } from "../model/sharing";
 import { initializeSharing, notifyDatasetChanged } from "../sharing/sync";
-import { loadDataset, loadOverlays, loadSettings, saveDataset, saveOverlays, saveSettings } from "../storage/db";
+import { loadDataset, loadOverlays, saveDataset, saveOverlays } from "../storage/db";
 import { loadPublicCatalog } from "../publicData/loader";
 import { buildFamousDataset, parseFamousGroupId, remainingRowKeys } from "../publicData/famous/alignToAge";
 import { isMirrorId } from "../sharing/mirror";
 import { appStore, isForeignId, userBirthMs } from "./store";
-import type { AppSettings, AppState, PickableDateField } from "./store";
-import { DEFAULT_ROW_STRIPES } from "../render/rowStripes";
-import type { RowStripeSettings } from "../render/rowStripes";
+import type { AppState, PickableDateField } from "./store";
 import type { FamousPerson } from "../publicData/famous/types";
 import type { RailChildRef } from "../model/dataset";
 import type {
@@ -74,16 +72,11 @@ export async function initializeApp(): Promise<void> {
   // menu — but a previous session's picks are restored here so the overlay
   // survives a reload.
   const overlays = await loadOverlays();
-  const stored = await loadSettings();
   appStore.setState({
     dataset,
     publicDatasets: [],
     activeWorldKeys: overlays?.activeWorldKeys ?? [],
     activeFamous: overlays?.activeFamous ?? [],
-    // Merged field by field over the defaults, so a settings record written by
-    // an older build (or one missing a key that was added since) restores what
-    // it does hold instead of being thrown away whole.
-    settings: { rowStripes: { ...DEFAULT_ROW_STRIPES, ...stored?.rowStripes } },
     loaded: true,
   });
   rebuildPublicDatasets(appStore.getState());
@@ -91,26 +84,6 @@ export async function initializeApp(): Promise<void> {
   // configured — a fresh clone, or any build without the Supabase env vars —
   // this sets `configured: false` and returns without touching the network.
   void initializeSharing();
-}
-
-// ---------- presentation settings ----------
-
-// Row striping and anything else that only describes how the timeline is
-// drawn. Written straight through to IndexedDB: these are single-field
-// switches on a settings panel, so there is nothing to debounce.
-export function updateRowStripes(patch: Partial<RowStripeSettings>): void {
-  const settings: AppSettings = {
-    ...appStore.getState().settings,
-    rowStripes: { ...appStore.getState().settings.rowStripes, ...patch },
-  };
-  appStore.setState({ settings });
-  void saveSettings(settings);
-}
-
-export function resetRowStripes(): void {
-  const settings: AppSettings = { ...appStore.getState().settings, rowStripes: DEFAULT_ROW_STRIPES };
-  appStore.setState({ settings });
-  void saveSettings(settings);
 }
 
 // ---------- optional public data (world events + famous people) ----------

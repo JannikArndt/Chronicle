@@ -11,11 +11,12 @@ export const GROUP_HEADER_HEIGHT_FLOOR = 22;
 const GROUP_HEADER_STEP_PX = 3; // header shrinks this much per nesting depth
 export const ROW_HEIGHT = 40;
 export const ROW_GAP = 10; // between sibling rows within the same container
-// Space before a group header, separating it from whatever precedes it at the
-// same level — bigger than ROW_GAP so a group reads as its own section, not
-// as one more row belonging to whatever came before it. Applies at every
-// depth, not just top-level, per the same "hierarchy through spacing" idea
-// GROUP_HEADER_CHILD_GAP applies going the other direction.
+// Space before a group, separating it from whatever precedes it at the same
+// level — bigger than ROW_GAP so a group reads as its own section, not as one
+// more row belonging to whatever came before it. Applies at every depth, not
+// just top-level, per the same "hierarchy through spacing" idea
+// GROUP_HEADER_CHILD_GAP applies going the other direction — and in BOTH
+// collapse states, so that expanding a group never shifts it on screen.
 export const GROUP_GAP_BEFORE = 20;
 // Tighter space from a group's own header down to its first child (row or
 // sub-group) — smaller than ROW_GAP, so a header binds visually to its own
@@ -239,11 +240,14 @@ export function computeLayout(
         pushRow(child.row, depth, gapBefore);
         return;
       }
-      // A collapsed group is spaced like the timeline it stands in for, not
-      // like a section: GROUP_GAP_BEFORE exists to separate a header from
-      // whatever precedes it, and there is no header here to separate.
-      const sectionGap = isCollapsed(child.group) ? ROW_GAP : GROUP_GAP_BEFORE;
-      const gapBefore = index === 0 ? (hasHeaderAbove ? GROUP_HEADER_CHILD_GAP : 0) : sectionGap;
+      // The SAME gap whether this group is collapsed or expanded. It used to
+      // be the narrower ROW_GAP while collapsed, on the reasoning that a
+      // collapsed group is standing in for a timeline and should be spaced
+      // like one — but the two states are one click apart, so the difference
+      // read as the group (and everything below it) jumping ten pixels down
+      // the moment it was expanded. A gap that changes under a toggle is
+      // worse than a gap that is slightly generous in one of the two states.
+      const gapBefore = index === 0 ? (hasHeaderAbove ? GROUP_HEADER_CHILD_GAP : 0) : GROUP_GAP_BEFORE;
       pushGroup(child.group, depth, gapBefore);
     });
   }

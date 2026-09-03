@@ -90,10 +90,12 @@ has nothing to say there.
   paint from it** — the canvas in `drawRowStripes` (over the WHOLE layout,
   then culled: counting only the virtualized visible items would flip every
   stripe as the user scrolls) and the rail as absolutely-positioned divs.
-  `strength` is applied as `globalAlpha`/`opacity` over the single
+  `ROW_STRIPES.strength` is applied as `globalAlpha`/`opacity` over the single
   `--color-row-stripe` token, so neither renderer parses a colour. An expanded
   group's header is never striped; a collapsed one is, because collapsed a
-  group *is* the timeline it stands in for.
+  group *is* the timeline it stands in for. `ROW_STRIPES` is a constant, not
+  state: the knobs were live controls in the rail long enough to settle them,
+  and what is left is the settled look plus the named fields that produced it.
 - **Groups nest arbitrarily deep; `LayoutItem.depth` means "nesting depth of
   the container", for both `"group"` and `"row"` items** — and it is what the
   rail indents by, which is most of how the hierarchy reads. There is no

@@ -8,8 +8,6 @@ import type { TimelineDataset, TimelineEntry, Precision } from "../model/types";
 import type { FamousPerson } from "../publicData/famous/types";
 import type { Grant, SharingSession } from "../sharing/backend";
 import type { Mirror } from "../sharing/mirror";
-import { DEFAULT_ROW_STRIPES } from "../render/rowStripes";
-import type { RowStripeSettings } from "../render/rowStripes";
 
 export interface TimeRangeFilter {
   startMs: number;
@@ -60,14 +58,6 @@ export interface AppState {
   // removing the whole person.
   activeFamous: { person: FamousPerson; aligned: boolean; removedRowKeys: string[] }[];
   sharing: SharingState;
-  // Presentation preferences — how the timeline looks, never what it holds.
-  // Persisted next to the dataset (not inside it): they belong to this device
-  // and must not travel in an export or through sharing.
-  settings: AppSettings;
-}
-
-export interface AppSettings {
-  rowStripes: RowStripeSettings;
 }
 
 export interface SharingState {
@@ -94,7 +84,6 @@ const initialState: AppState = {
   activeWorldKeys: [],
   activeFamous: [],
   sharing: { configured: false, mirrors: [], grants: [], status: "off" },
-  settings: { rowStripes: DEFAULT_ROW_STRIPES },
 };
 
 type Listener = () => void;

@@ -7,7 +7,7 @@ import type { MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } f
 import { canBreakOut, describeBreakOut } from "../model/breakOut";
 import { collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import { ROW_HEIGHT } from "../render/layout";
-import { rowStripes } from "../render/rowStripes";
+import { ROW_STRIPES, rowStripes } from "../render/rowStripes";
 import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
 import {
@@ -27,14 +27,12 @@ import {
   addFamousPerson,
   removeFamousRow,
   removePublicGroup,
-  resetRowStripes,
   setFamousAlignment,
   toggleGroupCollapsed,
   setRowShared,
   toggleRowHidden,
   updateGroup,
   updateRow,
-  updateRowStripes,
 } from "../state/actions";
 import { isForeignId, useAppState, userBirthMs } from "../state/store";
 import { formatFuzzyDate } from "../model/fuzzyDate";
@@ -44,7 +42,6 @@ import type { RailChildRef } from "../model/dataset";
 import { describePublishImpact } from "../model/sharing";
 import { importDatasetWithConfirmation } from "./importFlow";
 import { WorldEventsPicker } from "./WorldEventsPicker";
-import { PillSelector } from "./PillSelector";
 import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
 import { fetchWikidataBiography, searchWikidataCandidates } from "../publicData/famous/wikidata";
 import type { SparqlBinding, WikidataCandidate } from "../publicData/famous/wikidata";
@@ -60,13 +57,12 @@ type PopoverState =
   | { kind: "add-group"; top: number }
   | { kind: "add-row"; top: number }
   | { kind: "rail-add-menu"; top: number }
-  | { kind: "row-stripes"; top: number }
   | null;
 
 // Popovers anchored to the rail footer's "+" button open upward from the
 // bottom of the rail rather than downward from a click point.
 function isFooterPopover(kind: NonNullable<PopoverState>["kind"]): boolean {
-  return kind === "add-group" || kind === "add-row" || kind === "rail-add-menu" || kind === "row-stripes";
+  return kind === "add-group" || kind === "add-row" || kind === "rail-add-menu";
 }
 
 // ---------- drag-and-drop (move or, with Alt/Option held, copy) ----------
@@ -373,7 +369,6 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
   // mouse-exit from these absolutely-positioned, transitioned rows, but real
   // mouseenter/mouseleave events don't have that failure mode.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const stripeSettings = state.settings.rowStripes;
   const dragController = useRailDragController(railContentRef);
 
   const closePopover = () => setPopover(null);
@@ -387,11 +382,11 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
               one scroll position, so a stripe that disagreed would be visible
               as a step at the rail's edge. Opacity carries `strength`, which
               is the same trick the canvas plays with globalAlpha. */}
-          {rowStripes(layout.items, stripeSettings).map((stripe, index) => (
+          {rowStripes(layout.items).map((stripe, index) => (
             <div
               key={`stripe:${index}`}
               className="rail-row-stripe"
-              style={{ top: stripe.y, height: stripe.height, opacity: stripeSettings.strength }}
+              style={{ top: stripe.y, height: stripe.height, opacity: ROW_STRIPES.strength }}
             />
           ))}
           {layout.items
@@ -431,14 +426,6 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
             ✨ Set up your timeline
           </button>
         )}
-        <button
-          type="button"
-          className="rail-add-button"
-          title="Row striping…"
-          onClick={() => setPopover({ kind: "row-stripes", top: 0 })}
-        >
-          ☰
-        </button>
         <button
           type="button"
           className="rail-add-button"
@@ -727,7 +714,6 @@ function Popover({
         {popover.kind === "rail-add-menu" && (
           <RailAddMenu open={open} close={close} onStartOnboarding={onStartOnboarding} />
         )}
-        {popover.kind === "row-stripes" && <RowStripeSettingsForm />}
         {popover.kind === "add-group" && <AddGroupForm close={close} />}
         {popover.kind === "add-row" && <AddTopLevelRowForm close={close} />}
         {popover.kind === "add-menu" && <AddMenu groupId={popover.groupId} close={close} />}
@@ -736,69 +722,6 @@ function Popover({
         {popover.kind === "add-event" && <AddEventForm rowId={popover.rowId} close={close} />}
       </div>
     </>
-  );
-}
-
-// Row striping, and every knob that shapes it — kept as live controls rather
-// than a fixed look because the right strength depends on the palette, the
-// screen and how dense this particular timeline is. Every change is applied
-// and saved immediately: there are no Save buttons anywhere in this app.
-function RowStripeSettingsForm() {
-  const stripes = useAppState((state) => state.settings.rowStripes);
-  return (
-    <div className="popover-form">
-      <div className="popover-title">Row striping</div>
-      <label className="settings-check">
-        <input
-          type="checkbox"
-          checked={stripes.enabled}
-          onChange={(e) => updateRowStripes({ enabled: e.target.checked })}
-        />
-        Alternate row backgrounds
-      </label>
-      <div className="field-label">Strength — {Math.round(stripes.strength * 100)}%</div>
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.05}
-        value={stripes.strength}
-        disabled={!stripes.enabled}
-        onChange={(e) => updateRowStripes({ strength: Number(e.target.value) })}
-      />
-      <div className="field-label">Count rows</div>
-      <PillSelector
-        options={[
-          { value: "group", icon: "🗂️", label: "Per group" },
-          { value: "all", icon: "📜", label: "Continuous" },
-        ]}
-        value={stripes.scope}
-        disabled={!stripes.enabled}
-        onChange={(scope) => updateRowStripes({ scope })}
-      />
-      <div className="field-label">Start with</div>
-      <PillSelector
-        options={[
-          { value: "0", icon: "▪️", label: "1st row" },
-          { value: "1", icon: "▫️", label: "2nd row" },
-        ]}
-        value={String(stripes.offset)}
-        disabled={!stripes.enabled}
-        onChange={(offset) => updateRowStripes({ offset: offset === "1" ? 1 : 0 })}
-      />
-      <label className="settings-check">
-        <input
-          type="checkbox"
-          checked={stripes.includeGaps}
-          disabled={!stripes.enabled}
-          onChange={(e) => updateRowStripes({ includeGaps: e.target.checked })}
-        />
-        Cover the gaps between rows
-      </label>
-      <button type="button" className="small-button" onClick={resetRowStripes}>
-        Reset to defaults
-      </button>
-    </div>
   );
 }
 

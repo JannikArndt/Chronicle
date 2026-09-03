@@ -6,7 +6,6 @@
 import type { TimelineDataset } from "../model/types";
 import type { FamousPerson } from "../publicData/famous/types";
 import type { Mirror } from "../sharing/mirror";
-import type { AppSettings } from "../state/store";
 import { validateImport } from "./exportImport";
 
 const DB_NAME = "chronicle";
@@ -18,10 +17,6 @@ const OVERLAYS_KEY = "overlays";
 // else's personal data, it must never reach an export, and revoking access has
 // to be a delete that cannot possibly take the user's own records with it.
 const MIRRORS_KEY = "mirrors";
-// Presentation preferences (row striping, so far). Kept out of `main` on
-// purpose: they describe this device's view, not the user's records, and must
-// never ride along in an export or through sharing.
-const SETTINGS_KEY = "settings";
 
 // Which optional public data (world events + famous people) the user has added.
 // Persisted next to the dataset so the overlay survives a reload. Famous people
@@ -30,33 +25,6 @@ const SETTINGS_KEY = "settings";
 export interface StoredOverlays {
   activeWorldKeys: string[];
   activeFamous: { person: FamousPerson; aligned: boolean; removedRowKeys: string[] }[];
-}
-
-export async function loadSettings(): Promise<Partial<AppSettings> | null> {
-  const db = await openDatabase();
-  try {
-    return await new Promise((resolve, reject) => {
-      const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(SETTINGS_KEY);
-      request.onsuccess = () => resolve((request.result as Partial<AppSettings> | undefined) ?? null);
-      request.onerror = () => reject(request.error);
-    });
-  } finally {
-    db.close();
-  }
-}
-
-export async function saveSettings(settings: AppSettings): Promise<void> {
-  const db = await openDatabase();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, "readwrite");
-      transaction.objectStore(STORE_NAME).put(settings, SETTINGS_KEY);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-  } finally {
-    db.close();
-  }
 }
 
 function openDatabase(): Promise<IDBDatabase> {

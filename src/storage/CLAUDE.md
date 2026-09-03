@@ -44,9 +44,9 @@ Tests import `fake-indexeddb/auto`.
 ## Keys in the `datasets` store
 
 `main` (the user's dataset), `overlays` (which public data is switched on),
-`mirrors` (other people's shared timelines — deliberately never part of `main`,
-so revoking access cannot take the user's own records with it) and `settings`
-(presentation preferences: row striping). Only `main` is ever exported.
+and `mirrors` (other people's shared timelines — deliberately never part of
+`main`, so revoking access cannot take the user's own records with it). Only
+`main` is ever exported.
 
 ## Migrations
 

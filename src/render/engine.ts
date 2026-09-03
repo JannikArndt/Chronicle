@@ -11,8 +11,7 @@ import type { BarGeometry } from "./bars";
 import { EVENT_PIN_RADIUS_PX, eventMarkerOpacity, layoutEventMarkers } from "./events";
 import type { EventMarker } from "./events";
 import { PLUS_RADIUS, plusSpots } from "./plusSpots";
-import { DEFAULT_ROW_STRIPES, rowStripes } from "./rowStripes";
-import type { RowStripeSettings } from "./rowStripes";
+import { ROW_STRIPES, rowStripes } from "./rowStripes";
 import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
 import type { TimeScale } from "./timeScale";
 import { computeTicks, snapForScale } from "./timeAxis";
@@ -150,9 +149,6 @@ export interface EngineInput {
   // this stays false there; the mobile shell has no rail at all, and without
   // it the entries drawn on screen have no name to hang off.
   showRowLabels?: boolean;
-  // Alternating row backgrounds. Absent means the defaults — the engine is
-  // framework-agnostic and must draw sensibly without a settings store.
-  rowStripes?: RowStripeSettings;
 }
 
 interface EntryHit {
@@ -684,14 +680,13 @@ export class TimelineEngine {
   // rewriting the colour, so the token stays a plain CSS custom property that
   // both themes define for themselves.
   private drawRowStripes(): void {
-    const settings = this.input.rowStripes ?? DEFAULT_ROW_STRIPES;
-    const stripes = rowStripes(this.input.layout.items, settings);
+    const stripes = rowStripes(this.input.layout.items);
     if (stripes.length === 0) return;
     const top = this.scrollY;
     const bottom = this.scrollY + this.height - this.contentTop();
     const { ctx } = this;
     ctx.save();
-    ctx.globalAlpha = Math.min(1, settings.strength);
+    ctx.globalAlpha = Math.min(1, ROW_STRIPES.strength);
     ctx.fillStyle = this.colors.rowStripe;
     for (const stripe of stripes) {
       if (stripe.y + stripe.height < top || stripe.y > bottom) continue;

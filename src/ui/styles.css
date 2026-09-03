@@ -884,20 +884,6 @@ textarea {
   letter-spacing: 0.04em;
 }
 
-/* A checkbox and its wording on one line — the settings popover's shape, as
-   opposed to `.field-label`, which titles a control sitting underneath it. */
-.settings-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.settings-check input[type="checkbox"] {
-  width: auto;
-  margin: 0;
-}
-
 .field-pair {
   display: flex;
   gap: 8px;

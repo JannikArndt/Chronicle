@@ -3,8 +3,11 @@
 //
 // The point of striping here is horizontal tracking: a bar sits far to the
 // right of the name that labels it, and on a dense timeline the eye loses the
-// line. Everything about how strong that hint is, and where it restarts, is a
-// setting rather than a hardcoded look — see `RowStripeSettings`.
+// line. `ROW_STRIPES` below is the settled look; the fields exist so the
+// choices behind it stay named and adjustable in one place, not because
+// anything reads them from a store. There was briefly a settings panel for
+// them in the rail — it did its job, the values it produced are the defaults
+// now, and a permanent panel for a decision made once is just clutter.
 
 import { ROW_GAP } from "./layout";
 import type { LayoutItem } from "./layout";
@@ -28,12 +31,12 @@ export interface RowStripeSettings {
   includeGaps: boolean;
 }
 
-export const DEFAULT_ROW_STRIPES: RowStripeSettings = {
+export const ROW_STRIPES: RowStripeSettings = {
   enabled: true,
-  strength: 0.6,
+  strength: 0.7,
   scope: "group",
   offset: 0,
-  includeGaps: false,
+  includeGaps: true,
 };
 
 export interface RowStripe {
@@ -53,7 +56,10 @@ function isStripeable(item: LayoutItem): boolean {
 // The stripes to paint behind `items`, in layout coordinates. Empty whenever
 // striping is off or turned all the way down, so a caller can skip the paint
 // entirely without repeating the test.
-export function rowStripes(items: readonly LayoutItem[], settings: RowStripeSettings): RowStripe[] {
+export function rowStripes(
+  items: readonly LayoutItem[],
+  settings: RowStripeSettings = ROW_STRIPES,
+): RowStripe[] {
   if (!settings.enabled || settings.strength <= 0) return [];
   const stripes: RowStripe[] = [];
   // One counter per nesting depth, so "restart in each group" is exact:

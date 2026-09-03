@@ -214,15 +214,20 @@ describe("computeLayout", () => {
       expect(expanded.items.find((i) => i.id === "g-me")!.subtreeEndY).toBeDefined();
     });
 
-    test("it is spaced like a sibling row, not like a section", () => {
-      const { items } = computeLayout(collapsedFixture(), new Set(["g-me"]));
-      const rTop = items.find((i) => i.id === "r-top")!;
-      const gMe = items.find((i) => i.id === "g-me")!;
-      expect(gMe.y - (rTop.y + rTop.height)).toBe(ROW_GAP);
-      // Expanded, that same group takes the wider section gap.
+    test("collapsing does not move it: the gap above is the same in both states", () => {
+      const collapsed = computeLayout(collapsedFixture(), new Set(["g-me"]));
       const expanded = computeLayout(collapsedFixture(), new Set());
-      const gMeExpanded = expanded.items.find((i) => i.id === "g-me")!;
-      expect(gMeExpanded.y - (rTop.y + rTop.height)).toBe(GROUP_GAP_BEFORE);
+      const gapAbove = (layout: ReturnType<typeof computeLayout>) => {
+        const rTop = layout.items.find((i) => i.id === "r-top")!;
+        const gMe = layout.items.find((i) => i.id === "g-me")!;
+        return gMe.y - (rTop.y + rTop.height);
+      };
+      expect(gapAbove(collapsed)).toBe(GROUP_GAP_BEFORE);
+      expect(gapAbove(expanded)).toBe(GROUP_GAP_BEFORE);
+      // And the group's own top is unchanged by the toggle — the whole point.
+      expect(collapsed.items.find((i) => i.id === "g-me")!.y).toBe(
+        expanded.items.find((i) => i.id === "g-me")!.y,
+      );
     });
   });
 

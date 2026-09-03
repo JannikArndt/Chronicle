@@ -170,16 +170,6 @@ is desktop-only now.
   `moveGroup`/`moveRow` place it at the drop target — a copy is always
   private, regardless of whether the original was shared.
 
-## Presentation settings
-
-`state.settings` holds how the timeline is *drawn* — row striping, so far —
-persisted under its own IndexedDB key, never inside the dataset: it describes
-this device's view, so it must not ride along in an export or through sharing.
-The controls are `RowStripeSettingsForm` in `RowRail.tsx`, behind the ☰ button
-in the rail footer, and follow the house rules — pills rather than dropdowns,
-no Save button, each change written straight through. The striping itself is
-`src/render/rowStripes.ts`, shared by the canvas and the rail.
-
 ## Still open / untested
 
 - Real-device iOS Safari gesture check (pinch vs page zoom) has never been

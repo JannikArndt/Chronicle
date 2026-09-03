@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { DEFAULT_ROW_STRIPES, rowStripes } from "./rowStripes";
+import { ROW_STRIPES, rowStripes } from "./rowStripes";
 import type { RowStripeSettings } from "./rowStripes";
 import { ROW_GAP, ROW_HEIGHT } from "./layout";
 import type { LayoutItem } from "./layout";
@@ -16,8 +16,11 @@ function collapsedGroup(id: string, y: number, depth = 0): LayoutItem {
   return { kind: "group", id, y, height: ROW_HEIGHT, depth, hidden: false, summaries: [] };
 }
 
+// Every case that asserts a raw `y` pins `includeGaps: false`, so the numbers
+// below are the row's own box and the gap padding is tested on its own.
 const settings = (patch: Partial<RowStripeSettings>): RowStripeSettings => ({
-  ...DEFAULT_ROW_STRIPES,
+  ...ROW_STRIPES,
+  includeGaps: false,
   ...patch,
 });
 
