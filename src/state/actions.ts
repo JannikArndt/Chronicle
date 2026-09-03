@@ -50,8 +50,8 @@ let overlayPersistTimer: ReturnType<typeof setTimeout> | undefined;
 function persistOverlaysSoon(): void {
   clearTimeout(overlayPersistTimer);
   overlayPersistTimer = setTimeout(() => {
-    const { activeWorldKeys, activeFamous, hiddenRowIds, hiddenGroupIds } = appStore.getState();
-    void saveOverlays({ activeWorldKeys, activeFamous, hiddenRowIds, hiddenGroupIds });
+    const { activeWorldKeys, activeFamous, hiddenRowIds, hiddenGroupIds, showTreeLines } = appStore.getState();
+    void saveOverlays({ activeWorldKeys, activeFamous, hiddenRowIds, hiddenGroupIds, showTreeLines });
   }, 250);
 }
 
@@ -79,6 +79,7 @@ export async function initializeApp(): Promise<void> {
     activeFamous: overlays?.activeFamous ?? [],
     hiddenRowIds: overlays?.hiddenRowIds ?? [],
     hiddenGroupIds: overlays?.hiddenGroupIds ?? [],
+    showTreeLines: overlays?.showTreeLines ?? false,
     loaded: true,
   });
   rebuildPublicDatasets(appStore.getState());
@@ -816,6 +817,13 @@ export function toggleGroupHidden(groupId: string): void {
 export function unhideChild(child: RailChildRef): void {
   if (child.kind === "row") setRowHidden(child.id, false);
   else setGroupHidden(child.id, false);
+}
+
+// The tree overlay's switch. Nothing else reads it: both renderers ask
+// `treeLines()` for the same segments and only draw them when this is on.
+export function setShowTreeLines(showTreeLines: boolean): void {
+  appStore.setState({ showTreeLines });
+  persistOverlaysSoon();
 }
 
 export function unhideAll(): void {

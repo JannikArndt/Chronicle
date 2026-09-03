@@ -11,7 +11,7 @@ import type { EngineView, TimelineEngine } from "../render/engine";
 import type { Layout } from "../render/layout";
 import { AddEntryAssistant } from "../onboarding/AddEntryAssistant";
 import { AddTimelineAssistant } from "../onboarding/AddTimelineAssistant";
-import { clearSelection, selectEntry, selectEvent, setSearch } from "../state/actions";
+import { clearSelection, selectEntry, selectEvent, setSearch, setShowTreeLines } from "../state/actions";
 import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
 import { triggerDownload } from "../storage/exportImport";
 import { AssistantSheet } from "./AssistantSheet";
@@ -360,6 +360,7 @@ function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOn
   const [showingSharing, setShowingSharing] = useState(false);
   const sharingConfigured = useAppState((s) => s.sharing.configured);
   const signedIn = useAppState((s) => s.sharing.session !== undefined);
+  const showTreeLines = useAppState((s) => s.showTreeLines);
 
   const handleImport = () => {
     importDatasetWithConfirmation((message) => window.alert(message));
@@ -404,6 +405,12 @@ function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOn
             people still have no mobile home — see the backlog. */}
         <button type="button" className="menu-item" onClick={() => setShowingWorldEvents(true)}>
           🌍 World events…
+        </button>
+        {/* The same view switch the desktop rail's ＋ menu carries. It matters
+            more here: with no rail, the canvas labels and these lines are all
+            there is to say which group a row belongs to. */}
+        <button type="button" className="menu-item" onClick={() => setShowTreeLines(!showTreeLines)}>
+          {showTreeLines ? "☑" : "☐"} 🌳 Tree lines
         </button>
         {sharingConfigured && (
           <button type="button" className="menu-item" onClick={() => setShowingSharing(true)}>

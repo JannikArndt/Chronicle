@@ -8,6 +8,7 @@ import { canBreakOut, describeBreakOut } from "../model/breakOut";
 import { collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
 import { groupHeaderHeight } from "../render/layout";
 import { ROW_STRIPES, rowStripes } from "../render/rowStripes";
+import { treeLines } from "../render/treeLines";
 import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
 import {
@@ -32,6 +33,7 @@ import {
   setRowShared,
   setGroupHidden,
   setRowHidden,
+  setShowTreeLines,
   unhideChild,
   updateGroup,
   updateRow,
@@ -413,6 +415,22 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
                 style={{ top: item.y, height: item.subtreeEndY! - item.y }}
               />
             ))}
+          {/* The optional tree overlay, from the same pure `treeLines()` the
+              canvas strokes — drawn here between the bands and the items, so
+              a line runs behind the names rather than over them. */}
+          {state.showTreeLines &&
+            treeLines(layout.items).map((line, index) => (
+              <div
+                key={`tree:${index}`}
+                className="rail-tree-line"
+                style={{
+                  left: Math.min(line.x0, line.x1),
+                  top: Math.min(line.y0, line.y1),
+                  width: Math.max(1, Math.abs(line.x1 - line.x0)),
+                  height: Math.max(1, Math.abs(line.y1 - line.y0)),
+                }}
+              />
+            ))}
           {layout.items.map((item) => (
             <RailItem
               key={`${item.kind}:${item.id}`}
@@ -785,6 +803,7 @@ function RailAddMenu({
   };
 
   const [mode, setMode] = useState<"menu" | "world" | "famous">("menu");
+  const showTreeLines = useAppState((s) => s.showTreeLines);
 
   if (mode === "world") return <WorldEventsPicker back={() => setMode("menu")} />;
   if (mode === "famous") return <FamousPeoplePicker back={() => setMode("menu")} />;
@@ -805,6 +824,16 @@ function RailAddMenu({
       </button>
       <button type="button" className="menu-item" onClick={() => setMode("famous")}>
         🌟 Famous people ▸
+      </button>
+      {/* A view switch among the add actions, because this is the rail's only
+          menu and the thing it changes is the rail. It stays open on click:
+          the point is to see the lines appear behind it. */}
+      <button
+        type="button"
+        className="menu-item"
+        onClick={() => setShowTreeLines(!showTreeLines)}
+      >
+        {showTreeLines ? "☑" : "☐"} 🌳 Tree lines
       </button>
       <button
         type="button"

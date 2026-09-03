@@ -32,6 +32,9 @@ export interface StoredOverlays {
   // before hiding was persisted simply has neither.
   hiddenRowIds?: string[];
   hiddenGroupIds?: string[];
+  // Whether the tree overlay is switched on. Same reasoning as the two above:
+  // a view preference, absent from an older overlay record.
+  showTreeLines?: boolean;
 }
 
 function openDatabase(): Promise<IDBDatabase> {

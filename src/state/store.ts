@@ -54,6 +54,11 @@ export interface AppState {
   // this list, and the rail offers it back in the container it belongs to.
   hiddenRowIds: string[];
   hiddenGroupIds: string[];
+  // The optional tree overlay (src/render/treeLines.ts): lines from each group
+  // to the timelines and sub-groups it holds. A view preference like hiding,
+  // persisted the same way, off by default — the indent and the group band
+  // already say the same thing on a shallow tree.
+  showTreeLines: boolean;
   // Which optional public data the user has switched on. Nothing loads by
   // default — `publicDatasets` is rebuilt from these selections (see actions).
   // `activeFamous` holds the whole FamousPerson (not just an id) so a person
@@ -88,6 +93,7 @@ const initialState: AppState = {
   filters: { groupIds: [] },
   hiddenRowIds: [],
   hiddenGroupIds: [],
+  showTreeLines: false,
   activeWorldKeys: [],
   activeFamous: [],
   sharing: { configured: false, mirrors: [], grants: [], status: "off" },

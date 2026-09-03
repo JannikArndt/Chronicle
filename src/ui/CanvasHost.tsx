@@ -48,6 +48,9 @@ function engineInputFor(layout: Layout, axisTop: number, showRowLabels: boolean)
     picking: state.pickingField !== undefined,
     axisTop,
     showRowLabels,
+    // Straight from the store rather than a prop: it is a global view
+    // preference, and both shells want it.
+    showTreeLines: state.showTreeLines,
   };
 }
 

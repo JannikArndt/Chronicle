@@ -12,6 +12,7 @@ import { EVENT_PIN_RADIUS_PX, eventMarkerOpacity, layoutEventMarkers } from "./e
 import type { EventMarker } from "./events";
 import { PLUS_RADIUS, plusSpots } from "./plusSpots";
 import { ROW_STRIPES, rowStripes } from "./rowStripes";
+import { treeLines } from "./treeLines";
 import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
 import type { TimeScale } from "./timeScale";
 import { computeTicks, snapForScale } from "./timeAxis";
@@ -62,6 +63,7 @@ const FALLBACK_COLORS = {
   gridlineCoarse: "#dedcd5",
   groupBand: "rgba(41, 37, 34, 0.035)",
   rowStripe: "rgba(41, 37, 34, 0.06)",
+  treeLine: "rgba(41, 37, 34, 0.22)",
   rowSelected: "rgba(120, 140, 200, 0.10)",
   barText: "#292524",
   barTextInverse: "#ffffff",
@@ -94,7 +96,8 @@ export function readThemeColors(): ColorTable {
     gridline: read("--color-canvas-gridline", FALLBACK_COLORS.gridline),
     gridlineCoarse: read("--color-canvas-gridline-strong", FALLBACK_COLORS.gridlineCoarse),
     groupBand: read("--color-group-band", FALLBACK_COLORS.groupBand),
-    rowStripe: read("--color-row-stripe", FALLBACK_COLORS.rowStripe),
+  rowStripe: read("--color-row-stripe", FALLBACK_COLORS.rowStripe),
+    treeLine: read("--color-tree-line", FALLBACK_COLORS.treeLine),
     rowSelected: read("--color-canvas-row-selected", FALLBACK_COLORS.rowSelected),
     barText: read("--color-text", FALLBACK_COLORS.barText),
     barTextInverse: FALLBACK_COLORS.barTextInverse, // white-on-accent stays white in both themes
@@ -153,6 +156,12 @@ export interface EngineInput {
   // this stays false there; the mobile shell has no rail at all, and without
   // it the entries drawn on screen have no name to hang off.
   showRowLabels?: boolean;
+  // Draw the optional tree overlay — one line from each group to the
+  // timelines and sub-groups it holds (src/render/treeLines.ts). Off unless
+  // the user switched it on, and only ever drawn together with
+  // `showRowLabels`: it connects names, and on desktop the rail already has
+  // both.
+  showTreeLines?: boolean;
 }
 
 interface EntryHit {
@@ -651,6 +660,12 @@ export class TimelineEngine {
     // Behind everything: the alternating row backgrounds. Painted first so a
     // group's band, the selection tint and every bar sit on top of them.
     this.drawRowStripes();
+    // Gated on `showRowLabels` as well: the tree connects NAMES to the group
+    // that holds them, and the canvas only draws names where there is no DOM
+    // rail (mobile). On desktop the rail is drawing the same segments beside
+    // its own names, and repeating them over the bars would be a second tree
+    // connecting nothing.
+    if (this.input.showTreeLines && this.input.showRowLabels) this.drawTreeLines();
 
     for (const item of visible) {
       if (item.kind === "group") {
@@ -691,6 +706,29 @@ export class TimelineEngine {
   // the user scrolls. `strength` is applied as globalAlpha rather than by
   // rewriting the colour, so the token stays a plain CSS custom property that
   // both themes define for themselves.
+  // The optional tree overlay, from the same pure `treeLines()` the rail
+  // renders as divs — drawn before the rows so a bar always sits on top of it:
+  // it is a connector between things, never something that can cover one.
+  // Computed over the whole layout and culled here, like the stripes.
+  private drawTreeLines(): void {
+    const { ctx } = this;
+    const top = this.scrollY;
+    const bottom = this.scrollY + this.height - this.contentTop();
+    ctx.save();
+    ctx.strokeStyle = this.colors.treeLine;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const line of treeLines(this.input.layout.items)) {
+      if (Math.max(line.y0, line.y1) < top || Math.min(line.y0, line.y1) > bottom) continue;
+      // Half-pixel offsets keep a 1px stroke on one physical row of pixels
+      // instead of smearing it across two.
+      ctx.moveTo(Math.round(line.x0) + 0.5, Math.round(line.y0) + 0.5);
+      ctx.lineTo(Math.round(line.x1) + 0.5, Math.round(line.y1) + 0.5);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
   private drawRowStripes(): void {
     const stripes = rowStripes(this.input.layout.items);
     if (stripes.length === 0) return;

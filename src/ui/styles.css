@@ -57,6 +57,11 @@
      canvas and the rail; ink-on-paper, so it works under bars of any colour. */
   --color-row-stripe: rgba(41, 37, 34, 0.06);
 
+  /* The optional tree overlay's strokes (src/render/treeLines.ts), drawn by
+     both the rail and the canvas. Faint on purpose: it is a connector between
+     things that are already legible, not a border. */
+  --color-tree-line: rgba(41, 37, 34, 0.22);
+
   /* Canvas-only tokens — read at paint time by src/render/engine.ts. */
   --color-canvas-gridline: #eceae5;
   --color-canvas-gridline-strong: #dedcd5;
@@ -114,6 +119,7 @@
     /* Lighter-on-dark rather than darker-on-light, same low alpha. */
     --color-group-band: rgba(255, 255, 255, 0.035);
     --color-row-stripe: rgba(255, 255, 255, 0.055);
+    --color-tree-line: rgba(255, 255, 255, 0.24);
 
     --color-canvas-gridline: #322e27;
     --color-canvas-gridline-strong: #3e392f;
@@ -2601,6 +2607,17 @@ textarea {
 .invite-landing p {
   margin: 0;
   font-size: 14px;
+}
+
+/* ---------- tree overlay ---------- */
+
+/* One div per segment from `treeLines()`; a vertical is 1px wide and a
+   horizontal 1px tall, so the same element type draws both. The rail and the
+   canvas stroke the same numbers — see src/render/treeLines.ts. */
+.rail-tree-line {
+  position: absolute;
+  background: var(--color-tree-line);
+  pointer-events: none;
 }
 
 /* ---------- the 16px floor (must stay last in this file) ---------- */
