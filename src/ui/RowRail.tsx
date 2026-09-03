@@ -57,23 +57,26 @@ import type { FamousPerson } from "../publicData/famous/types";
 const EMOJI_QUICK_PICKS = ["💼", "🏠", "❤️", "🎓", "✈️", "🎨", "⚽", "🐕"];
 
 type PopoverState =
-  | { kind: "add-menu"; groupId: string; top: number }
   | { kind: "group-edit"; groupId: string; top: number }
   | { kind: "row-edit"; rowId: string; top: number }
   | { kind: "add-event"; rowId: string; top: number }
   | { kind: "add-group"; top: number }
   | { kind: "add-row"; top: number }
   | { kind: "rail-add-menu"; top: number }
-  // The hidden children of one container, offered back. `groupId: undefined`
-  // is the root container, whose list opens from the rail footer.
-  | { kind: "hidden-children"; groupId: string | undefined; top: number }
+  // What the TOP LEVEL is holding back, opened from the rail footer. Every
+  // other container offers its hidden children inside its own ⚙ settings.
+  | { kind: "hidden-root"; top: number }
   | null;
 
 // Popovers anchored to the rail footer's "+" button open upward from the
 // bottom of the rail rather than downward from a click point.
 function isFooterPopover(popover: NonNullable<PopoverState>): boolean {
-  if (popover.kind === "hidden-children") return popover.groupId === undefined;
-  return popover.kind === "add-group" || popover.kind === "add-row" || popover.kind === "rail-add-menu";
+  return (
+    popover.kind === "hidden-root" ||
+    popover.kind === "add-group" ||
+    popover.kind === "add-row" ||
+    popover.kind === "rail-add-menu"
+  );
 }
 
 // ---------- drag-and-drop (move or, with Alt/Option held, copy) ----------
@@ -463,7 +466,7 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
             type="button"
             className="icon-button hidden-count"
             title={`${hiddenAtRoot.length} hidden at the top level — click to show`}
-            onClick={() => setPopover({ kind: "hidden-children", groupId: undefined, top: 0 })}
+            onClick={() => setPopover({ kind: "hidden-root", top: 0 })}
           >
             🙈 {hiddenAtRoot.length}
           </button>
@@ -543,16 +546,6 @@ function RailItem({
   const readOnly = isForeignId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
-  // How many of THIS group's direct children are hidden. A count, not the list
-  // itself: `useAppState` is `useSyncExternalStore`, whose snapshot has to be
-  // referentially stable, and a freshly-built array never is. The popover
-  // rebuilds the list when it opens.
-  const hiddenChildCount = useAppState((s) =>
-    item.kind === "group"
-      ? hiddenChildrenOf(mergedDataset(s), item.id, hiddenIdsOf(s.hiddenRowIds, s.hiddenGroupIds)).length
-      : 0,
-  );
-
   const key = `${item.kind}:${item.id}`;
   const hoverReveal = (visible: boolean) => `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`;
 
@@ -616,21 +609,6 @@ function RailItem({
               ⇔
             </button>
           )}
-          {/* Deliberately NOT hover-revealed: it is the only way back for
-              something the user removed from the picture, and a control that
-              has to be discovered by hovering is how a hidden timeline stays
-              lost. It exists only while this group is actually holding
-              something back. */}
-          {hiddenChildCount > 0 && (
-            <button
-              type="button"
-              className="icon-button hidden-count"
-              title={`${hiddenChildCount} hidden here — click to show`}
-              onClick={(e) => openPopover({ kind: "hidden-children", groupId: group.id, top: topOf(e) })}
-            >
-              🙈 {hiddenChildCount}
-            </button>
-          )}
           {!readOnly && (
             <>
               <RailDragHandle
@@ -641,18 +619,10 @@ function RailItem({
               <button
                 type="button"
                 className={hoverReveal(visible)}
-                title="Edit group"
+                title="Group settings — add, hide, delete"
                 onClick={(e) => openPopover({ kind: "group-edit", groupId: group.id, top: topOf(e) })}
               >
                 ⚙
-              </button>
-              <button
-                type="button"
-                className={hoverReveal(visible)}
-                title="Add…"
-                onClick={(e) => openPopover({ kind: "add-menu", groupId: group.id, top: topOf(e) })}
-              >
-                ＋
               </button>
             </>
           )}
@@ -778,11 +748,10 @@ function Popover({
         )}
         {popover.kind === "add-group" && <AddGroupForm close={close} />}
         {popover.kind === "add-row" && <AddTopLevelRowForm close={close} />}
-        {popover.kind === "add-menu" && <AddMenu groupId={popover.groupId} close={close} />}
         {popover.kind === "group-edit" && <GroupEditor groupId={popover.groupId} close={close} />}
         {popover.kind === "row-edit" && <RowEditor rowId={popover.rowId} close={close} />}
         {popover.kind === "add-event" && <AddEventForm rowId={popover.rowId} close={close} />}
-        {popover.kind === "hidden-children" && <HiddenChildrenList groupId={popover.groupId} close={close} />}
+        {popover.kind === "hidden-root" && <HiddenChildrenList close={close} />}
       </div>
     </>
   );
@@ -1092,41 +1061,56 @@ function WikidataDebugPanel({ debug, onClose }: { debug: WikidataDebug; onClose:
 // What one container is holding back, offered by name. This is the whole of
 // "hidden completely, but never lost": a hidden row or group leaves the layout
 // entirely, and the only place it can be found again is the container it sits
-// in — under that group's header, or in the rail footer for the top level.
+// in — its ⚙ settings, or the rail footer for the top level.
 //
-// One line per hidden child, each showing what it is; clicking it puts that
-// one back. There is no "hide all", so there is no "show all" either — the
-// list is short by construction, because it is per container.
-function HiddenChildrenList({ groupId, close }: { groupId: string | undefined; close: () => void }) {
+// The list is built where it is *rendered*, never held in the store snapshot:
+// `useAppState` is `useSyncExternalStore`, whose snapshot has to be
+// referentially stable, and a freshly-built array never is.
+function useHiddenChildren(groupId: string | undefined): RailChild[] {
   // The MERGED dataset, not just the user's own: a public or mirrored timeline
   // can be hidden too (from the mobile row menu), and it has to be offered
   // back from the container it is actually drawn in.
   const dataset = useAppState((s) => mergedDataset(s));
   const hiddenRowIds = useAppState((s) => s.hiddenRowIds);
   const hiddenGroupIds = useAppState((s) => s.hiddenGroupIds);
-  const children = hiddenChildrenOf(dataset, groupId, hiddenIdsOf(hiddenRowIds, hiddenGroupIds));
-  const containerLabel =
-    groupId === undefined ? "the top level" : `“${dataset.groups.find((g) => g.id === groupId)?.label ?? ""}”`;
+  return hiddenChildrenOf(dataset, groupId, hiddenIdsOf(hiddenRowIds, hiddenGroupIds));
+}
 
+// One line per hidden child, each showing what it is; clicking it puts that
+// one back. There is no "hide all", so there is no "show all" either — the
+// list is short by construction, because it is per container.
+function HiddenChildLines({ items, onLastShown }: { items: RailChild[]; onLastShown: () => void }) {
   return (
-    <div className="popover-form">
-      <div className="popover-title">Hidden in {containerLabel}</div>
-      {children.length === 0 && <div className="hint">Nothing is hidden here any more.</div>}
-      {children.map((child: RailChild) => (
+    <>
+      {items.map((child: RailChild) => (
         <button
           key={`${child.kind}:${child.id}`}
           type="button"
           className="menu-item"
           onClick={() => {
             unhideChild({ kind: child.kind, id: child.id });
-            // The last one puts the list itself out of a job — and the button
+            // The last one puts the list itself out of a job — and the control
             // that opened it disappears with it.
-            if (children.length === 1) close();
+            if (items.length === 1) onLastShown();
           }}
         >
-          👁 {child.kind === "row" ? child.row.label : `${child.group.label} (group)`}
+          <span className="menu-item-icon">👁</span>
+          {child.kind === "row" ? child.row.label : `${child.group.label} (group)`}
         </button>
       ))}
+    </>
+  );
+}
+
+// The top level's copy of that list, opened from the rail footer — the root
+// has no ⚙ of its own to put it in.
+function HiddenChildrenList({ close }: { close: () => void }) {
+  const children = useHiddenChildren(undefined);
+  return (
+    <div className="popover-form">
+      <div className="popover-title">Hidden at the top level</div>
+      {children.length === 0 && <div className="hint">Nothing is hidden here any more.</div>}
+      <HiddenChildLines items={children} onLastShown={close} />
     </div>
   );
 }
@@ -1190,67 +1174,6 @@ function AddTopLevelRowForm({ close }: { close: () => void }) {
   );
 }
 
-function AddMenu({ groupId, close }: { groupId: string; close: () => void }) {
-  const dataset = useAppState((s) => s.dataset);
-  const group = dataset.groups.find((g) => g.id === groupId);
-  const [mode, setMode] = useState<"menu" | "subgroup" | "row">("menu");
-  const [label, setLabel] = useState("");
-
-  const submit = () => {
-    if (mode === "subgroup") addSubGroup(groupId, label.trim());
-    else addRow(groupId, label.trim());
-    close();
-  };
-
-  if (mode === "menu") {
-    return (
-      <div className="popover-form">
-        <button type="button" className="menu-item" onClick={() => setMode("subgroup")}>
-          🧑 Person or sub-group
-        </button>
-        <button type="button" className="menu-item" onClick={() => setMode("row")}>
-          🏷️ Timeline row
-        </button>
-        <button
-          type="button"
-          className="menu-item menu-item-danger"
-          onClick={() => {
-            const cascade = collectGroupCascade(dataset, groupId);
-            if (window.confirm(`Delete group “${group?.label}”? ${describeCascade(cascade)}`)) {
-              deleteGroupWithCascade(groupId);
-              close();
-            }
-          }}
-        >
-          🗑 Delete group…
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="popover-form">
-      <div className="popover-title">{mode === "subgroup" ? "New sub-group" : "New timeline row"}</div>
-      <input
-        type="text"
-        autoFocus
-        placeholder={mode === "subgroup" ? "Name" : "Label (e.g. Job, Residence)"}
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
-      />
-      <button
-        type="button"
-        className="small-button"
-        disabled={label.trim() === ""}
-        onClick={submit}
-      >
-        Add
-      </button>
-    </div>
-  );
-}
-
 // A site for a group or a timeline, shown as its favicon in place of the
 // emoji (`nameIcon()` decides, in one place, for the rail and the canvas
 // both). The emoji stays editable above it on purpose: it is the fallback
@@ -1280,10 +1203,54 @@ function WebsiteField({
   );
 }
 
+// The ⚙ of a group is the group's ONE menu: its fields, everything you can add
+// inside it, whatever it is holding back, and the two ways to make it go away.
+// It used to be split with a ＋ that carried its own copy of "delete group",
+// which is how the same group ended up deletable from two different-looking
+// menus. Everything below the fields is a `menu-item` in one list — same size,
+// same icon column, same alignment — so the destructive one is told apart by
+// its colour and its position, not by being a differently-shaped button.
 function GroupEditor({ groupId, close }: { groupId: string; close: () => void }) {
   const dataset = useAppState((s) => s.dataset);
+  const hiddenChildren = useHiddenChildren(groupId);
+  // Adding a child takes over the same popover rather than opening a second
+  // one: it is the ⚙ asking one more question, not a new place to be.
+  const [adding, setAdding] = useState<"group" | "row" | null>(null);
+  const [label, setLabel] = useState("");
   const group = dataset.groups.find((g) => g.id === groupId);
   if (!group) return null;
+
+  if (adding !== null) {
+    const submit = () => {
+      if (adding === "group") addSubGroup(groupId, label.trim());
+      else addRow(groupId, label.trim());
+      close();
+    };
+    return (
+      <div className="popover-form">
+        <div className="popover-title">
+          {adding === "group" ? "New group" : "New timeline"} in “{group.label}”
+        </div>
+        <input
+          type="text"
+          autoFocus
+          placeholder={adding === "group" ? "Name (e.g. Anna, Work)" : "Label (e.g. Job, Residence)"}
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && label.trim() !== "" && submit()}
+        />
+        <div className="popover-footer">
+          <button type="button" className="small-button" onClick={() => setAdding(null)}>
+            Back
+          </button>
+          <button type="button" className="small-button" disabled={label.trim() === ""} onClick={submit}>
+            Add
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const birthValue =
     group.birthDate !== undefined ? new Date(group.birthDate).toISOString().slice(0, 10) : "";
   return (
@@ -1333,36 +1300,55 @@ function GroupEditor({ groupId, close }: { groupId: string; close: () => void })
           });
         }}
       />
-      {/* Hiding sits directly above deleting, and says how it differs: one is
-          a view of your own, the other is the data. A group hides with
-          everything in it, and comes back from the list its container offers
-          (the rail footer, for a top-level group). */}
-      <button
-        type="button"
-        className="small-button"
-        onClick={() => {
-          setGroupHidden(groupId, true);
-          close();
-        }}
-      >
-        🙈 Hide — this group and everything in it
-      </button>
-      <button
-        type="button"
-        className="danger-button"
-        onClick={() => {
-          const cascade = collectGroupCascade(dataset, groupId);
-          if (window.confirm(`Delete “${group.label}”? ${describeCascade(cascade)}`)) {
-            deleteGroupWithCascade(groupId);
+      <div className="popover-actions">
+        <button type="button" className="menu-item" onClick={() => setAdding("group")}>
+          <span className="menu-item-icon">＋</span>Group
+        </button>
+        <button type="button" className="menu-item" onClick={() => setAdding("row")}>
+          <span className="menu-item-icon">＋</span>Timeline
+        </button>
+        {/* Hiding sits directly above deleting, and says how it differs: one is
+            a view of your own, the other is the data. A group hides with
+            everything in it, and comes back from the list its container offers
+            (the rail footer, for a top-level group). */}
+        <button
+          type="button"
+          className="menu-item"
+          onClick={() => {
+            setGroupHidden(groupId, true);
             close();
-          }
-        }}
-      >
-        🗑 Delete
-      </button>
-      <button type="button" className="small-button" onClick={close}>
-        Done
-      </button>
+          }}
+        >
+          <span className="menu-item-icon">🙈</span>Hide — this group and everything in it
+        </button>
+        <button
+          type="button"
+          className="menu-item menu-item-danger"
+          onClick={() => {
+            const cascade = collectGroupCascade(dataset, groupId);
+            if (window.confirm(`Delete “${group.label}”? ${describeCascade(cascade)}`)) {
+              deleteGroupWithCascade(groupId);
+              close();
+            }
+          }}
+        >
+          <span className="menu-item-icon">🗑</span>Delete…
+        </button>
+      </div>
+      {/* What this group is holding back, offered by name — the only way back
+          for something taken out of the picture, and now reached the same way
+          as everything else about this group. */}
+      {hiddenChildren.length > 0 && (
+        <div className="popover-actions">
+          <div className="field-label">Hidden here</div>
+          <HiddenChildLines items={hiddenChildren} onLastShown={() => undefined} />
+        </div>
+      )}
+      <div className="popover-footer">
+        <button type="button" className="small-button" onClick={close}>
+          Done
+        </button>
+      </div>
     </div>
   );
 }
@@ -1375,7 +1361,7 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
 
   return (
     <div className="popover-form">
-      <div className="popover-title">Row</div>
+      <div className="popover-title">Timeline</div>
       <div className="row-edit-line">
         <input
           type="color"
@@ -1418,46 +1404,52 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
           updateRow(rowId, { birthDate: value === "" ? undefined : Date.parse(`${value}T00:00:00Z`) });
         }}
       />
-      {canBreakOut(dataset, rowId) && (
+      {/* The same one list as a group's ⚙, in the same order: what this can
+          become, then hiding, then deleting last and in the danger colour. */}
+      <div className="popover-actions">
+        {canBreakOut(dataset, rowId) && (
+          <button
+            type="button"
+            className="menu-item"
+            onClick={() => {
+              if (window.confirm(describeBreakOut(dataset, rowId))) {
+                breakOutRow(rowId);
+                close();
+              }
+            }}
+          >
+            <span className="menu-item-icon">🔀</span>Break out into timelines…
+          </button>
+        )}
         <button
           type="button"
-          className="small-button"
+          className="menu-item"
           onClick={() => {
-            if (window.confirm(describeBreakOut(dataset, rowId))) {
-              breakOutRow(rowId);
+            setRowHidden(rowId, true);
+            close();
+          }}
+        >
+          <span className="menu-item-icon">🙈</span>Hide this timeline
+        </button>
+        <button
+          type="button"
+          className="menu-item menu-item-danger"
+          onClick={() => {
+            const cascade = collectRowCascade(dataset, rowId);
+            if (window.confirm(`Delete “${row.label}”? ${describeCascade(cascade)}`)) {
+              deleteRowWithCascade(rowId);
               close();
             }
           }}
         >
-          Break out into timelines…
+          <span className="menu-item-icon">🗑</span>Delete…
         </button>
-      )}
-      <button
-        type="button"
-        className="small-button"
-        onClick={() => {
-          setRowHidden(rowId, true);
-          close();
-        }}
-      >
-        🙈 Hide this timeline
-      </button>
-      <button
-        type="button"
-        className="danger-button"
-        onClick={() => {
-          const cascade = collectRowCascade(dataset, rowId);
-          if (window.confirm(`Delete row “${row.label}”? ${describeCascade(cascade)}`)) {
-            deleteRowWithCascade(rowId);
-            close();
-          }
-        }}
-      >
-        Delete row…
-      </button>
-      <button type="button" className="small-button" onClick={close}>
-        Done
-      </button>
+      </div>
+      <div className="popover-footer">
+        <button type="button" className="small-button" onClick={close}>
+          Done
+        </button>
+      </div>
     </div>
   );
 }

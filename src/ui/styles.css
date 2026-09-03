@@ -295,8 +295,10 @@ textarea {
   align-items: center;
   gap: 6px;
   /* padding-left is overridden inline, per LayoutItem.depth — that indent is
-     the hierarchy. */
-  padding: 0 4px 0 8px;
+     the hierarchy. No padding on the right: the margin that used to sit there
+     is spent on the action buttons instead (see `.rail-actions .icon-button`),
+     which grows the hit targets without growing the row. */
+  padding: 0 0 0 8px;
   overflow: hidden;
   white-space: nowrap;
   /* Deliberately shared: a group's name and a timeline's name are the same
@@ -385,10 +387,24 @@ textarea {
   object-fit: contain;
 }
 
+/* The rail's action buttons take the FULL height of the row as their hit
+   target and sit flush against each other and the rail's edge. The row box is
+   unchanged — every pixel this gains comes out of the margin that was inside
+   it. A 1em glyph with 2px of padding is a target you hunt for; the same glyph
+   centred in the row's own height is one you just hit. */
 .rail-actions {
   display: flex;
-  gap: 2px;
+  gap: 0;
   flex: none;
+  align-self: stretch;
+}
+
+.rail-actions .icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  padding: 0 3px;
 }
 
 .collapse-button {
@@ -420,8 +436,10 @@ textarea {
   height: 14px;
 }
 
-/* Never hover-revealed, unlike the other rail actions: it is the only way back
-   for something taken out of the picture. It shows up only while its container
+/* The rail footer's "n hidden at the top level". Every other container offers
+   its hidden children inside its own ⚙ instead — the root is the one that has
+   no ⚙ to put them in. Never hover-revealed: it is the only way back for
+   something taken out of the picture, and it shows up only while the top level
    is actually holding something back. */
 .hidden-count {
   flex: none;
@@ -647,6 +665,48 @@ textarea {
 
 .menu-item-danger {
   color: var(--color-danger);
+}
+
+/* Every menu row reads as the same row: one icon in a fixed column, then the
+   label, all starting at the same x. The column is what stops a 🗑 and a ＋ and
+   a 🙈 from each setting their own left edge — which is what made one popover
+   look like three. */
+.menu-item-icon {
+  display: inline-block;
+  width: 1.3em;
+  margin-right: 8px;
+  text-align: center;
+}
+
+/* The actions at the foot of a ⚙ popover: one list, ruled off from the fields
+   above it, and stretched to the popover's own edges so a row highlights
+   full-width like a menu rather than floating like a button. */
+.popover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  /* Pulled to the popover's own edges, then given back just enough padding
+     that `.menu-item`'s own 8px lands the label on the same x as the fields
+     above it. */
+  margin: 2px -10px 0;
+  padding: 8px 2px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+/* A label long enough to wrap keeps its hanging indent: the icon is a flex
+   item beside the text, not a prefix inside it, so the second line starts
+   under the first rather than under the icon. */
+.popover-actions .menu-item {
+  display: flex;
+  align-items: baseline;
+}
+
+/* Dismissal, deliberately NOT a menu row: "Done" ends the popover, it does not
+   act on the thing the popover is about. */
+.popover-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .checkbox-line {

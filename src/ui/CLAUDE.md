@@ -22,7 +22,9 @@ event` in `RowPane.tsx` is that same flow opened with the answer pre-picked.
 There is deliberately no inline event form on mobile — one add idiom per shell.
 
 **Break out** (a timeline into a group of timelines, one per entry) has four
-entry points, deliberately all sitting directly above the matching delete:
+entry points, deliberately all sitting in the same action list as the matching
+delete (in `RowEditor` with hiding between them, since both are ways to make
+the row stop being one row):
 `RowEditor` in `RowRail.tsx` and the mobile row menu in `TimelineSheet.tsx` for
 a whole timeline, `EntryDetail` in `DetailPanel.tsx` and the mobile entry menu
 for one entry. All four confirm first with `describeBreakOut()` — the same
@@ -138,8 +140,23 @@ is desktop-only now.
   share toggle is not: it is the only way back for something the user took out
   of the picture, and a control found only by hovering is how a hidden timeline
   stays hidden. It exists only while its container is actually holding
-  something back — `🙈 n` on the group header, the same in the rail footer for
-  the top level, `👁 Show …` at the foot of the mobile list.
+  something back — a `Hidden here` list inside the group's own ⚙, `🙈 n` in the
+  rail footer for the top level, `👁 Show …` at the foot of the mobile list.
+- **A rail item has exactly one menu, and it is the ⚙.** A group's settings,
+  everything you can add inside it, what it is holding back and both ways to
+  make it go away all live in `GroupEditor`; there is no second ＋ menu beside
+  it. The split is what let "delete group" exist twice, in two menus that
+  looked nothing alike. Below the fields, every action is a `.menu-item` with a
+  `.menu-item-icon` — one width, one alignment, one hover — so the destructive
+  one is told apart by its colour and its position at the end, not by being a
+  differently-shaped button. `Done` is the exception on purpose: it dismisses
+  the popover rather than acting on the thing, so it sits in `.popover-footer`
+  as a button.
+- **Rail action buttons are as tall as their row.** `.rail-actions` stretches
+  and its `.icon-button`s fill it (`min-width: 26px`, no gap, no padding on the
+  row's right edge), so the ≡ and the ⚙ are hit targets rather than glyphs to
+  aim at. Every pixel of that comes out of the margin *inside* the row
+  background — the row box, its height and the name's position are unchanged.
 - **The share toggle stays visible while it is on**, unlike every other
   hover-revealed rail action. "Who can see this" has to be legible at a glance;
   a share control that hides itself is how someone forgets what they published.
