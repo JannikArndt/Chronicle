@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { describeBreakOut } from "../model/breakOut";
 import { collectEntryCascade, describeCascade } from "../model/cascade";
 import { faviconUrl } from "../model/favicon";
+import { NameIcon } from "./NameIcon";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import type { Place, TimelineEntry, TimelineEvent } from "../model/types";
 import {
@@ -74,7 +75,7 @@ function EntryDetail() {
     <aside className="detail-panel">
       <div className="detail-header">
         <span className="detail-category">
-          {row?.icon} {row?.label}
+          {row && <NameIcon subject={row} size={14} />} {row?.label}
         </span>
         <button type="button" className="icon-button" title="Close" onClick={clearSelection}>
           ✕
@@ -248,7 +249,7 @@ function EventDetail({ eventId }: { eventId: string }) {
     <aside className="detail-panel">
       <div className="detail-header">
         <span className="detail-category">
-          {row?.icon} {row?.label}
+          {row && <NameIcon subject={row} size={14} />} {row?.label}
         </span>
         <button type="button" className="icon-button" title="Close" onClick={clearSelection}>
           ✕

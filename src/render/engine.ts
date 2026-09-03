@@ -16,7 +16,7 @@ import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeSc
 import type { TimeScale } from "./timeScale";
 import { computeTicks, snapForScale } from "./timeAxis";
 import { formatFuzzyDate } from "../model/fuzzyDate";
-import { faviconUrl } from "../model/favicon";
+import { faviconUrl, nameIcon } from "../model/favicon";
 import type { Precision, TimelineDataset, TimelineEntry, TimelineEvent, TimelineRow } from "../model/types";
 import { birthDateForRow } from "../model/dataset";
 
@@ -996,25 +996,45 @@ export class TimelineEngine {
   // mobile only). Plated like an event label: it is drawn over bars of any
   // colour, so a name at full opacity straight onto one would be unreadable.
   private drawRowLabel(item: LayoutItem, row: TimelineRow, color: string): void {
-    this.drawPinnedLabel(item, row.icon ? `${row.icon} ${row.label}` : row.label, color);
+    this.drawPinnedLabel(item, row.label, color, row);
   }
 
   // The plate itself, shared with a collapsed group — which draws bars in its
   // own band now, so its name needs the same protection a row's does.
-  private drawPinnedLabel(item: LayoutItem, text: string, color: string): void {
+  // `subject` is the row or group the name belongs to, and the only thing the
+  // mark in front of it is read from: `nameIcon()` picks favicon over emoji,
+  // exactly as the rail does. An emoji is drawn as text (it is text); a
+  // favicon is an image, and until it has loaded the name simply starts where
+  // the emoji would have — no reflow when it arrives, because the space is
+  // reserved either way.
+  private drawPinnedLabel(
+    item: LayoutItem,
+    text: string,
+    color: string,
+    subject?: { icon?: string; website?: string },
+  ): void {
     const { ctx } = this;
     const indent = 8 + item.depth * 14;
+    const mark = subject === undefined ? undefined : nameIcon(subject, FAVICON_SIZE_PX);
+    const label = mark?.kind === "emoji" ? `${mark.emoji} ${text}` : text;
+    const iconSpace = mark?.kind === "favicon" ? FAVICON_SIZE_PX + FAVICON_GAP_PX : 0;
     ctx.save();
     ctx.font = "600 12px -apple-system, system-ui, sans-serif";
-    const textWidth = ctx.measureText(text).width;
+    const textWidth = ctx.measureText(label).width;
     const plateHeight = 16;
     const plateY = item.y + 4;
     ctx.fillStyle = colorWithAlpha(this.colors.background, 0.85);
-    roundRectPath(ctx, indent - 4, plateY, textWidth + 8, plateHeight, 4);
+    roundRectPath(ctx, indent - 4, plateY, textWidth + iconSpace + 8, plateHeight, 4);
     ctx.fill();
+    if (mark?.kind === "favicon") {
+      const image = this.getFaviconImage(mark.url);
+      if (image) {
+        ctx.drawImage(image, indent, plateY + (plateHeight - FAVICON_SIZE_PX) / 2, FAVICON_SIZE_PX, FAVICON_SIZE_PX);
+      }
+    }
     ctx.fillStyle = color;
     ctx.textBaseline = "middle";
-    ctx.fillText(text, indent, plateY + plateHeight / 2);
+    ctx.fillText(label, indent + iconSpace, plateY + plateHeight / 2);
     ctx.restore();
   }
 
@@ -1027,8 +1047,7 @@ export class TimelineEngine {
   private drawGroupLabel(item: LayoutItem): void {
     const group = item.group;
     if (!group) return;
-    const text = group.icon ? `${group.icon} ${group.label}` : group.label;
-    this.drawPinnedLabel(item, text, group.color ?? "#888");
+    this.drawPinnedLabel(item, group.label, group.color ?? "#888", group);
   }
 
   // Lazily loads and caches a favicon image; returns undefined until it has

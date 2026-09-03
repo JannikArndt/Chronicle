@@ -6,6 +6,8 @@
 
 import type { Layout } from "../render/layout";
 import { mergedDataset, useAppState } from "../state/store";
+import { nameIcon } from "../model/favicon";
+import { NameIcon } from "./NameIcon";
 
 export function TimelineListPane({
   layout,
@@ -49,7 +51,9 @@ export function TimelineListPane({
             style={{ paddingLeft: 8 + item.depth * 14 }}
             onClick={() => onOpenRow(row.id)}
           >
-            <span className="sheet-row-emoji">{row.icon ?? "🏷️"}</span>
+            <span className="sheet-row-emoji">
+              {nameIcon(row, 18) === undefined ? "🏷️" : <NameIcon subject={row} size={18} />}
+            </span>
             <span className="sheet-row-label">{row.label}</span>
             <span className="sheet-row-count">{count}</span>
             <span className="sheet-chevron">›</span>

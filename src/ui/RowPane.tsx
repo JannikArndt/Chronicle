@@ -15,6 +15,8 @@ import { isForeignId, isPublicId, mergedDataset, useAppState } from "../state/st
 import { EditableLine } from "./EditableLine";
 import { nextEntryStartMs } from "./nextEntryStart";
 import { SheetMenuPicker } from "./SheetMenu";
+import { faviconUrl, nameIcon } from "../model/favicon";
+import { NameIcon } from "./NameIcon";
 
 // Six row colours that read clearly against both themes at bar height. Row
 // colours are data (any CSS colour is valid), so these are quick picks, not a
@@ -76,7 +78,7 @@ export function RowPane({
             disabled={readOnly}
             onClick={() => setPicker("icon")}
           >
-            {row.icon ?? "🏷️"}
+            {nameIcon(row, 22) === undefined ? "🏷️" : <NameIcon subject={row} size={22} />}
           </button>
           <button
             type="button"
@@ -94,6 +96,24 @@ export function RowPane({
             onCommit={(label) => updateRow(row.id, { label })}
           />
         </div>
+
+        {/* The site whose favicon stands in for the emoji above. One line, no
+            label: the placeholder says what it is, and the icon button beside
+            it is already showing the result. */}
+        {!readOnly && (
+          <div className="row-settings-site">
+            {row.website !== undefined && faviconUrl(row.website, 16) && (
+              <img className="favicon-preview" src={faviconUrl(row.website, 16)} alt="" width={16} height={16} />
+            )}
+            <EditableLine
+              className="row-settings-site-input"
+              value={row.website ?? ""}
+              placeholder="Website — its favicon replaces the icon"
+              readOnly={false}
+              onCommit={(website) => updateRow(row.id, { website: website.trim() || undefined })}
+            />
+          </div>
+        )}
 
         {picker === "icon" && (
           <PickerPopover title="Icon" onDismiss={() => setPicker("none")}>

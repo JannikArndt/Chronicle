@@ -369,6 +369,16 @@ textarea {
   flex: none;
 }
 
+/* A favicon stands in for the emoji (never beside it — see nameIcon()), so it
+   has to occupy the same slot: same box, same baseline, no layout shift while
+   it loads. */
+.row-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
 .rail-actions {
   display: flex;
   gap: 2px;
@@ -1789,6 +1799,22 @@ textarea {
   align-items: center;
   gap: 8px;
   padding: 0 8px 4px;
+}
+
+/* The site line sits under the name, indented past the icon button so it reads
+   as belonging to it — the favicon it produces is what that button shows. */
+.row-settings-site {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 8px 50px;
+  color: var(--color-text-faint);
+}
+
+.row-settings-site-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
 }
 
 /* Icon and colour are edited by tapping them, so both need to look pressable

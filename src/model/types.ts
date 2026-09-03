@@ -5,7 +5,7 @@
 // A date like "2020-05-14" always means 2020-05-14T00:00:00Z regardless of the
 // viewer's local timezone, so a dataset renders identically on every device.
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export type Precision = "exact" | "day" | "month" | "year" | "circa";
 
@@ -29,6 +29,12 @@ export interface Group {
   label: string;
   color?: string; // any CSS color — accents this group's own header
   icon?: string; // any emoji, shown before the group's name — free-text input
+  // A site that stands for this group ("acme.com"), shown as its favicon in
+  // place of `icon`. Both fields may be set — the favicon wins wherever the
+  // name is drawn, so exactly one coloured mark sits in front of a name and
+  // the emoji stays as the fallback for when the icon fails to load or the
+  // site is cleared. Same field, same rule, on TimelineRow.
+  website?: string;
   // ms, UTC. What makes a group a *person*. Time before it renders "inactive"
   // on this group's own timelines and those of its sub-groups, and the header
   // shows a live computed age. (A TimelineRow can independently carry its own
@@ -60,6 +66,10 @@ export interface TimelineRow {
   groupId?: string;
   color?: string; // any CSS color for this row's bars — a native color picker, not a fixed palette
   icon?: string; // any emoji, shown before the row label in the rail and inspector — free-text input
+  // A site that stands for this timeline ("acme.com" on a job row), shown as
+  // its favicon in place of `icon` — see Group.website for why it replaces
+  // rather than joins the emoji.
+  website?: string;
   label: string;
   // ms, UTC. A timeline can independently BE a person too — not every person
   // deserves a whole group of sub-groups and timelines; an acquaintance might

@@ -17,6 +17,7 @@
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "label": { "type": "string", "minLength": 1 },
+          "website": { "type": "string", "minLength": 1, "description": "A site standing for this group; drawn as its favicon in front of the name." },
           "collapsed": { "type": "boolean" }
         }
       }
@@ -32,6 +33,7 @@
           "groupId": { "type": "string", "minLength": 1 },
           "color": { "type": "string", "minLength": 1, "description": "Any CSS color for this row's bars; omit for a neutral default." },
           "icon": { "type": "string", "minLength": 1, "description": "One emoji shown before the row label; optional." },
+          "website": { "type": "string", "minLength": 1, "description": "A site standing for this timeline; drawn as its favicon in place of the emoji." },
           "label": { "type": "string", "minLength": 1 }
         }
       }

@@ -40,7 +40,9 @@ import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateIn
 import type { Group, TimelineRow } from "../model/types";
 import type { RailChildRef } from "../model/dataset";
 import { describePublishImpact } from "../model/sharing";
+import { faviconUrl } from "../model/favicon";
 import { importDatasetWithConfirmation } from "./importFlow";
+import { NameIcon } from "./NameIcon";
 import { WorldEventsPicker } from "./WorldEventsPicker";
 import { parseFamousGroupId, parseFamousRowId } from "../publicData/famous/alignToAge";
 import { fetchWikidataBiography, searchWikidataCandidates } from "../publicData/famous/wikidata";
@@ -528,7 +530,7 @@ function RailItem({
         <button type="button" className="collapse-button" onClick={() => toggleGroupCollapsed(group.id)}>
           {collapsed ? "▸" : "▾"}
         </button>
-        {group.icon && <span className="row-icon">{group.icon}</span>}
+        <NameIcon subject={group} />
         <span className="rail-group-label" title={group.label}>
           {group.label}
           {age !== null && <span className="age-badge">{age}</span>}
@@ -627,7 +629,7 @@ function RailItem({
           onClick={(e) => e.stopPropagation()}
           onChange={() => toggleRowHidden(row.id)}
         />
-        <span className="row-icon">{row.icon}</span>
+        <NameIcon subject={row} />
         <span className="rail-row-label" title={row.label}>
           <span className="label-full">{row.label}</span>
           <span className="label-initial">{row.label.slice(0, 1)}</span>
@@ -1137,6 +1139,35 @@ function AddMenu({ groupId, close }: { groupId: string; close: () => void }) {
   );
 }
 
+// A site for a group or a timeline, shown as its favicon in place of the
+// emoji (`nameIcon()` decides, in one place, for the rail and the canvas
+// both). The emoji stays editable above it on purpose: it is the fallback
+// whenever the favicon cannot be fetched.
+function WebsiteField({
+  website,
+  onChange,
+}: {
+  website: string | undefined;
+  onChange: (website: string | undefined) => void;
+}) {
+  return (
+    <>
+      <label className="field-label">Website — its favicon replaces the emoji</label>
+      <div className="field-with-icon">
+        {website !== undefined && faviconUrl(website, 16) && (
+          <img className="favicon-preview" src={faviconUrl(website, 16)} alt="" width={16} height={16} />
+        )}
+        <input
+          type="text"
+          value={website ?? ""}
+          placeholder="example.com"
+          onChange={(e) => onChange(e.target.value || undefined)}
+        />
+      </div>
+    </>
+  );
+}
+
 function GroupEditor({ groupId, close }: { groupId: string; close: () => void }) {
   const dataset = useAppState((s) => s.dataset);
   const group = dataset.groups.find((g) => g.id === groupId);
@@ -1178,6 +1209,7 @@ function GroupEditor({ groupId, close }: { groupId: string; close: () => void })
           </button>
         ))}
       </span>
+      <WebsiteField website={group.website} onChange={(website) => updateGroup(groupId, { website })} />
       <label className="field-label">Birth date — if this group is a person</label>
       <input
         type="date"
@@ -1250,6 +1282,7 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
           </button>
         ))}
       </span>
+      <WebsiteField website={row.website} onChange={(website) => updateRow(rowId, { website })} />
       <label className="field-label">Birth date — if this timeline is itself a person</label>
       <input
         type="date"

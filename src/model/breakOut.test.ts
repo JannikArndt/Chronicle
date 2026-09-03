@@ -239,6 +239,22 @@ describe("breakOut — group placement (the new group takes the row's own slot)"
   });
 });
 
+describe("breakOut — the site each new timeline stands for", () => {
+  test("the group takes the row's site, and each new row the entry's own", () => {
+    const dataset = threeJobsFixture();
+    dataset.rows[0].website = "agency.example";
+    dataset.entries[0].website = "job-b.example"; // e-b
+    const { dataset: out, groupId, rowIds } = breakOut(dataset, "r1", undefined, idFactory())!;
+
+    expect(out.groups.find((g) => g.id === groupId)?.website).toBe("agency.example");
+    const byLabel = new Map(out.rows.filter((r) => rowIds.includes(r.id)).map((r) => [r.label, r.website]));
+    expect(byLabel.get("Job B")).toBe("job-b.example");
+    // No site of its own — the row's stands in, so the broken-out timelines
+    // still read as one family.
+    expect(byLabel.get("Job A")).toBe("agency.example");
+  });
+});
+
 describe("canBreakOut", () => {
   test("true when the row has at least one entry", () => {
     expect(canBreakOut(threeJobsFixture(), "r1")).toBe(true);

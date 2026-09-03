@@ -24,7 +24,9 @@ const ARRAY_FIELDS = ["groups", "rows", "entries"] as const;
 // dropped `visibility`/`defaultVisibility`. Five versions carry a real data
 // step: v5 folded each category's color and icon onto the row, v6 folded the
 // whole Person entity into Group, v7 added sharing, v8 added events and v10 made
-// sibling order explicit (all below).
+// sibling order explicit (all below). v11 is another no-step version: it only
+// added the optional `website` on groups and rows, which an older file simply
+// does not have.
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
 
 export function validateImport(raw: unknown): ImportResult {

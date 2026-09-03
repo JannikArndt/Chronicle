@@ -59,6 +59,7 @@ export function breakOut(
     label: sourceRow.label,
     color: sourceRow.color,
     icon: sourceRow.icon,
+    website: sourceRow.website,
     birthDate: sourceRow.birthDate,
     collapsed: false,
     // The new group takes the row's own slot among its siblings — breaking
@@ -78,6 +79,10 @@ export function breakOut(
     label: titleOf(entry),
     color: sourceRow.color,
     icon: sourceRow.icon,
+    // The entry's own site beats the row's: a "Jobs" row broken out into one
+    // row per employer should show each employer's favicon, and the entry is
+    // where that site was already recorded. The row's own is the fallback.
+    website: entry.website ?? sourceRow.website,
     shared: sourceRow.shared,
   }));
   const newRowIdByEntryId = new Map(ordered.map((entry, i) => [entry.id, newRows[i].id]));
