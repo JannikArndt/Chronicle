@@ -7,6 +7,8 @@
 import type { Layout } from "../render/layout";
 import { mergedDataset, useAppState } from "../state/store";
 import { nameIcon } from "../model/favicon";
+import { hiddenChildrenEverywhere, hiddenIdsOf } from "../model/hidden";
+import { unhideChild } from "../state/actions";
 import { NameIcon } from "./NameIcon";
 
 export function TimelineListPane({
@@ -20,7 +22,13 @@ export function TimelineListPane({
 }) {
   const state = useAppState((s) => s);
   const merged = mergedDataset(state);
-  const hidden = new Set(state.hiddenRowIds);
+  // Hidden timelines and groups are not in the layout at all, so the list
+  // cannot show them greyed out — it offers them back at the foot instead,
+  // which is the mobile counterpart of the rail's per-container unhide lists.
+  const hiddenChildren = hiddenChildrenEverywhere(
+    state.dataset,
+    hiddenIdsOf(state.hiddenRowIds, state.hiddenGroupIds),
+  );
 
   return (
     <>
@@ -47,7 +55,7 @@ export function TimelineListPane({
           <button
             key={row.id}
             type="button"
-            className={`sheet-row ${hidden.has(row.id) ? "sheet-row-hidden" : ""}`}
+            className="sheet-row"
             style={{ paddingLeft: 8 + item.depth * 14 }}
             onClick={() => onOpenRow(row.id)}
           >
@@ -66,6 +74,16 @@ export function TimelineListPane({
       <button type="button" className="sheet-add-row" onClick={onAddTimeline}>
         ＋ New timeline
       </button>
+      {hiddenChildren.map((child) => (
+        <button
+          key={`${child.kind}:${child.id}`}
+          type="button"
+          className="sheet-add-row sheet-hidden-row"
+          onClick={() => unhideChild({ kind: child.kind, id: child.id })}
+        >
+          👁 Show {child.kind === "row" ? child.row.label : `${child.group.label} (group)`}
+        </button>
+      ))}
     </>
   );
 }

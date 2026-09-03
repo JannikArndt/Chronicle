@@ -30,7 +30,9 @@ import {
   setFamousAlignment,
   toggleGroupCollapsed,
   setRowShared,
-  toggleRowHidden,
+  setGroupHidden,
+  setRowHidden,
+  unhideChild,
   updateGroup,
   updateRow,
 } from "../state/actions";
@@ -38,7 +40,8 @@ import { isForeignId, useAppState, userBirthMs } from "../state/store";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateInput";
 import type { Group, TimelineRow } from "../model/types";
-import type { RailChildRef } from "../model/dataset";
+import type { RailChild, RailChildRef } from "../model/dataset";
+import { hiddenChildrenOf, hiddenIdsOf } from "../model/hidden";
 import { describePublishImpact } from "../model/sharing";
 import { faviconUrl } from "../model/favicon";
 import { importDatasetWithConfirmation } from "./importFlow";
@@ -59,12 +62,16 @@ type PopoverState =
   | { kind: "add-group"; top: number }
   | { kind: "add-row"; top: number }
   | { kind: "rail-add-menu"; top: number }
+  // The hidden children of one container, offered back. `groupId: undefined`
+  // is the root container, whose list opens from the rail footer.
+  | { kind: "hidden-children"; groupId: string | undefined; top: number }
   | null;
 
 // Popovers anchored to the rail footer's "+" button open upward from the
 // bottom of the rail rather than downward from a click point.
-function isFooterPopover(kind: NonNullable<PopoverState>["kind"]): boolean {
-  return kind === "add-group" || kind === "add-row" || kind === "rail-add-menu";
+function isFooterPopover(popover: NonNullable<PopoverState>): boolean {
+  if (popover.kind === "hidden-children") return popover.groupId === undefined;
+  return popover.kind === "add-group" || popover.kind === "add-row" || popover.kind === "rail-add-menu";
 }
 
 // ---------- drag-and-drop (move or, with Alt/Option held, copy) ----------
@@ -363,7 +370,13 @@ interface RowRailProps {
 export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }: RowRailProps) {
   const state = useAppState((s) => s);
   const dataset = state.dataset;
-  const hiddenRowIds = state.hiddenRowIds;
+  // Hidden top-level timelines and groups are offered back in the footer —
+  // there is no container header at the root to hang them under.
+  const hiddenAtRoot = hiddenChildrenOf(
+    state.dataset,
+    undefined,
+    hiddenIdsOf(state.hiddenRowIds, state.hiddenGroupIds),
+  );
   const selectedRowId = state.selectedRowId;
   const [popover, setPopover] = useState<PopoverState>(null);
   // Which rail item's action buttons are shown (§ hover-reveal). Tracked in JS
@@ -404,7 +417,6 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
             <RailItem
               key={`${item.kind}:${item.id}`}
               item={item}
-              hiddenRowIds={hiddenRowIds}
               selectedRowId={selectedRowId}
               openPopover={setPopover}
               engineRef={engineRef}
@@ -426,6 +438,16 @@ export function RowRail({ layout, railContentRef, onStartOnboarding, engineRef }
         {dataset.selfGroupId === undefined && (
           <button type="button" className="small-button" onClick={onStartOnboarding}>
             ✨ Set up your timeline
+          </button>
+        )}
+        {hiddenAtRoot.length > 0 && (
+          <button
+            type="button"
+            className="icon-button hidden-count"
+            title={`${hiddenAtRoot.length} hidden at the top level — click to show`}
+            onClick={() => setPopover({ kind: "hidden-children", groupId: undefined, top: 0 })}
+          >
+            🙈 {hiddenAtRoot.length}
           </button>
         )}
         <button
@@ -465,7 +487,6 @@ function lifeSpanRange(birthDate: number): { startMs: number; endMs: number } {
 
 interface RailItemProps {
   item: LayoutItem;
-  hiddenRowIds: string[];
   selectedRowId?: string;
   openPopover: (p: PopoverState) => void;
   engineRef: MutableRefObject<TimelineEngine | null>;
@@ -477,7 +498,6 @@ interface RailItemProps {
 
 function RailItem({
   item,
-  hiddenRowIds,
   selectedRowId,
   openPopover,
   engineRef,
@@ -505,6 +525,15 @@ function RailItem({
   const readOnly = isForeignId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
+  // How many of THIS group's direct children are hidden. A count, not the list
+  // itself: `useAppState` is `useSyncExternalStore`, whose snapshot has to be
+  // referentially stable, and a freshly-built array never is. The popover
+  // rebuilds the list when it opens.
+  const hiddenChildCount = useAppState((s) =>
+    item.kind === "group"
+      ? hiddenChildrenOf(s.dataset, item.id, hiddenIdsOf(s.hiddenRowIds, s.hiddenGroupIds)).length
+      : 0,
+  );
 
   const key = `${item.kind}:${item.id}`;
   const hoverReveal = (visible: boolean) => `icon-button hover-reveal ${visible ? "hover-reveal-visible" : ""}`;
@@ -569,6 +598,21 @@ function RailItem({
               ⇔
             </button>
           )}
+          {/* Deliberately NOT hover-revealed: it is the only way back for
+              something the user removed from the picture, and a control that
+              has to be discovered by hovering is how a hidden timeline stays
+              lost. It exists only while this group is actually holding
+              something back. */}
+          {hiddenChildCount > 0 && (
+            <button
+              type="button"
+              className="icon-button hidden-count"
+              title={`${hiddenChildCount} hidden here — click to show`}
+              onClick={(e) => openPopover({ kind: "hidden-children", groupId: group.id, top: topOf(e) })}
+            >
+              🙈 {hiddenChildCount}
+            </button>
+          )}
           {!readOnly && (
             <>
               <RailDragHandle
@@ -601,7 +645,6 @@ function RailItem({
 
   if (item.kind === "row" && item.row) {
     const row = item.row;
-    const hidden = hiddenRowIds.includes(row.id);
     // The row's own birthDate only — not a group's inherited one (§ pre-birth
     // fade uses birthDateForRow for that approximation; the badge states a
     // specific age, which would be wrong for a nested row that just hasn't
@@ -620,15 +663,12 @@ function RailItem({
         onMouseEnter={() => onHoverEnter(key)}
         onMouseLeave={onHoverLeave}
       >
-        <input
-          type="checkbox"
-          className="rail-row-checkbox"
-          checked={!hidden}
-          title="Show row"
-          style={{ accentColor: row.color ?? "#888" }}
-          onClick={(e) => e.stopPropagation()}
-          onChange={() => toggleRowHidden(row.id)}
-        />
+        {/* Where a group's ▸/▾ sits. Empty, but present: it is what keeps a
+            timeline's name starting at the same x as a group's at the same
+            depth, which is how the indentation carries the hierarchy on its
+            own. It used to be a visibility checkbox — hiding now lives in
+            this row's ⚙ settings, and hides the row completely. */}
+        <span className="rail-row-spacer" />
         <NameIcon subject={row} />
         <span className="rail-row-label" title={row.label}>
           <span className="label-full">{row.label}</span>
@@ -710,7 +750,7 @@ function Popover({
   close: () => void;
   onStartOnboarding: () => void;
 }) {
-  const footer = isFooterPopover(popover.kind);
+  const footer = isFooterPopover(popover);
   return (
     <>
       <div className="popover-backdrop" onClick={close} />
@@ -724,6 +764,7 @@ function Popover({
         {popover.kind === "group-edit" && <GroupEditor groupId={popover.groupId} close={close} />}
         {popover.kind === "row-edit" && <RowEditor rowId={popover.rowId} close={close} />}
         {popover.kind === "add-event" && <AddEventForm rowId={popover.rowId} close={close} />}
+        {popover.kind === "hidden-children" && <HiddenChildrenList groupId={popover.groupId} close={close} />}
       </div>
     </>
   );
@@ -1019,6 +1060,45 @@ function WikidataDebugPanel({ debug, onClose }: { debug: WikidataDebug; onClose:
   );
 }
 
+// What one container is holding back, offered by name. This is the whole of
+// "hidden completely, but never lost": a hidden row or group leaves the layout
+// entirely, and the only place it can be found again is the container it sits
+// in — under that group's header, or in the rail footer for the top level.
+//
+// One line per hidden child, each showing what it is; clicking it puts that
+// one back. There is no "hide all", so there is no "show all" either — the
+// list is short by construction, because it is per container.
+function HiddenChildrenList({ groupId, close }: { groupId: string | undefined; close: () => void }) {
+  const dataset = useAppState((s) => s.dataset);
+  const hiddenRowIds = useAppState((s) => s.hiddenRowIds);
+  const hiddenGroupIds = useAppState((s) => s.hiddenGroupIds);
+  const children = hiddenChildrenOf(dataset, groupId, hiddenIdsOf(hiddenRowIds, hiddenGroupIds));
+  const containerLabel =
+    groupId === undefined ? "the top level" : `“${dataset.groups.find((g) => g.id === groupId)?.label ?? ""}”`;
+
+  return (
+    <div className="popover-form">
+      <div className="popover-title">Hidden in {containerLabel}</div>
+      {children.length === 0 && <div className="hint">Nothing is hidden here any more.</div>}
+      {children.map((child: RailChild) => (
+        <button
+          key={`${child.kind}:${child.id}`}
+          type="button"
+          className="menu-item"
+          onClick={() => {
+            unhideChild({ kind: child.kind, id: child.id });
+            // The last one puts the list itself out of a job — and the button
+            // that opened it disappears with it.
+            if (children.length === 1) close();
+          }}
+        >
+          👁 {child.kind === "row" ? child.row.label : `${child.group.label} (group)`}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // There is no separate "new person" form any more: a person is a group with a
 // birth date, so the date field is the whole difference and it is offered here.
 function AddGroupForm({ close }: { close: () => void }) {
@@ -1221,6 +1301,20 @@ function GroupEditor({ groupId, close }: { groupId: string; close: () => void })
           });
         }}
       />
+      {/* Hiding sits directly above deleting, and says how it differs: one is
+          a view of your own, the other is the data. A group hides with
+          everything in it, and comes back from the list its container offers
+          (the rail footer, for a top-level group). */}
+      <button
+        type="button"
+        className="small-button"
+        onClick={() => {
+          setGroupHidden(groupId, true);
+          close();
+        }}
+      >
+        🙈 Hide — this group and everything in it
+      </button>
       <button
         type="button"
         className="danger-button"
@@ -1306,6 +1400,16 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
           Break out into timelines…
         </button>
       )}
+      <button
+        type="button"
+        className="small-button"
+        onClick={() => {
+          setRowHidden(rowId, true);
+          close();
+        }}
+      >
+        🙈 Hide this timeline
+      </button>
       <button
         type="button"
         className="danger-button"

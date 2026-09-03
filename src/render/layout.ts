@@ -4,6 +4,8 @@
 // list so they can never drift apart.
 
 import { orderedChildren } from "../model/dataset";
+import { NOTHING_HIDDEN, isHidden } from "../model/hidden";
+import type { HiddenIds } from "../model/hidden";
 import type { Group, TimelineDataset, TimelineRow } from "../model/types";
 
 export const GROUP_HEADER_HEIGHT = 32;
@@ -62,7 +64,6 @@ export interface LayoutItem {
   // Nesting depth of the CONTAINER this item sits in — 0 at the root. Drives
   // both indentation and font-size step-down in the rail.
   depth: number;
-  hidden: boolean; // row is unchecked in the rail (§2) — canvas skips its entries, rail keeps the row
   group?: Group;
   row?: TimelineRow;
   // Set on a COLLAPSED group and on nothing else — so its presence is also
@@ -89,23 +90,33 @@ export interface Layout {
   totalHeight: number;
 }
 
+// `hidden` removes items ENTIRELY rather than marking them: a hidden row or
+// group produces no LayoutItem, so neither renderer has to know the concept
+// (there is no `LayoutItem.hidden` any more, and nothing may reintroduce one —
+// a "drawn but faded" row is what this feature replaced). A hidden group takes
+// its whole subtree with it. What was hidden is remembered in the app store
+// and offered back by `hiddenChildrenOf()` (src/model/hidden.ts), which is
+// what keeps "completely gone" from meaning "gone for good".
 export function computeLayout(
   dataset: TimelineDataset,
   collapsedGroupIds: Set<string>,
-  hiddenRowIds: Set<string> = new Set(),
+  hidden: HiddenIds = NOTHING_HIDDEN,
 ): Layout {
   const items: LayoutItem[] = [];
   let y = EDGE_PAD;
 
   const isCollapsed = (group: Group): boolean => collapsedGroupIds.has(group.id) || group.collapsed;
 
-  // Every group at or under `groupId`, `groupId` itself first.
+  // Every group at or under `groupId`, `groupId` itself first — hidden
+  // sub-groups and everything under them excluded, for the same reason hidden
+  // rows are: a collapsed ancestor's summary must not put back what the user
+  // took out of the picture.
   const subtreeGroupIds = (groupId: string): string[] => {
     const collected = [groupId];
     let frontier = [groupId];
     while (frontier.length > 0) {
       const children = dataset.groups.filter(
-        (g) => g.parentGroupId !== undefined && frontier.includes(g.parentGroupId),
+        (g) => g.parentGroupId !== undefined && frontier.includes(g.parentGroupId) && !hidden.groups.has(g.id),
       );
       frontier = children.map((g) => g.id);
       collected.push(...frontier);
@@ -119,7 +130,7 @@ export function computeLayout(
   const visibleSubtreeRowIds = (groupId: string): string[] => {
     const groupIds = new Set(subtreeGroupIds(groupId));
     return dataset.rows
-      .filter((r) => r.groupId !== undefined && groupIds.has(r.groupId) && !hiddenRowIds.has(r.id))
+      .filter((r) => r.groupId !== undefined && groupIds.has(r.groupId) && !hidden.rows.has(r.id))
       .map((r) => r.id);
   };
 
@@ -175,8 +186,8 @@ export function computeLayout(
   const groupSummaryBars = (groupId: string): GroupSummaryBar[] => {
     const bars: Array<Omit<GroupSummaryBar, "lane">> = [];
     for (const child of orderedChildren(dataset, groupId)) {
+      if (isHidden(hidden, child)) continue;
       if (child.kind === "row") {
-        if (hiddenRowIds.has(child.row.id)) continue;
         const agg = aggregate(new Set([child.row.id]));
         if (!agg) continue;
         bars.push({ kind: "row", id: child.row.id, label: child.row.label, color: child.row.color, ...agg });
@@ -197,7 +208,6 @@ export function computeLayout(
       y,
       height: ROW_HEIGHT,
       depth,
-      hidden: hiddenRowIds.has(row.id),
       row,
     });
     y += ROW_HEIGHT;
@@ -217,13 +227,13 @@ export function computeLayout(
       const summaries = groupSummaryBars(group.id);
       const laneCount = summaries.length === 0 ? 1 : summaries[summaries.length - 1].lane + 1;
       const height = laneCount * ROW_HEIGHT;
-      items.push({ kind: "group", id: group.id, y, height, depth, hidden: false, group, summaries });
+      items.push({ kind: "group", id: group.id, y, height, depth, group, summaries });
       y += height;
       return;
     }
 
     const height = groupHeaderHeight(depth);
-    const item: LayoutItem = { kind: "group", id: group.id, y, height, depth, hidden: false, group };
+    const item: LayoutItem = { kind: "group", id: group.id, y, height, depth, group };
     items.push(item);
     y += height;
     pushContainer(group.id, depth + 1, true);
@@ -237,7 +247,11 @@ export function computeLayout(
   // group's own body, i.e. this container's first item sits under that
   // header rather than at the top of the layout.
   function pushContainer(parentGroupId: string | undefined, depth: number, hasHeaderAbove: boolean): void {
-    orderedChildren(dataset, parentGroupId).forEach((child, index) => {
+    // Hidden children are filtered out BEFORE the index is taken, so the
+    // first visible item still gets the no-gap treatment below rather than
+    // inheriting a gap from a sibling that is not on screen.
+    const visible = orderedChildren(dataset, parentGroupId).filter((child) => !isHidden(hidden, child));
+    visible.forEach((child, index) => {
       // ROW_GAP before everything, with one exception: the very first item in
       // the whole layout, which has nothing above it to be separated from and
       // already sits on EDGE_PAD. Kind and collapse state do not enter into

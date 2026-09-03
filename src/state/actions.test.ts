@@ -32,6 +32,7 @@ import {
 import { appStore, mergedDataset } from "./store";
 import { serializeDataset } from "../storage/exportImport";
 import { SCHEMA_VERSION } from "../model/types";
+import { setGroupHidden, setRowHidden, unhideChild } from "./actions";
 import { emptyDataset, orderedChildren } from "../model/dataset";
 import type { RailChildRef } from "../model/dataset";
 import { DAY_MS } from "../model/fuzzyDate";
@@ -723,5 +724,36 @@ describe("mirrors stay out of the user's own data", () => {
   test("dropping the mirror leaves the user's own data untouched", () => {
     appStore.setState({ sharing: { ...appStore.getState().sharing, mirrors: [] } });
     expect(mergedDataset(appStore.getState()).rows.map((row) => row.label)).toEqual(["Job"]);
+  });
+});
+
+// Hiding is view state, so these assert two things at once: that the ids land
+// in the store, and that they never land in the dataset (which is what gets
+// exported and published).
+describe("hiding timelines and groups", () => {
+  beforeEach(() => {
+    appStore.setState({ hiddenRowIds: [], hiddenGroupIds: [] });
+  });
+
+  test("hiding a row and a group is idempotent, and unhiding is exact", () => {
+    setRowHidden("r1", true);
+    setRowHidden("r1", true);
+    setGroupHidden("g1", true);
+    expect(appStore.getState().hiddenRowIds).toEqual(["r1"]);
+    expect(appStore.getState().hiddenGroupIds).toEqual(["g1"]);
+
+    unhideChild({ kind: "row", id: "r1" });
+    expect(appStore.getState().hiddenRowIds).toEqual([]);
+    expect(appStore.getState().hiddenGroupIds).toEqual(["g1"]);
+
+    unhideChild({ kind: "group", id: "g1" });
+    expect(appStore.getState().hiddenGroupIds).toEqual([]);
+  });
+
+  test("hiding writes nothing to the dataset", () => {
+    setRowHidden("r1", true);
+    setGroupHidden("g1", true);
+    const exported = serializeDataset(appStore.getState().dataset);
+    expect(exported).not.toContain("hidden");
   });
 });

@@ -9,6 +9,7 @@ import {
   viewportWindow,
 } from "./miniMap";
 import type { TimelineDataset } from "../model/types";
+import { hiddenIdsOf } from "../model/hidden";
 
 const YEAR_MS = 365.25 * 86_400_000;
 const NOW_MS = Date.UTC(2026, 0, 1);
@@ -40,8 +41,8 @@ function datasetWithRows(rowCount: number, entriesPerRow = 1): TimelineDataset {
   };
 }
 
-function lanesFor(dataset: TimelineDataset, hiddenRowIds = new Set<string>()) {
-  const layout = computeLayout(dataset, new Set(), hiddenRowIds);
+function lanesFor(dataset: TimelineDataset, hiddenRowIds: string[] = []) {
+  const layout = computeLayout(dataset, new Set(), hiddenIdsOf(hiddenRowIds, []));
   return miniMapLanes(layout, dataset, NOW_MS);
 }
 
@@ -52,7 +53,7 @@ describe("miniMapLanes", () => {
   });
 
   it("drops hidden rows so the strip re-fits", () => {
-    const lanes = lanesFor(datasetWithRows(3), new Set(["row-1"]));
+    const lanes = lanesFor(datasetWithRows(3), ["row-1"]);
     expect(lanes.map((lane) => lane.rowId)).toEqual(["row-0", "row-2"]);
   });
 

@@ -8,6 +8,7 @@ import {
 } from "./layout";
 import { emptyDataset } from "../model/dataset";
 import type { TimelineDataset } from "../model/types";
+import { hiddenIdsOf } from "../model/hidden";
 
 // "Me" is a person (birth date) holding row r1. "r-top" is a timeline with no
 // group at all. "Family" holds no rows of its own but nests "Finn" two levels
@@ -289,7 +290,7 @@ describe("computeLayout", () => {
 
     test("a hidden row is excluded from its own bar, and from an ancestor's aggregate", () => {
       const ds = siblingRowsFixture();
-      const { items } = computeLayout(ds, new Set(["g-work"]), new Set(["r-b"]));
+      const { items } = computeLayout(ds, new Set(["g-work"]), hiddenIdsOf(["r-b"], []));
       const item = items.find((i) => i.kind === "group" && i.id === "g-work")!;
       // r-b is hidden — it must not reappear as a summary bar even though it
       // has a dated entry.
@@ -314,7 +315,7 @@ describe("computeLayout", () => {
           start: { ms: Date.UTC(2010, 0, 1), precision: "exact" },
         },
       ];
-      const { items: items2 } = computeLayout(ds2, new Set(["g-outer"]), new Set(["r-only"]));
+      const { items: items2 } = computeLayout(ds2, new Set(["g-outer"]), hiddenIdsOf(["r-only"], []));
       expect(items2.find((i) => i.kind === "group" && i.id === "g-outer")!.summaries).toEqual([]);
     });
 
@@ -510,12 +511,34 @@ describe("computeLayout", () => {
     });
   });
 
-  test("hidden rows stay in the layout, flagged hidden", () => {
-    const { items } = computeLayout(fixture(), new Set(), new Set(["r1"]));
-    const r1 = items.find((i) => i.id === "r1");
-    expect(r1).toBeDefined();
-    expect(r1!.hidden).toBe(true);
-    expect(items.find((i) => i.id === "r-top")!.hidden).toBe(false);
+  describe("hiding removes items entirely", () => {
+    test("a hidden row produces no item at all", () => {
+      const { items } = computeLayout(fixture(), new Set(), hiddenIdsOf(["r1"], []));
+      expect(items.find((i) => i.id === "r1")).toBeUndefined();
+      expect(items.find((i) => i.id === "r-top")).toBeDefined();
+    });
+
+    test("a hidden group takes its whole subtree with it", () => {
+      const { items } = computeLayout(fixture(), new Set(), hiddenIdsOf([], ["g-family"]));
+      const ids = items.map((i) => i.id);
+      expect(ids).not.toContain("g-family");
+      expect(ids).not.toContain("g-finn"); // a sub-group of g-family
+      expect(ids).not.toContain("g-finn-kid"); // three levels down
+      expect(ids).not.toContain("r2"); // a row inside the subtree
+      expect(ids).not.toContain("r3");
+      expect(ids).toContain("r-top"); // untouched, it sits at the root
+    });
+
+    test("the layout closes up: whatever is first now gets the top pad", () => {
+      const all = computeLayout(fixture(), new Set());
+      // r-top is the first item; hiding it must not leave its gap behind for
+      // the item that takes its place.
+      const without = computeLayout(fixture(), new Set(), hiddenIdsOf(["r-top"], []));
+      expect(all.items[0].id).toBe("r-top");
+      expect(without.items[0].id).toBe("g-me");
+      expect(without.items[0].y).toBe(all.items[0].y);
+      expect(without.totalHeight).toBeLessThan(all.totalHeight);
+    });
   });
 
   test("a top-level row needs no group at all", () => {

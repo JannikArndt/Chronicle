@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { computeLayout } from "../render/layout";
+import { hiddenIdsOf } from "../model/hidden";
 import type { TimelineEngine } from "../render/engine";
 import {
   cancelDatePicking,
@@ -48,9 +49,15 @@ export function App() {
   }, [loaded]);
 
   const layout = useMemo(
-    () => computeLayout(mergedDataset(state), new Set(), new Set(state.hiddenRowIds)),
+    () => computeLayout(mergedDataset(state), new Set(), hiddenIdsOf(state.hiddenRowIds, state.hiddenGroupIds)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.dataset, state.publicDatasets, state.sharing.mirrors, state.hiddenRowIds],
+    [
+      state.dataset,
+      state.publicDatasets,
+      state.sharing.mirrors,
+      state.hiddenRowIds,
+      state.hiddenGroupIds,
+    ],
   );
 
   // Global keyboard handling (§6) — all ignored while typing in a field.

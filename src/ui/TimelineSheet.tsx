@@ -30,7 +30,7 @@ import {
   deleteRowWithCascade,
   selectEntry,
   selectEvent,
-  toggleRowHidden,
+  setRowHidden,
   updateEntry,
   updateEvent,
 } from "../state/actions";
@@ -214,10 +214,9 @@ export function TimelineSheet({
     eventIsReadOnly: event ? isForeignId(event.id) : false,
     onRemoveEvent: removeEvent,
     rowIsReadOnly: row ? isForeignId(row.id) : true,
-    rowIsVisible: row ? !state.hiddenRowIds.includes(row.id) : false,
     rowCanBreakOut: row ? canBreakOut(state.dataset, row.id) : false,
     canMoveGroups: state.dataset.groups.filter((group) => !isPublicId(group.id)).length > 1,
-    onToggleRowHidden: () => row && toggleRowHidden(row.id),
+    onHideRow: () => row && setRowHidden(row.id, true),
     onMoveToGroup: () => setMovingToGroup(true),
     onRemoveRow: removeRow,
     onRemoveEntry: removeEntry,
@@ -360,10 +359,9 @@ function buildMenuItems({
   entryIsReadOnly,
   eventIsReadOnly,
   rowIsReadOnly,
-  rowIsVisible,
   rowCanBreakOut,
   canMoveGroups,
-  onToggleRowHidden,
+  onHideRow,
   onMoveToGroup,
   onRemoveRow,
   onRemoveEntry,
@@ -376,10 +374,9 @@ function buildMenuItems({
   entryIsReadOnly: boolean;
   eventIsReadOnly: boolean;
   rowIsReadOnly: boolean;
-  rowIsVisible: boolean;
   rowCanBreakOut: boolean;
   canMoveGroups: boolean;
-  onToggleRowHidden: () => void;
+  onHideRow: () => void;
   onMoveToGroup: () => void;
   onRemoveRow: () => void;
   onRemoveEntry: () => void;
@@ -401,7 +398,10 @@ function buildMenuItems({
   }
   if (pane === "row") {
     return [
-      { label: "Show on timeline", onSelect: onToggleRowHidden, checked: rowIsVisible },
+      // Not a checkbox any more: hiding removes the timeline from this list
+      // too, so there is no row left to un-check. It comes back from the
+      // "👁 Show …" entries at the foot of the list.
+      { label: "Hide from the timeline", onSelect: onHideRow },
       ...(rowIsReadOnly
         ? []
         : [

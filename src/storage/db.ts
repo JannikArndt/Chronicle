@@ -25,6 +25,13 @@ const MIRRORS_KEY = "mirrors";
 export interface StoredOverlays {
   activeWorldKeys: string[];
   activeFamous: { person: FamousPerson; aligned: boolean; removedRowKeys: string[] }[];
+  // Which timelines and groups the user has hidden from the view. Here rather
+  // than in the dataset because hiding is a view preference: it must not
+  // travel with an export, and it must not be published as if it said
+  // something about the timeline itself. Optional — an overlay record written
+  // before hiding was persisted simply has neither.
+  hiddenRowIds?: string[];
+  hiddenGroupIds?: string[];
 }
 
 function openDatabase(): Promise<IDBDatabase> {

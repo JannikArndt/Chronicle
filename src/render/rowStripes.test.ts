@@ -5,15 +5,15 @@ import { ROW_GAP, ROW_HEIGHT } from "./layout";
 import type { LayoutItem } from "./layout";
 
 function row(id: string, y: number, depth = 0): LayoutItem {
-  return { kind: "row", id, y, height: ROW_HEIGHT, depth, hidden: false };
+  return { kind: "row", id, y, height: ROW_HEIGHT, depth };
 }
 
 function expandedGroup(id: string, y: number, depth = 0): LayoutItem {
-  return { kind: "group", id, y, height: 32, depth, hidden: false, subtreeEndY: y + 200 };
+  return { kind: "group", id, y, height: 32, depth, subtreeEndY: y + 200 };
 }
 
 function collapsedGroup(id: string, y: number, depth = 0): LayoutItem {
-  return { kind: "group", id, y, height: ROW_HEIGHT, depth, hidden: false, summaries: [] };
+  return { kind: "group", id, y, height: ROW_HEIGHT, depth, summaries: [] };
 }
 
 // Every case that asserts a raw `y` pins `includeGaps: false`, so the numbers

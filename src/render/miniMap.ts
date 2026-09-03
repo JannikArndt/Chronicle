@@ -82,7 +82,7 @@ function clamp(value: number, low: number, high: number): number {
 export function miniMapLanes(layout: Layout, dataset: TimelineDataset, nowMs: number): MiniMapLane[] {
   const lanes: MiniMapLane[] = [];
   for (const item of layout.items) {
-    if (item.kind !== "row" || item.hidden || !item.row) continue;
+    if (item.kind !== "row" || !item.row) continue;
     const row = item.row;
     lanes.push({
       rowId: row.id,

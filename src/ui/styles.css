@@ -402,14 +402,28 @@ textarea {
   font-size: 1.55em;
 }
 
-/* The ▸/▾ and a timeline's checkbox occupy the SAME slot, so a group's name
-   and a timeline's name at the same depth start at the same x — which is what
-   lets the indentation carry the hierarchy on its own. */
+/* The ▸/▾ and a timeline's empty slot are the SAME size, so a group's name and
+   a timeline's name at the same depth start at the same x — which is what lets
+   the indentation carry the hierarchy on its own. The slot held a visibility
+   checkbox until hiding moved into the ⚙ settings and started hiding rows
+   completely; the width has to stay whatever the ▸/▾ needs. */
 .collapse-button,
-.rail-row-checkbox {
+.rail-row-spacer {
   flex: none;
   width: 14px;
   height: 14px;
+}
+
+/* Never hover-revealed, unlike the other rail actions: it is the only way back
+   for something taken out of the picture. It shows up only while its container
+   is actually holding something back. */
+.hidden-count {
+  flex: none;
+  width: auto;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  white-space: nowrap;
 }
 
 .rail-footer {
@@ -1299,8 +1313,12 @@ textarea {
   background: var(--color-bg-hover);
 }
 
-.sheet-row-hidden {
-  opacity: 0.45;
+/* The unhide entries at the foot of the list: the same shape as "＋ New
+   timeline" beside them, quieter, because they are a way back rather than a
+   way forward. (There is no dimmed-row style any more — a hidden timeline is
+   not in the list at all.) */
+.sheet-hidden-row {
+  color: var(--color-text-faint);
 }
 
 .sheet-row-emoji {

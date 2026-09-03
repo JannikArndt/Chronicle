@@ -677,7 +677,7 @@ export class TimelineEngine {
         if (this.input.showRowLabels) this.drawGroupLabel(item);
         continue;
       }
-      if (item.row && !item.hidden) this.drawRow(item, nowMs, emphasis, relatedIds);
+      if (item.row) this.drawRow(item, nowMs, emphasis, relatedIds);
     }
 
     if (selectedEntry) this.drawConnectors(selectedEntry, visible, nowMs);

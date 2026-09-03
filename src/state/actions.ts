@@ -50,8 +50,8 @@ let overlayPersistTimer: ReturnType<typeof setTimeout> | undefined;
 function persistOverlaysSoon(): void {
   clearTimeout(overlayPersistTimer);
   overlayPersistTimer = setTimeout(() => {
-    const { activeWorldKeys, activeFamous } = appStore.getState();
-    void saveOverlays({ activeWorldKeys, activeFamous });
+    const { activeWorldKeys, activeFamous, hiddenRowIds, hiddenGroupIds } = appStore.getState();
+    void saveOverlays({ activeWorldKeys, activeFamous, hiddenRowIds, hiddenGroupIds });
   }, 250);
 }
 
@@ -77,6 +77,8 @@ export async function initializeApp(): Promise<void> {
     publicDatasets: [],
     activeWorldKeys: overlays?.activeWorldKeys ?? [],
     activeFamous: overlays?.activeFamous ?? [],
+    hiddenRowIds: overlays?.hiddenRowIds ?? [],
+    hiddenGroupIds: overlays?.hiddenGroupIds ?? [],
     loaded: true,
   });
   rebuildPublicDatasets(appStore.getState());
@@ -777,13 +779,48 @@ export function toggleGroupCollapsed(groupId: string): void {
   appStore.setState({ publicDatasets: state.publicDatasets.map(toggle) });
 }
 
-export function toggleRowHidden(rowId: string): void {
+// ---------- hiding (a view preference, see src/model/hidden.ts) ----------
+//
+// Hidden things leave the layout entirely, so every one of these persists:
+// a hide that came back on reload would look like the app forgetting, and an
+// unhide that came back would look like it ignoring you.
+
+function withId(ids: string[], id: string, present: boolean): string[] {
+  if (present) return ids.includes(id) ? ids : [...ids, id];
+  return ids.filter((candidate) => candidate !== id);
+}
+
+export function setRowHidden(rowId: string, hidden: boolean): void {
   const { hiddenRowIds } = appStore.getState();
-  appStore.setState({
-    hiddenRowIds: hiddenRowIds.includes(rowId)
-      ? hiddenRowIds.filter((id) => id !== rowId)
-      : [...hiddenRowIds, rowId],
-  });
+  appStore.setState({ hiddenRowIds: withId(hiddenRowIds, rowId, hidden) });
+  persistOverlaysSoon();
+}
+
+export function toggleRowHidden(rowId: string): void {
+  setRowHidden(rowId, !appStore.getState().hiddenRowIds.includes(rowId));
+}
+
+export function setGroupHidden(groupId: string, hidden: boolean): void {
+  const { hiddenGroupIds } = appStore.getState();
+  appStore.setState({ hiddenGroupIds: withId(hiddenGroupIds, groupId, hidden) });
+  persistOverlaysSoon();
+}
+
+export function toggleGroupHidden(groupId: string): void {
+  setGroupHidden(groupId, !appStore.getState().hiddenGroupIds.includes(groupId));
+}
+
+// Unhide one child of a container, whichever kind it is — what the rail's
+// unhide lists call. Deliberately not "unhide everything": the thing being
+// offered back is a named timeline or group, not a bulk state.
+export function unhideChild(child: RailChildRef): void {
+  if (child.kind === "row") setRowHidden(child.id, false);
+  else setGroupHidden(child.id, false);
+}
+
+export function unhideAll(): void {
+  appStore.setState({ hiddenRowIds: [], hiddenGroupIds: [] });
+  persistOverlaysSoon();
 }
 
 export function setSearch(search: string): void {

@@ -47,7 +47,13 @@ export interface AppState {
   // entry from the canvas queues ["end"] behind "start" so that pointing at a
   // span is one gesture rather than two arm-the-crosshair round trips.
   pickChain?: PickableDateField[];
+  // Hidden timelines and groups (src/model/hidden.ts). A view preference, not
+  // data: persisted with the other overlays, never in the dataset, so hiding
+  // someone's shared timeline is your decision and stays on your device. A
+  // hidden thing is gone from the picture completely — what remembers it is
+  // this list, and the rail offers it back in the container it belongs to.
   hiddenRowIds: string[];
+  hiddenGroupIds: string[];
   // Which optional public data the user has switched on. Nothing loads by
   // default — `publicDatasets` is rebuilt from these selections (see actions).
   // `activeFamous` holds the whole FamousPerson (not just an id) so a person
@@ -81,6 +87,7 @@ const initialState: AppState = {
   search: "",
   filters: { groupIds: [] },
   hiddenRowIds: [],
+  hiddenGroupIds: [],
   activeWorldKeys: [],
   activeFamous: [],
   sharing: { configured: false, mirrors: [], grants: [], status: "off" },
