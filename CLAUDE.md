@@ -71,8 +71,9 @@ what's true across the whole codebase.
   no `LayoutItem.hidden` and nothing may bring one back: a dimmed-but-present
   row is what this replaced. What keeps "gone" from meaning "lost" is that every
   container offers its own hidden children back — `hiddenChildrenOf()` in
-  `src/model/hidden.ts`, shown on the group header, in the rail footer for the
-  top level, and at the foot of the mobile list.
+  `src/model/hidden.ts`, shown in a group's own ⚙ settings, in the rail footer
+  for the top level (the root has no ⚙ to put them in), and at the foot of the
+  mobile list.
 - **An entry is a span, an event is a point** — and the point is *only drawn
   when zoomed in* (`src/render/events.ts` owns that rule and nothing else may
   re-decide it). A zero-length entry is not an event and must not be used as
