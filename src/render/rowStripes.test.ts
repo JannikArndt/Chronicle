@@ -62,6 +62,11 @@ describe("rowStripes", () => {
     expect(stripe).toEqual({ y: 100 - ROW_GAP / 2, height: ROW_HEIGHT + ROW_GAP });
   });
 
+  test("the gap padding never lifts a stripe above the top of the layout", () => {
+    const [stripe] = rowStripes([row("r1", 0)], settings({ scope: "all", includeGaps: true }));
+    expect(stripe).toEqual({ y: 0, height: ROW_HEIGHT + ROW_GAP / 2 });
+  });
+
   test("nothing is painted when striping is off or turned all the way down", () => {
     const items = [row("r1", 0), row("r2", 50)];
     expect(rowStripes(items, settings({ enabled: false }))).toEqual([]);

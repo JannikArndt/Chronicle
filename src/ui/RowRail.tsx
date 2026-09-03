@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { MutableRefObject, PointerEvent as ReactPointerEvent, RefObject } from "react";
 import { canBreakOut, describeBreakOut } from "../model/breakOut";
 import { collectGroupCascade, collectRowCascade, describeCascade } from "../model/cascade";
-import { ROW_HEIGHT } from "../render/layout";
+import { groupHeaderHeight } from "../render/layout";
 import { ROW_STRIPES, rowStripes } from "../render/rowStripes";
 import type { Layout, LayoutItem } from "../render/layout";
 import type { TimelineEngine } from "../render/engine";
@@ -491,13 +491,15 @@ function RailItem({
   // how this reads: a group's name looks the same collapsed or not, and the
   // same as a timeline's.
   const collapsed = item.summaries !== undefined;
-  // A collapsed group whose children overlap is `lanes × ROW_HEIGHT` tall so
-  // the canvas can stack their summary bars — but the rail shows no bars, only
-  // the name, and centring that name over the whole stack floated it in the
-  // middle of rows it does not label. The rail box stays ONE row tall, which
-  // puts the name on the first line, level with the first lane and with the
-  // plate the canvas draws it on.
-  const style = { top: item.y, height: collapsed ? ROW_HEIGHT : item.height };
+  // A collapsed group's layout item is as tall as the summary bars the canvas
+  // stacks in it (`lanes × ROW_HEIGHT`) — but the rail shows no bars, only the
+  // name, so its box is the height that group's HEADER would have had while
+  // expanded. Two things follow, and both are the point: the name sits on the
+  // first line instead of floating in the middle of bars it does not label,
+  // and — since `item.y` no longer changes with the collapse state either —
+  // it sits at exactly the same pixel whether the group is open or shut.
+  // Collapsing a group must not make its own name move.
+  const style = { top: item.y, height: collapsed ? groupHeaderHeight(item.depth) : item.height };
   const readOnly = isForeignId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);

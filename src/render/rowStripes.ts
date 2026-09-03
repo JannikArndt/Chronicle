@@ -78,7 +78,13 @@ export function rowStripes(
     counters[depth] = index + 1;
     if (index % 2 !== settings.offset) continue;
     const pad = settings.includeGaps ? ROW_GAP / 2 : 0;
-    stripes.push({ y: item.y - pad, height: item.height + pad * 2 });
+    // The top pad is clamped at the top of the layout: the first row starts at
+    // y 0, so unclamped it would open the whole rail with a stripe hanging
+    // five pixels above everything, which reads as a misalignment rather than
+    // as banding. The bottom edge is left where it was, so the stripe only
+    // ever loses the part that had nothing to band against.
+    const top = Math.max(0, item.y - pad);
+    stripes.push({ y: top, height: item.y + item.height + pad - top });
   }
   return stripes;
 }
