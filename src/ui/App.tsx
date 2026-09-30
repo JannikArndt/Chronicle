@@ -10,8 +10,9 @@ import {
 import { appStore, mergedDataset, useAppState } from "../state/store";
 import { CanvasHost } from "./CanvasHost";
 import { DataMenu } from "./DataMenu";
-import { InviteLanding, readInviteToken } from "./InviteLanding";
-import { SharingMenu } from "./SharingMenu";
+import { InviteLanding, readInviteToken, readPublicLinkToken } from "./InviteLanding";
+import { AccountMenu } from "./AccountMenu";
+import { openPublicLink } from "../sync/engine";
 import { DetailPanel } from "./DetailPanel";
 import { MobileShell } from "./MobileShell";
 import { RowRail } from "./RowRail";
@@ -31,17 +32,32 @@ export function App() {
   // an invite token is a capability and should not sit in the URL, in the
   // back-button history, or in whatever the browser syncs between devices.
   const [inviteToken, setInviteToken] = useState(() => readInviteToken(window.location.hash));
+  // A public link (`#/view/<token>`): someone's published timelines, shown
+  // read-only next to whatever is on this device, with no account needed.
+  const [viewToken] = useState(() => readPublicLinkToken(window.location.hash));
+  const [viewNote, setViewNote] = useState<string | null>(null);
 
   useEffect(() => {
     void initializeApp();
   }, []);
 
   useEffect(() => {
-    if (inviteToken === null) return;
+    if (inviteToken === null && viewToken === null) return;
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  }, [inviteToken]);
+  }, [inviteToken, viewToken]);
 
   useEffect(() => {
+    if (!loaded || viewToken === null) return;
+    openPublicLink(viewToken).then(
+      (owner) => setViewNote(`Showing what ${owner} shared by link — read-only, and not saved on this device.`),
+      (reason: unknown) => setViewNote(reason instanceof Error ? reason.message : "This link does not work."),
+    );
+  }, [loaded, viewToken]);
+
+  useEffect(() => {
+    // Someone arriving by a link came to see or join something, not to be
+    // walked through setting up their own life first.
+    if (inviteToken !== null || viewToken !== null) return;
     if (loaded && shouldShowOnboarding(state.dataset)) setOnboardingOpen(true);
     // Only re-check right after load — once open, later dataset changes
     // (created by the assistant itself) must not affect this decision.
@@ -54,7 +70,7 @@ export function App() {
     [
       state.dataset,
       state.publicDatasets,
-      state.sharing.mirrors,
+      state.linkDatasets,
       state.hiddenRowIds,
       state.hiddenGroupIds,
     ],
@@ -139,7 +155,7 @@ export function App() {
           <header className="top-bar">
             <span className="app-title">Chronicle</span>
             <SearchBar />
-            <SharingMenu />
+            <AccountMenu />
             <DataMenu />
           </header>
           <div className="main-area">
@@ -160,6 +176,14 @@ export function App() {
         </div>
       )}
       {inviteToken !== null && <InviteLanding token={inviteToken} onDone={() => setInviteToken(null)} />}
+      {viewNote !== null && (
+        <div className="view-note">
+          <span>{viewNote}</span>
+          <button type="button" className="icon-button" aria-label="Dismiss" onClick={() => setViewNote(null)}>
+            ✕
+          </button>
+        </div>
+      )}
       {onboardingOpen && (
         <div className="assistant-overlay">
           <IdentityBirthPlacesAssistant onFinished={() => setOnboardingOpen(false)} />

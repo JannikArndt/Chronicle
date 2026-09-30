@@ -24,6 +24,8 @@ import type { Layout } from "../render/layout";
 import {
   breakOutEntry,
   breakOutRow,
+  canMoveInto,
+  canRestructure,
   clearSelection,
   deleteEntryWithCascade,
   deleteEvent,
@@ -34,7 +36,7 @@ import {
   updateEntry,
   updateEvent,
 } from "../state/actions";
-import { isForeignId, isPublicId, mergedDataset, useAppState } from "../state/store";
+import { isReadOnlyId, mergedDataset, useAppState } from "../state/store";
 import { BottomSheet } from "./BottomSheet";
 import { centerOnEntry, centerOnEvent } from "./centerOnEntry";
 import type { BottomSheetHandle } from "./BottomSheet";
@@ -210,12 +212,13 @@ export function TimelineSheet({
   const menuItems = buildMenuItems({
     pane,
     entryIsDraft: state.draft?.id === entry?.id,
-    entryIsReadOnly: entry ? isForeignId(entry.id) : false,
-    eventIsReadOnly: event ? isForeignId(event.id) : false,
+    entryIsReadOnly: entry ? isReadOnlyId(entry.id) : false,
+    eventIsReadOnly: event ? isReadOnlyId(event.id) : false,
     onRemoveEvent: removeEvent,
-    rowIsReadOnly: row ? isForeignId(row.id) : true,
+    rowIsReadOnly: row ? !canRestructure(row.id) : true,
+    entryCanBreakOut: entry ? canRestructure(entry.rowId) : false,
     rowCanBreakOut: row ? canBreakOut(state.dataset, row.id) : false,
-    canMoveGroups: state.dataset.groups.filter((group) => !isPublicId(group.id)).length > 1,
+    canMoveGroups: row ? state.dataset.groups.some((group) => group.id !== row.groupId && canMoveInto(row.id, group.id)) : false,
     onHideRow: () => row && setRowHidden(row.id, true),
     onMoveToGroup: () => setMovingToGroup(true),
     onRemoveRow: removeRow,
@@ -303,7 +306,7 @@ function PaneTitle({
   const isDraft = useAppState((s) => s.draft?.id) === entry?.id && entry !== undefined;
 
   if (pane === "entry" && entry) {
-    const readOnly = isForeignId(entry.id);
+    const readOnly = isReadOnlyId(entry.id);
     return (
       <>
         <EditableLine
@@ -325,7 +328,7 @@ function PaneTitle({
     );
   }
   if (pane === "event" && event) {
-    const readOnly = isForeignId(event.id);
+    const readOnly = isReadOnlyId(event.id);
     return (
       <>
         <EditableLine
@@ -357,6 +360,7 @@ function buildMenuItems({
   pane,
   entryIsDraft,
   entryIsReadOnly,
+  entryCanBreakOut,
   eventIsReadOnly,
   rowIsReadOnly,
   rowCanBreakOut,
@@ -372,6 +376,7 @@ function buildMenuItems({
   pane: PaneName;
   entryIsDraft: boolean;
   entryIsReadOnly: boolean;
+  entryCanBreakOut: boolean;
   eventIsReadOnly: boolean;
   rowIsReadOnly: boolean;
   rowCanBreakOut: boolean;
@@ -389,7 +394,7 @@ function buildMenuItems({
     return entryIsReadOnly || entryIsDraft
       ? []
       : [
-          { label: "Break out into its own timeline", onSelect: onBreakOutEntry },
+          ...(entryCanBreakOut ? [{ label: "Break out into its own timeline", onSelect: onBreakOutEntry }] : []),
           { label: "Remove from timeline", onSelect: onRemoveEntry, danger: true },
         ];
   }

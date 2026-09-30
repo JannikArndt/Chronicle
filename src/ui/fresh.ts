@@ -28,6 +28,7 @@ let knownNewBuild: string | undefined;
 const busyChecks: Array<() => boolean> = [];
 
 export function currentBuild(): string {
+  if (typeof document === "undefined") return "dev";
   return document.querySelector<HTMLMetaElement>('meta[name="app-build"]')?.content ?? "dev";
 }
 

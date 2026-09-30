@@ -16,8 +16,9 @@ import {
   updateEntry,
   updateEvent,
 } from "../state/actions";
-import { appStore, isForeignId, mergedDataset, useAppState } from "../state/store";
+import { appStore, isReadOnlyId, mergedDataset, useAppState } from "../state/store";
 import { DateField } from "./DateField";
+import { PresenceChips } from "./PresenceChips";
 import { PlaceAutocompleteInput } from "../onboarding/PlaceAutocompleteInput";
 import { formatSuggestionText } from "../onboarding/nominatim";
 import type { PlaceSuggestion } from "../onboarding/nominatim";
@@ -67,7 +68,7 @@ function EntryDetail() {
   if (!entry) return null;
 
   const isDraft = state.draft?.id === entry.id;
-  const readOnly = isForeignId(entry.id);
+  const readOnly = isReadOnlyId(entry.id);
   const row = merged.rows.find((r) => r.id === entry.rowId);
   const change = (patch: Partial<TimelineEntry>) => updateEntry(entry.id, patch);
 
@@ -81,6 +82,7 @@ function EntryDetail() {
           ✕
         </button>
       </div>
+      <OwnerLine id={entry.id} />
 
       <div className="field">
         <label className="field-label">Title</label>
@@ -241,7 +243,7 @@ function EventDetail({ eventId }: { eventId: string }) {
 
   if (!event) return null;
 
-  const readOnly = isForeignId(event.id);
+  const readOnly = isReadOnlyId(event.id);
   const row = merged.rows.find((candidate) => candidate.id === event.rowId);
   const change = (patch: Partial<TimelineEvent>) => updateEvent(event.id, patch);
 
@@ -255,6 +257,7 @@ function EventDetail({ eventId }: { eventId: string }) {
           ✕
         </button>
       </div>
+      <OwnerLine id={event.id} />
 
       <div className="field">
         <label className="field-label">Event</label>
@@ -385,5 +388,23 @@ function PlaceField({
         onBlur={commit}
       />
     </div>
+  );
+}
+
+// Whose this is, when it is not yours, and who else has it open right now.
+function OwnerLine({ id }: { id: string }) {
+  const meta = useAppState((s) => s.sync.meta.get(id));
+  const names = useAppState((s) => s.sync.names);
+  const me = useAppState((s) => s.sync.account?.id);
+  const foreign = meta !== undefined && meta.owner !== me;
+  return (
+    <>
+      {foreign && (
+        <div className="hint">
+          {names[meta.owner] ?? "Someone"}’s — shared with you to {meta.access === "edit" ? "edit" : "view"}.
+        </div>
+      )}
+      <PresenceChips ids={[id]} />
+    </>
   );
 }

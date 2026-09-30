@@ -7,11 +7,13 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { moveRow, setRowShared, updateRow } from "../state/actions";
+import { canMoveInto, moveRow, setRowShared, updateRow } from "../state/actions";
 import { describePublishImpact } from "../model/sharing";
 import { ancestorGroups } from "../model/dataset";
 import { formatByPrecision } from "../model/fuzzyDate";
-import { isForeignId, isPublicId, mergedDataset, useAppState } from "../state/store";
+import { isOwnId, isReadOnlyId, mergedDataset, useAppState } from "../state/store";
+import { ShareSection } from "./ShareSection";
+import { PresenceChips } from "./PresenceChips";
 import { EditableLine } from "./EditableLine";
 import { nextEntryStartMs } from "./nextEntryStart";
 import { SheetMenuPicker } from "./SheetMenu";
@@ -48,12 +50,13 @@ export function RowPane({
 }) {
   const state = useAppState((s) => s);
   const [picker, setPicker] = useState<OpenPicker>("none");
-  const signedIn = useAppState((s) => s.sharing.session !== undefined);
+  const [sharing, setSharing] = useState(false);
+  const signedIn = useAppState((s) => s.sync.account !== undefined);
   const merged = mergedDataset(state);
   const row = merged.rows.find((candidate) => candidate.id === rowId);
   if (!row) return null;
 
-  const readOnly = isForeignId(row.id);
+  const readOnly = isReadOnlyId(row.id);
   const entries = merged.entries
     .filter((entry) => entry.rowId === row.id)
     .sort((a, b) => a.start.ms - b.start.ms);
@@ -61,8 +64,9 @@ export function RowPane({
     .filter((event) => event.rowId === row.id)
     .sort((a, b) => a.date.ms - b.date.ms);
 
-  // Public groups are read-only, so they are never a destination.
-  const ownGroups = state.dataset.groups.filter((group) => !isPublicId(group.id));
+  // Only groups this timeline could actually land in: never public or
+  // view-only ones, and never one in someone else's tree.
+  const ownGroups = state.dataset.groups.filter((group) => canMoveInto(row.id, group.id));
 
   return (
     <>
@@ -181,7 +185,11 @@ export function RowPane({
       {/* The publish switch, same rule as the desktop rail: private until
           someone says otherwise, and legible without hovering (there is no
           hovering here anyway). Hidden entirely when signed out. */}
-      {!readOnly && signedIn && (
+      <PresenceChips
+        ids={[row.id, ...entries.map((entry) => entry.id), ...events.map((event) => event.id)]}
+      />
+
+      {!readOnly && signedIn && isOwnId(row.id) && (
         <button
           type="button"
           className="sheet-row"
@@ -192,6 +200,18 @@ export function RowPane({
             {row.shared === true ? "Tap to make private" : describePublishImpact(state.dataset, row.id)}
           </span>
         </button>
+      )}
+
+      {signedIn && !row.id.startsWith("pub:") && (
+        <button type="button" className="sheet-row" onClick={() => setSharing(!sharing)}>
+          <span>👥 {isOwnId(row.id) ? "Share with people…" : "Shared with you"}</span>
+          <span className="sheet-chevron">{sharing ? "▾" : "›"}</span>
+        </button>
+      )}
+      {sharing && (
+        <div className="sheet-share">
+          <ShareSection kind="row" id={row.id} />
+        </div>
       )}
 
       <div className="sheet-section">Entries · {entries.length}</div>

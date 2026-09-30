@@ -1,15 +1,15 @@
-// Export / import — the v1 sync path (§3). Import validates before touching
-// IndexedDB. Gist sync is a KNOWN GAP, deliberately not faked (§7):
-// pasting a personal access token works for power users but is not a
-// solution for non-technical users, and that problem is still open.
+// Export / import. Import validates before touching anything. Signed in, an
+// export is your own records only (`ownDataset`) and an import replaces your
+// own records only — what others share with you is theirs to change.
 
 import { useState } from "react";
 import { triggerDownload } from "../storage/exportImport";
-import { useAppState } from "../state/store";
+import { ownDataset, useAppState } from "../state/store";
 import { importDatasetWithConfirmation } from "./importFlow";
 
 export function DataMenu() {
-  const dataset = useAppState((s) => s.dataset);
+  const state = useAppState((s) => s);
+  const signedIn = state.sync.account !== undefined;
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -25,22 +25,16 @@ export function DataMenu() {
           <div className="popover-backdrop" onClick={() => setOpen(false)} />
           <div className="popover data-menu-popover">
             <div className="popover-form">
-              <button type="button" className="menu-item" onClick={() => triggerDownload(dataset)}>
+              <button type="button" className="menu-item" onClick={() => triggerDownload(ownDataset(state))}>
                 ⬇️ Export JSON
               </button>
               <button type="button" className="menu-item" onClick={handleImport}>
                 ⬆️ Import JSON…
               </button>
               <div className="hint">
-                Your data lives only in this browser (IndexedDB) — export regularly to back it up or
-                move devices.
-              </div>
-              <button type="button" className="menu-item" disabled title="Not built yet">
-                ☁️ Sync via GitHub Gist — planned
-              </button>
-              <div className="hint">
-                Known gap: Gist sync via personal access token suits power users only; a
-                non-technical-user story doesn't exist yet and isn't faked here.
+                {signedIn
+                  ? "An export holds your own timelines — never what others share with you. Importing replaces your own timelines in your account."
+                  : "Your data lives only in this browser (IndexedDB) — export regularly, or create an account to keep it on every device."}
               </div>
               {message && <div className="note">{message}</div>}
             </div>

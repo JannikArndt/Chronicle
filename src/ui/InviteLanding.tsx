@@ -1,114 +1,99 @@
-// Redeeming an invite link — plans/sharing-feature-design.md §D5.
+// Redeeming an invite link (`#/invite/<token>`) — plans/v2-server-design.md §5.
 //
-// The token arrives in the URL fragment (`#/invite/<token>`) rather than the
-// query string: a fragment is never sent to a server in a request line or a
-// Referer header, so the capability does not end up in an access log on the way
-// past. It is stripped from the address bar as soon as it has been read.
+// The token arrives in the URL fragment, which is never sent to a server in
+// a request line or a Referer header, and App strips it from the address bar
+// as soon as it has been read. It goes to the server only in a request body.
+//
+// Someone following an invite usually has no account yet: they see who
+// invited them to what, create an account in the same card, and the invite
+// is redeemed straight after.
 
 import { useEffect, useState } from "react";
-import { redeemInviteToken, requestMagicLink } from "../sharing/sync";
+import { previewInvite, redeemInvite } from "../sync/engine";
 import { useAppState } from "../state/store";
+import { SignInForm } from "./SignInForm";
+import type { InvitePreview } from "../sync/protocol";
 
-const INVITE_HASH = /^#\/invite\/(.+)$/;
+const INVITE_HASH = /^#\/invite\/([A-Za-z0-9_-]+)$/;
+const VIEW_HASH = /^#\/view\/([A-Za-z0-9_-]+)$/;
 
 export function readInviteToken(hash: string): string | null {
   return INVITE_HASH.exec(hash)?.[1] ?? null;
 }
 
-export function InviteLanding({ token, onDone }: { token: string; onDone: () => void }) {
-  const session = useAppState((s) => s.sharing.session);
-  const configured = useAppState((s) => s.sharing.configured);
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
-  const [outcome, setOutcome] = useState<"pending" | "accepted" | "failed">("pending");
-  const [error, setError] = useState<string | null>(null);
-
-  // Redeem as soon as there is somebody to redeem it for. A visitor who follows
-  // the link before signing in lands here, signs in, comes back to the same URL
-  // and this fires on the return trip.
-  useEffect(() => {
-    if (session === undefined || outcome !== "pending") return;
-    void redeemInviteToken(token).then(
-      () => setOutcome("accepted"),
-      (reason: unknown) => {
-        setOutcome("failed");
-        setError(reason instanceof Error ? reason.message : "This invite link is not valid.");
-      },
-    );
-  }, [session, token, outcome]);
-
-  if (!configured) {
-    return (
-      <Shell onDone={onDone}>
-        <p>This copy of Chronicle has no sharing backend configured, so the invite can’t be accepted here.</p>
-      </Shell>
-    );
-  }
-
-  if (outcome === "accepted") {
-    return (
-      <Shell onDone={onDone}>
-        <p>Invite accepted — their shared timelines now appear alongside your own.</p>
-      </Shell>
-    );
-  }
-
-  if (outcome === "failed") {
-    return (
-      <Shell onDone={onDone}>
-        <p>{error}</p>
-        <p className="hint">Invite links expire after 30 days and can only be used once.</p>
-      </Shell>
-    );
-  }
-
-  if (session !== undefined) {
-    return (
-      <Shell onDone={onDone}>
-        <p>Accepting the invite…</p>
-      </Shell>
-    );
-  }
-
-  return (
-    <Shell onDone={onDone}>
-      <p>You’ve been invited to see someone’s timelines.</p>
-      <p className="hint">
-        Sign in to accept. Your own Chronicle stays on this device — accepting an invite doesn’t
-        share anything of yours back.
-      </p>
-      {sent ? (
-        <p className="note">Check your inbox, then open the link on this device.</p>
-      ) : (
-        <>
-          <input
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <button
-            type="button"
-            className="menu-item"
-            disabled={email.trim() === ""}
-            onClick={() => void requestMagicLink(email.trim()).then(() => setSent(true))}
-          >
-            ✉️ Email me a sign-in link
-          </button>
-        </>
-      )}
-    </Shell>
-  );
+export function readPublicLinkToken(hash: string): string | null {
+  return VIEW_HASH.exec(hash)?.[1] ?? null;
 }
 
-function Shell({ children, onDone }: { children: React.ReactNode; onDone: () => void }) {
+function describe(preview: InvitePreview): string {
+  const who = preview.inviter.name;
+  if (preview.subject === null) return `${who} would like to connect with you on Chronicle.`;
+  const verb = preview.role === "editor" ? "fill in" : "see";
+  if (preview.subject.kind === "all") return `${who} invites you to ${verb} the timelines they publish.`;
+  const what = preview.subject.label === "" ? `a ${preview.subject.kind === "group" ? "group" : "timeline"}` : `“${preview.subject.label}”`;
+  return `${who} invites you to ${verb} ${what}.`;
+}
+
+export function InviteLanding({ token, onDone }: { token: string; onDone: () => void }) {
+  const signedIn = useAppState((s) => s.sync.account !== undefined && !s.sync.sessionExpired);
+  const [preview, setPreview] = useState<InvitePreview | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "accepting" | "accepted" | "failed">("loading");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    previewInvite(token).then(
+      (result) => {
+        setPreview(result);
+        setState("ready");
+      },
+      (reason: unknown) => {
+        setError(reason instanceof Error ? reason.message : "This invite link does not work.");
+        setState("failed");
+      },
+    );
+  }, [token]);
+
+  const accept = () => {
+    setState("accepting");
+    redeemInvite(token).then(
+      () => setState("accepted"),
+      (reason: unknown) => {
+        setError(reason instanceof Error ? reason.message : "This invite link does not work.");
+        setState("failed");
+      },
+    );
+  };
+
   return (
     <div className="assistant-overlay">
       <div className="invite-landing">
         <h2>Chronicle</h2>
-        {children}
+        {state === "loading" && <p>Opening the invite…</p>}
+        {state === "failed" && <p>{error}</p>}
+        {preview !== null && state !== "failed" && <p>{describe(preview)}</p>}
+        {state === "ready" && preview !== null && signedIn && (
+          <button type="button" className="small-button small-button-primary" onClick={accept}>
+            Accept
+          </button>
+        )}
+        {state === "ready" && preview !== null && !signedIn && (
+          <>
+            <p className="hint">
+              Accepting connects you with {preview.inviter.name}. Nothing of yours is shared back unless you
+              share it.
+            </p>
+            <SignInForm initialMode="signup" submitSuffix=" and accept" onSignedIn={accept} />
+          </>
+        )}
+        {state === "accepting" && <p>Accepting…</p>}
+        {state === "accepted" && preview !== null && (
+          <p>
+            Done — you are connected with {preview.inviter.name}
+            {preview.subject === null ? "." : ", and what they shared now appears with your own timelines."}
+          </p>
+        )}
         <button type="button" className="small-button" onClick={onDone}>
-          Close
+          {state === "accepted" ? "Go to my timelines" : "Close"}
         </button>
       </div>
     </div>
