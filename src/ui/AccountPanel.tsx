@@ -8,22 +8,18 @@ import { useState } from "react";
 import {
   acceptConnection,
   cancelInvite,
-  changePassword,
   createInviteLink,
   declineConnection,
-  deleteAccount,
   deletePublicLink,
   disconnect,
   dismissSuggestion,
   requestConnection,
   revokeGrant,
-  signOut,
-  updateAccount,
 } from "../sync/engine";
 import { useAppState } from "../state/store";
+import { AccountSettings } from "./AccountSettings";
 import { SignInForm } from "./SignInForm";
 import { roleVerb, subjectLabel } from "./subjects";
-import { MIN_PASSWORD_LENGTH } from "../sync/protocol";
 import type { GrantInfo } from "../sync/protocol";
 
 export function AccountPanel() {
@@ -263,102 +259,6 @@ function YourShares() {
         Sharing is not recallable: stopping ends future access, but anyone who could already see something may
         have kept a copy.
       </div>
-    </section>
-  );
-}
-
-function AccountSettings() {
-  const account = useAppState((s) => s.sync.account)!;
-  const pending = useAppState((s) => s.sync.pending);
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState(account.name);
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
-
-  const leave = () => {
-    const warning =
-      pending > 0
-        ? `${pending} ${pending === 1 ? "change has" : "changes have"} not reached the server yet and will be lost. Sign out anyway?`
-        : "Sign out? Your timelines leave this device; they stay in your account.";
-    if (window.confirm(warning)) void signOut();
-  };
-
-  return (
-    <section className="account-section">
-      <button type="button" className="menu-item" onClick={() => setOpen(!open)}>
-        <span className="menu-item-icon">⚙</span>Account {open ? "▴" : "▾"}
-      </button>
-      {open && (
-        <div className="popover-form">
-          <label className="hint" htmlFor="account-name">
-            Your name, as others see it
-          </label>
-          <input
-            id="account-name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onBlur={() => {
-              if (name.trim() !== "" && name.trim() !== account.name) void updateAccount({ name: name.trim() });
-            }}
-          />
-          <form
-            className="popover-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              changePassword(current, next).then(
-                () => {
-                  setCurrent("");
-                  setNext("");
-                  setMessage("Password changed. Your other devices were signed out.");
-                },
-                (reason: unknown) => setMessage(reason instanceof Error ? reason.message : "That did not work."),
-              );
-            }}
-          >
-            <input type="text" name="username" autoComplete="username" value={account.handle} readOnly hidden />
-            <input
-              type="password"
-              autoComplete="current-password"
-              placeholder="Current password"
-              value={current}
-              onChange={(event) => setCurrent(event.target.value)}
-            />
-            <input
-              type="password"
-              autoComplete="new-password"
-              placeholder="New password"
-              value={next}
-              onChange={(event) => setNext(event.target.value)}
-            />
-            <button type="submit" className="small-button" disabled={current === "" || next.length < MIN_PASSWORD_LENGTH}>
-              Change password
-            </button>
-          </form>
-          {message !== null && <div className="note">{message}</div>}
-          <div className="popover-actions">
-            <button type="button" className="menu-item" onClick={leave}>
-              <span className="menu-item-icon">🚪</span>Sign out
-            </button>
-            <button
-              type="button"
-              className="menu-item menu-item-danger"
-              onClick={() => {
-                const password = window.prompt(
-                  "Deleting your account removes every timeline you own from the server, for everyone you shared them with. It cannot be undone.\n\nType your password to confirm:",
-                );
-                if (password) {
-                  deleteAccount(password).catch((reason: unknown) =>
-                    setMessage(reason instanceof Error ? reason.message : "That did not work."),
-                  );
-                }
-              }}
-            >
-              <span className="menu-item-icon">🗑</span>Delete account…
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

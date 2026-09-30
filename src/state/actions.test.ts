@@ -701,7 +701,7 @@ describe("records shared with you stay out of your own data", () => {
     appStore.setState({
       sync: {
         ...appStore.getState().sync,
-        account: { id: "acct-me", handle: "me", name: "Me" },
+        account: { id: "acct-me", handle: "me", name: "Me", hasPassword: true },
         meta: new Map([
           ["g-dad", { owner: "acct-dad", access: "edit" as const, rootProjected: true }],
           ["r-dad", { owner: "acct-dad", access: "read" as const, rootProjected: false }],

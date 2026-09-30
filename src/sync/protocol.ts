@@ -61,7 +61,22 @@ export interface AccountInfo {
   // Which of the account's groups is the person themselves — the dataset's
   // `selfGroupId`, kept on the account so every device agrees.
   selfGroupId?: string;
+  // An account made with a passkey has no password until one is set.
+  hasPassword: boolean;
 }
+
+export interface PasskeyInfo {
+  id: string;
+  name: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+  // Synced by its provider (iCloud Keychain, Google Password Manager, a
+  // password manager) — so losing one device does not lose it.
+  backedUp: boolean;
+}
+
+// An error the client acts on rather than just shows.
+export const ERROR_CONFIRM_IDENTITY = "confirm-identity";
 
 export interface PersonRef {
   id: string;

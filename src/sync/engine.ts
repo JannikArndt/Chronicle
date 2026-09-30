@@ -11,6 +11,7 @@
 import { api, ApiError, NetworkError } from "./api";
 import { formatHlc, localTick } from "./hlc";
 import { openLiveStream } from "./live";
+import { createPasskey, deviceName, usePasskey } from "./passkeys";
 import {
   acknowledge,
   adoptLocalDataset,
@@ -202,6 +203,7 @@ function onEvent(event: ServerEvent): void {
         void push();
         sendFocus();
         void refreshSocial();
+        void refreshPasskeys();
       });
       return;
     case "records":
@@ -384,11 +386,34 @@ export async function signUp(handle: string, password: string, name: string): Pr
   await adopt(me, true);
 }
 
+// An account made with a passkey instead of a password: the handle and
+// name first (the server checks the handle is free), then the device's
+// passkey sheet, then the same adoption of this device's timelines.
+export async function signUpWithPasskey(handle: string, name: string): Promise<void> {
+  const { ceremonyId, options } = await api.passkeySignUpOptions(handle, name);
+  const response = await createPasskey(options);
+  const { me } = await api.passkeySignUp(ceremonyId, response, deviceName());
+  await adopt(me, true);
+}
+
 // `keepLocal`: add this device's own timelines to the account. On a device
 // that already holds the account (its session had expired), nothing is
 // adopted — the replica simply carries on.
 export async function signIn(handle: string, password: string, keepLocal: boolean): Promise<void> {
   const { me } = await api.signIn(handle, password);
+  await signedIn(me, keepLocal);
+}
+
+// No handle typed: the passkey says whose it is. With `autofill`, it waits
+// in the handle field's suggestions until someone picks one there.
+export async function signInWithPasskey(keepLocal: boolean, autofill = false): Promise<void> {
+  const { ceremonyId, options } = await api.passkeySignInOptions();
+  const response = await usePasskey(options, autofill);
+  const { me } = await api.passkeySignIn(ceremonyId, response);
+  await signedIn(me, keepLocal);
+}
+
+async function signedIn(me: AccountInfo, keepLocal: boolean): Promise<void> {
   if (replica !== undefined && replica.me === me.id) {
     generation += 1;
     patch({ account: me, sessionExpired: false, error: undefined });
@@ -430,7 +455,9 @@ export async function signOut(): Promise<void> {
   await forgetEverything();
 }
 
-export async function deleteAccount(password: string): Promise<void> {
+// Without a password, the session must have confirmed it's you recently —
+// the caller handles ERROR_CONFIRM_IDENTITY by asking (`confirmIdentity`).
+export async function deleteAccount(password?: string): Promise<void> {
   await api.deleteAccount(password);
   await forgetEverything();
 }
@@ -468,8 +495,48 @@ export async function updateAccount(patchMe: { name?: string; selfGroupId?: stri
   }
 }
 
-export async function changePassword(current: string, next: string): Promise<void> {
-  await api.changePassword(current, next);
+// Set a first password (an account made with a passkey), or change it.
+// Signs out every other session.
+export async function changePassword(current: string | undefined, next: string): Promise<void> {
+  const { me } = await api.changePassword(current, next);
+  patch({ account: me });
+  void saveNow();
+}
+
+// "Confirm it's you", for the few changes that could take an account over.
+// A passkey where there is one; the password otherwise.
+export async function confirmIdentity(proof: { password: string } | "passkey"): Promise<void> {
+  if (proof === "passkey") {
+    const { ceremonyId, options } = await api.confirmOptions();
+    await api.confirm({ ceremonyId, response: await usePasskey(options) });
+    return;
+  }
+  await api.confirm(proof);
+}
+
+// ---------- passkeys ----------
+
+export async function refreshPasskeys(): Promise<void> {
+  if (replica === undefined) return;
+  try {
+    patch({ passkeys: (await api.passkeys()).passkeys });
+  } catch (error) {
+    handleFailure(error);
+  }
+}
+
+export async function addPasskey(): Promise<void> {
+  const { ceremonyId, options } = await api.addPasskeyOptions();
+  const response = await createPasskey(options);
+  patch({ passkeys: (await api.addPasskey(ceremonyId, response, deviceName())).passkeys });
+}
+
+export async function renamePasskey(id: string, name: string): Promise<void> {
+  patch({ passkeys: (await api.renamePasskey(id, name)).passkeys });
+}
+
+export async function removePasskey(id: string): Promise<void> {
+  patch({ passkeys: (await api.removePasskey(id)).passkeys });
 }
 
 // ---------- presence ----------

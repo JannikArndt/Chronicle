@@ -6,14 +6,16 @@ import { Auth, RateLimiter, accountInfo } from "./auth";
 import { openDatabase } from "./db";
 import { HttpError, Router, clientAddress, isSecureRequest, readJson, sendError, sendJson } from "./http";
 import { Hub } from "./hub";
+import { Passkeys, passkeyName } from "./passkeys";
 import { RecordStore } from "./records";
 import { Social, parseRole, parseSubject } from "./social";
 import { SyncService } from "./sync";
 import { createStaticSite, SECURITY_HEADERS } from "./static";
 import { ID_PATTERN } from "./validate";
-import { CSRF_HEADER, HANDLE_PATTERN, MIN_PASSWORD_LENGTH } from "../src/sync/protocol";
+import { CSRF_HEADER, ERROR_CONFIRM_IDENTITY, HANDLE_PATTERN, MIN_PASSWORD_LENGTH } from "../src/sync/protocol";
 import type { Database } from "./db";
 import type { RequestContext } from "./http";
+import type { RelyingParty } from "./passkeys";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { PushRecord } from "../src/sync/protocol";
 
@@ -32,6 +34,10 @@ export interface AppConfig {
   limits?: { signUpsPerHour?: number; signInsPer10Min?: number };
   // scrypt's cost parameter. Tests lower it; production keeps the default.
   passwordCost?: number;
+  // The app's own origin (https://chronicle.timpanini.com), which every
+  // passkey is bound to. Unset, it is read off each request — which is right
+  // behind a proxy that passes the Host header on, and in development.
+  publicOrigin?: string;
 }
 
 export interface App {
@@ -64,6 +70,14 @@ function checkPassword(value: unknown): string {
   return value;
 }
 
+function checkHandle(value: unknown): string {
+  const handle = text(value).toLowerCase();
+  if (!HANDLE_PATTERN.test(handle)) {
+    throw new HttpError(400, "Handles are 3 to 32 characters: letters, digits, dots, dashes or underscores.");
+  }
+  return handle;
+}
+
 function checkId(value: unknown): string {
   if (typeof value !== "string" || !ID_PATTERN.test(value)) throw new HttpError(400, "Invalid id.");
   return value;
@@ -73,6 +87,7 @@ export function createApp(config: AppConfig): App {
   const db = openDatabase(config.dataDir);
   const auth = new Auth(db, config.trustProxy, config.passwordCost);
   const store = new RecordStore(db);
+  const passkeys = new Passkeys(db);
   const hub = new Hub(config.buildId);
   // Social and SyncService need each other's names and broadcasts; the
   // names lookup is late-bound to break the cycle.
@@ -101,6 +116,24 @@ export function createApp(config: AppConfig): App {
     }
   };
 
+  // Changes that could take an account over — a new passkey, a new password,
+  // deleting it — need a session that proved who it is in the last few
+  // minutes. The client answers this error by asking for a passkey or the
+  // password, then tries again.
+  const requireRecentlyVerified = (req: IncomingMessage) => {
+    if (!auth.isRecentlyVerified(req)) {
+      throw new HttpError(403, "Confirm it’s you first.", ERROR_CONFIRM_IDENTITY);
+    }
+  };
+
+  const relyingParty = (req: IncomingMessage): RelyingParty => {
+    const origin =
+      config.publicOrigin ??
+      `${isSecureRequest(req, config.trustProxy) ? "https" : "http"}://${String(req.headers.host ?? "localhost")}`;
+    const url = new URL(origin);
+    return { origin: url.origin, rpID: url.hostname };
+  };
+
   // ---------- version ----------
 
   // `build` says the code changed; `schema` says a stored shape changed too.
@@ -115,10 +148,7 @@ export function createApp(config: AppConfig): App {
     requireHttps(req);
     signUpLimit.hit(address(req));
     const body = await readJson<{ handle?: unknown; password?: unknown; name?: unknown }>(req);
-    const handle = text(body.handle).toLowerCase();
-    if (!HANDLE_PATTERN.test(handle)) {
-      throw new HttpError(400, "Handles are 3 to 32 characters: letters, digits, dots, dashes or underscores.");
-    }
+    const handle = checkHandle(body.handle);
     const account = await auth.createAccount(handle, checkPassword(body.password), checkName(body.name));
     auth.startSession(req, res, account.id);
     sendJson(req, res, 201, { me: accountInfo(account) });
@@ -161,27 +191,145 @@ export function createApp(config: AppConfig): App {
     sendJson(req, res, 200, { me: accountInfo(auth.require(req)) });
   });
 
+  // Set or change the password. With the current password in the body that
+  // is proof enough; without one (an account that has only passkeys, or
+  // someone who just confirmed with a passkey) the session must have proved
+  // itself recently.
   router.on("POST", "/api/me/password", async ({ req, res }) => {
     const account = auth.require(req);
     const body = await readJson<{ current?: unknown; next?: unknown }>(req);
     signInLimit.hit(`handle:${account.handle}`);
     const next = checkPassword(body.next);
-    const verified = typeof body.current === "string" ? await auth.checkPassword(account.handle, body.current) : null;
-    if (verified === null) throw new HttpError(401, "Your current password is not right.");
+    if (typeof body.current === "string" && body.current !== "") {
+      if ((await auth.checkPassword(account.handle, body.current)) === null) {
+        throw new HttpError(401, "Your current password is not right.");
+      }
+    } else {
+      requireRecentlyVerified(req);
+    }
     await auth.setPassword(account.id, next);
     auth.endOtherSessions(req, account.id);
-    sendJson(req, res, 200, { ok: true });
+    sendJson(req, res, 200, { me: accountInfo(auth.require(req)) });
   });
 
   router.on("DELETE", "/api/me", async ({ req, res }) => {
     const account = auth.require(req);
     const body = await readJson<{ password?: unknown }>(req);
     signInLimit.hit(`handle:${account.handle}`);
-    const verified = typeof body.password === "string" ? await auth.checkPassword(account.handle, body.password) : null;
-    if (verified === null) throw new HttpError(401, "Your password is not right.");
+    if (typeof body.password === "string" && body.password !== "") {
+      if ((await auth.checkPassword(account.handle, body.password)) === null) {
+        throw new HttpError(401, "Your password is not right.");
+      }
+    } else {
+      requireRecentlyVerified(req);
+    }
     social.deleteAccount(account.id);
     auth.endSession(req, res);
     sendJson(req, res, 200, { ok: true });
+  });
+
+  // Confirm it's you: a password or a passkey, and for the next few minutes
+  // this session may make the changes `requireRecentlyVerified` guards.
+  router.on("POST", "/api/auth/confirm/options", async ({ req, res }) => {
+    const account = auth.require(req);
+    sendJson(req, res, 200, await passkeys.reauthOptions(relyingParty(req), account.id));
+  });
+
+  router.on("POST", "/api/auth/confirm", async ({ req, res }) => {
+    const account = auth.require(req);
+    const body = await readJson<{ password?: unknown; ceremonyId?: unknown; response?: unknown }>(req);
+    signInLimit.hit(`handle:${account.handle}`);
+    if (typeof body.password === "string") {
+      if ((await auth.checkPassword(account.handle, body.password)) === null) {
+        throw new HttpError(401, "Your password is not right.");
+      }
+    } else {
+      await passkeys.reauth(relyingParty(req), account.id, body.ceremonyId, body.response);
+    }
+    auth.markVerified(req);
+    sendJson(req, res, 200, { ok: true });
+  });
+
+  // ---------- passkeys ----------
+
+  // A new account with a passkey and no password. The handle is checked
+  // before the browser asks for Face ID, so nobody makes a passkey for an
+  // account that then cannot be created.
+  router.on("POST", "/api/passkeys/signup/options", async ({ req, res }) => {
+    requireHttps(req);
+    signUpLimit.hit(address(req));
+    const body = await readJson<{ handle?: unknown; name?: unknown }>(req);
+    const handle = checkHandle(body.handle);
+    const name = checkName(body.name);
+    if (auth.isHandleTaken(handle)) throw new HttpError(409, "That handle is taken — pick another one.");
+    sendJson(req, res, 200, await passkeys.signUpOptions(relyingParty(req), handle, name));
+  });
+
+  router.on("POST", "/api/passkeys/signup", async ({ req, res }) => {
+    requireHttps(req);
+    const body = await readJson<{ ceremonyId?: unknown; response?: unknown; passkeyName?: unknown }>(req);
+    const verified = await passkeys.verifySignUp(relyingParty(req), body.ceremonyId, body.response);
+    const account = await auth.createAccount(verified.handle, null, verified.name, verified.accountId);
+    try {
+      verified.attach(passkeyName(body.passkeyName, "Passkey"));
+    } catch (error) {
+      // An account with no password and no passkey could never be signed
+      // into again; it must not exist.
+      db.prepare("DELETE FROM accounts WHERE id = ?").run(account.id);
+      throw error;
+    }
+    auth.startSession(req, res, account.id);
+    sendJson(req, res, 201, { me: accountInfo(account) });
+  });
+
+  router.on("POST", "/api/passkeys/signin/options", async ({ req, res }) => {
+    requireHttps(req);
+    tokenLimit.hit(address(req));
+    sendJson(req, res, 200, await passkeys.signInOptions(relyingParty(req)));
+  });
+
+  router.on("POST", "/api/passkeys/signin", async ({ req, res }) => {
+    requireHttps(req);
+    signInLimit.hit(address(req));
+    const body = await readJson<{ ceremonyId?: unknown; response?: unknown }>(req);
+    const accountId = await passkeys.signIn(relyingParty(req), body.ceremonyId, body.response);
+    const account = auth.account(accountId);
+    if (account === null) throw new HttpError(401, "This passkey is not registered with Chronicle — it may have been removed.");
+    auth.startSession(req, res, account.id);
+    sendJson(req, res, 200, { me: accountInfo(account) });
+  });
+
+  router.on("GET", "/api/passkeys", ({ req, res }) => {
+    sendJson(req, res, 200, { passkeys: passkeys.list(auth.require(req).id) });
+  });
+
+  router.on("POST", "/api/passkeys/options", async ({ req, res }) => {
+    const account = auth.require(req);
+    requireRecentlyVerified(req);
+    const user = { accountId: account.id, handle: account.handle, name: account.name };
+    sendJson(req, res, 200, await passkeys.addOptions(relyingParty(req), user));
+  });
+
+  router.on("POST", "/api/passkeys", async ({ req, res }) => {
+    const account = auth.require(req);
+    requireRecentlyVerified(req);
+    const body = await readJson<{ ceremonyId?: unknown; response?: unknown; name?: unknown }>(req);
+    await passkeys.add(relyingParty(req), account.id, body.ceremonyId, body.response, passkeyName(body.name, "Passkey"));
+    sendJson(req, res, 201, { passkeys: passkeys.list(account.id) });
+  });
+
+  router.on("PATCH", "/api/passkeys/:id", async ({ req, res, params }) => {
+    const account = auth.require(req);
+    const body = await readJson<{ name?: unknown }>(req);
+    passkeys.rename(account.id, params.id, passkeyName(body.name, "Passkey"));
+    sendJson(req, res, 200, { passkeys: passkeys.list(account.id) });
+  });
+
+  router.on("DELETE", "/api/passkeys/:id", ({ req, res, params }) => {
+    const account = auth.require(req);
+    requireRecentlyVerified(req);
+    passkeys.remove(account.id, params.id, account.hasPassword);
+    sendJson(req, res, 200, { passkeys: passkeys.list(account.id) });
   });
 
   // ---------- records ----------
@@ -336,7 +484,7 @@ export function createApp(config: AppConfig): App {
       // answered like one that rejects later.
       (async () => matched.handler({ req, res, url, params: matched.params }))().catch((error: unknown) => {
         if (error instanceof HttpError) {
-          sendError(req, res, error.status, error.message);
+          sendError(req, res, error.status, error.message, error.code);
           return;
         }
         console.error(`${method} ${pathname} failed:`, error);

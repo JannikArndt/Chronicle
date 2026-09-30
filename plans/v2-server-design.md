@@ -22,7 +22,7 @@ connection shows up as a suggestion, never as access.
 | | v1 (Supabase) | v2 (own server) |
 |---|---|---|
 | Hosting | GitHub Pages + optional Supabase | CapRover app, one container |
-| Auth | Magic link (needed SMTP) | Handle + password (no mail server needed) |
+| Auth | Magic link (needed SMTP) | Handle + passkey and/or password (no mail server needed) |
 | What is uploaded | only published timelines | everything, once you sign in |
 | Other people's data | read-only mirrors, `shared:<owner>:` ids | the same records, in the same dataset, with an access level |
 | Co-ownership | granted, but no write-back path | editors write in place, live |
@@ -39,8 +39,9 @@ viewer only ever sees what you have published.* The sign-in form says it.
 
 ## 2. The server
 
-`server/` — TypeScript bundled by esbuild into `dist-server/main.mjs`, zero
-runtime dependencies: `node:http`, `node:sqlite`, `node:crypto`, `node:zlib`.
+`server/` — TypeScript bundled by esbuild into `dist-server/main.mjs`, no
+`node_modules` at runtime: `node:http`, `node:sqlite`, `node:crypto`,
+`node:zlib`, and `@simplewebauthn/server` bundled into the same file.
 
 - **Storage**: SQLite in `$DATA_DIR/chronicle.db` (WAL). `DATA_DIR` must be a
   CapRover persistent directory, or every deploy starts from an empty database.
@@ -49,6 +50,14 @@ runtime dependencies: `node:http`, `node:sqlite`, `node:crypto`, `node:zlib`.
   Every non-GET API call must carry `X-Chronicle: 1`, which a cross-site form
   cannot send and a cross-site `fetch` cannot send without a CORS preflight
   this server never grants. Sign-in and sign-up are rate-limited per address.
+- **Passkeys** (`passkeys.ts`): WebAuthn, discoverable credentials with user
+  verification required, so signing in needs no handle. An account can be
+  created with a passkey alone (no password), and has a passkey, a password,
+  or both — never neither. Adding a passkey, setting the password, removing a
+  passkey and deleting the account need a proof from the last 10 minutes (the
+  sign-in itself, or "confirm it's you" with either); otherwise the server
+  answers `403 confirm-identity`. The relying party is the request's own host
+  (or `PUBLIC_ORIGIN`).
 - **Records** (`records.ts`): one table, keyed by a globally unique id. Every
   field carries its own hybrid-logical-clock stamp; a write sets a field only
   if its stamp is newer. A delete is a permanent tombstone.
@@ -131,9 +140,9 @@ v1, now running in both directions.
 
 ## 6. Deliberately not built
 
-- Passkeys, and any account recovery — a forgotten password cannot be reset
-  (there is no email on file, by design). Signing in on a second device is the
-  backup; exporting still works.
+- Any account recovery — a forgotten password cannot be reset (there is no
+  email on file, by design). A passkey synced by the person's own password
+  manager, or a second signed-in device, is the backup; exporting still works.
 - End-to-end encryption. The server reads what it stores, and the UI says so.
 - Per-person hold-backs, invite chaining that grants access, discovery.
 - Character-level merging of one text field typed by two people at once: the

@@ -11,6 +11,10 @@ everyone else editing it. Design: `plans/v2-server-design.md` §4.
 - `replica.ts` — **pure core**: `base` + `pending`, `buildView`, `diffView`,
   `acknowledge`, remote application. Most tests live here.
 - `api.ts` — one function per endpoint; `useTransport` for tests.
+- `passkeys.ts` — the browser half of WebAuthn (`@simplewebauthn/browser`):
+  create, use (including the handle field's autofill), cancel, and a
+  default name for a new passkey. A dismissed sheet is `PasskeyCancelled`,
+  which the UI swallows rather than showing as an error.
 - `live.ts` — the SSE stream, read with fetch (works in Node tests too).
 - `engine.ts` — the runtime: capture, push, pull, reconnect, persistence,
   presence, people. Owns module state; `__resetEngineForTests` resets it.

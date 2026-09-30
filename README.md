@@ -1,6 +1,7 @@
 # Chronicle 🕰️
 
-**Live at [chronicle.timpanini.com](https://chronicle.timpanini.com)**
+**Live at [chronicle.timpanini.com](https://chronicle.timpanini.com)** ·
+[What it does](https://jannikarndt.github.io/Chronicle/)
 
 A personal life-timeline web app: your life — and the lives of people around you, and the
 world — as parallel horizontal timelines on one shared time axis. Canvas-rendered,
@@ -21,7 +22,8 @@ local-first, with an optional account for your other devices and the people you 
 - **A dedicated mobile shell** (bottom sheets, a mini-map, touch gestures), not a
   responsive reflow of the desktop layout.
 - **An account, if you want one**: your timelines on every device you sign in on, synced
-  live. A handle and a password — no email needed.
+  live. A handle and a passkey (Face ID, a fingerprint, your device PIN) or a password,
+  or both — no email needed.
 - **Sharing and live editing**: invite your dad by link to fill in his own group and watch
   his entries appear as he types them; let your family view the timelines you publish;
   edit a trip together on two phones — both edits survive, field by field, and you see
@@ -54,7 +56,8 @@ Signed in:
 - **Not end-to-end encrypted, and not recallable.** The server can read what it stores,
   and stopping a share ends future access but cannot un-see what someone already saw.
   The app says both, in those words.
-- **No email on file**, so no password reset — let your browser save the password.
+- **No email on file**, so no password reset — a passkey (kept by your phone or password
+  manager) is the default for that reason; with a password, let your browser save it.
 - **An export is your own timelines only**, never what others share with you.
 
 ## Contributing public datasets
@@ -94,8 +97,8 @@ directory mounted at `/data`.
 
 ## Scope cuts & known gaps (deliberate, not oversights)
 
-- **No password reset** — there is no email on file, by design. A second signed-in device
-  (or an export) is the backup.
+- **No account recovery** — there is no email on file, by design. A synced passkey, a
+  second signed-in device, or an export is the backup.
 - **No end-to-end encryption** — the server reads what it stores; the UI says so.
 - **One field typed by two people at the same moment**: the later keystroke wins that
   field. Different fields of the same entry merge fine; presence chips show who else is

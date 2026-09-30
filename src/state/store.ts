@@ -10,6 +10,7 @@ import type {
   AccountInfo,
   GrantsResponse,
   InviteInfo,
+  PasskeyInfo,
   Peer,
   PeopleResponse,
   PublicLinkInfo,
@@ -110,6 +111,8 @@ export interface SyncState {
   // Who else is online, and what they have open.
   peers: Peer[];
   social?: SocialState;
+  // This account's passkeys, for the account settings.
+  passkeys?: PasskeyInfo[];
 }
 
 const initialState: AppState = {
