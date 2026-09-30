@@ -35,6 +35,64 @@ describe("import validation", () => {
     if (result.ok) expect(result.dataset.schemaVersion).toBe(SCHEMA_VERSION);
   });
 
+  // Stamped current on purpose: a v1 record kept these keys through every
+  // schema bump, so the app's own recent exports still carry them — and the
+  // server refuses an entry with a field it does not know.
+  function currentFileWithV1Links() {
+    return {
+      ...emptyDataset(),
+      groups: [{ id: "g1", label: "Me", collapsed: false }],
+      rows: [{ id: "r1", groupId: "g1", label: "Places" }],
+      entities: [
+        {
+          id: "ent-street",
+          kind: "place",
+          label: "Hauptstraße",
+          place: { fullName: "Hauptstraße, Musterstadt", coordinates: { lat: 50.1, lon: 8.6 }, subtitle: "Musterstadt", city: "Musterstadt" },
+        },
+        { id: "ent-town", kind: "place", label: "Lisbon", place: { fullName: "Lisbon" } },
+        { id: "ent-bare", kind: "place", label: "foo" },
+        { id: "ent-sam", kind: "person", label: "Sam" },
+      ],
+      entries: [
+        { id: "e-street", rowId: "r1", title: "Hauptstraße", start: { ms: 0, precision: "day" }, linkedEntityIds: ["ent-street"] },
+        { id: "e-person", rowId: "r1", title: "Moved in", start: { ms: 0, precision: "day" }, linkedEntityIds: ["ent-sam", "ent-town"] },
+        { id: "e-bare", rowId: "r1", title: "foo", start: { ms: 0, precision: "day" }, linkedEntityIds: ["ent-bare", "ent-sam"] },
+        { id: "e-empty", rowId: "r1", title: "Job", start: { ms: 0, precision: "day" }, linkedEntityIds: [] },
+        {
+          id: "e-own",
+          rowId: "r1",
+          title: "Kept",
+          start: { ms: 0, precision: "day" },
+          place: { fullName: "Porto" },
+          linkedEntityIds: ["ent-town"],
+        },
+      ],
+    };
+  }
+
+  test("moves an entry's linked v1 place onto the entry and drops the link fields, whatever the file's version", () => {
+    const result = validateImport(currentFileWithV1Links());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const byId = new Map(result.dataset.entries.map((entry) => [entry.id, entry]));
+    expect(byId.get("e-street")!.place).toEqual({ fullName: "Hauptstraße, Musterstadt", coordinates: { lat: 50.1, lon: 8.6 }, city: "Musterstadt" });
+    expect(byId.get("e-person")!.place).toEqual({ fullName: "Lisbon" });
+    expect(byId.get("e-bare")!.place).toBeUndefined();
+    expect(byId.get("e-empty")!.place).toBeUndefined();
+    expect(byId.get("e-own")!.place).toEqual({ fullName: "Porto" });
+    for (const entry of result.dataset.entries) expect("linkedEntityIds" in entry).toBe(false);
+    expect("entities" in result.dataset).toBe(false);
+  });
+
+  test("a stored dataset holding v1 links loads without them", async () => {
+    await saveDataset(currentFileWithV1Links() as unknown as TimelineDataset);
+    const loaded = await loadDataset();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.entries.some((entry) => "linkedEntityIds" in entry)).toBe(false);
+    expect(loaded!.entries.find((entry) => entry.id === "e-street")!.place?.fullName).toBe("Hauptstraße, Musterstadt");
+  });
+
   test("folds a pre-v5 category color and icon onto each row and drops the categories array", () => {
     const legacy = {
       schemaVersion: 4,

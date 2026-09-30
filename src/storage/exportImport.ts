@@ -4,7 +4,7 @@
 
 import { normalizeChildOrder } from "../model/dataset";
 import { SCHEMA_VERSION } from "../model/types";
-import type { TimelineDataset } from "../model/types";
+import type { Place, TimelineDataset } from "../model/types";
 
 export function serializeDataset(dataset: TimelineDataset): string {
   return JSON.stringify(dataset, null, 2);
@@ -20,8 +20,8 @@ const ARRAY_FIELDS = ["groups", "rows", "entries"] as const;
 
 // Oldest export shape this importer still reads. v1/v2/v3/v4 files are
 // structurally valid as-is: v2 only added the optional selfPersonId, v3
-// dropped the (now-ignored) `entities`/`linkedEntityIds` fields, and v4
-// dropped `visibility`/`defaultVisibility`. Five versions carry a real data
+// dropped the `entities`/`linkedEntityIds` fields (see `foldLinkedPlaces`),
+// and v4 dropped `visibility`/`defaultVisibility`. Five versions carry a real data
 // step: v5 folded each category's color and icon onto the row, v6 folded the
 // whole Person entity into Group, v7 added sharing, v8 added events and v10 made
 // sibling order explicit (all below). v11 is another no-step version: it only
@@ -70,11 +70,14 @@ export function validateImport(raw: unknown): ImportResult {
   // hand-written one, or one from a build between the schema bump and the first
   // event — would otherwise arrive with `events: undefined`.
   addMissingEventsArray(candidate);
+  // Also on every import, for a different reason: no version step ever deleted
+  // these keys, so a v1 record kept them through every schema bump since, and
+  // a file stamped v11 can still carry them.
+  foldLinkedPlaces(candidate);
   // v1→v4 need no data migration: their diffs are either an optional new field
-  // (selfPersonId) or removed fields the app no longer reads
-  // (`entities`/`linkedEntityIds`), so leftover copies are simply ignored. v5,
-  // v6 and v7 are the exceptions: the first two removed an entity that carried
-  // data the rest of the model still needs, and v7 has a field name to defuse.
+  // (selfPersonId) or removed fields (handled above). v5, v6 and v7 are the
+  // exceptions: the first two removed an entity that carried data the rest of
+  // the model still needs, and v7 has a field name to defuse.
   if (schemaVersion < SCHEMA_VERSION) {
     if (Array.isArray(candidate.categories)) foldCategoryColorsIntoRows(candidate);
     if (Array.isArray(candidate.people)) foldPeopleIntoGroups(candidate);
@@ -133,6 +136,48 @@ function flattenSubRows(candidate: Record<string, unknown>): void {
   for (const row of candidate.rows as Array<Record<string, unknown>>) {
     delete row.parentRowId;
   }
+}
+
+// v3 migration, run on every import: v1/v2 kept places and people as
+// separate `entities`, linked from an entry by `linkedEntityIds`. v3 stopped
+// reading both without deleting them, which was harmless while nothing left
+// the device — but a signed-in account sends every field to the server, and
+// the server refuses an entry with a field it does not know. A linked place
+// is exactly what an entry's own `place` holds today, so the first one moves
+// there (only the fields `Place` has); a linked person has no equivalent and
+// goes. An entry that already has a `place` keeps it.
+function foldLinkedPlaces(candidate: Record<string, unknown>): void {
+  const placeById = new Map<string, Place>();
+  if (Array.isArray(candidate.entities)) {
+    for (const entity of candidate.entities as Array<Record<string, unknown>>) {
+      const place = entity.kind === "place" ? placeOf(entity.place) : undefined;
+      if (place !== undefined) placeById.set(entity.id as string, place);
+    }
+  }
+  for (const entry of candidate.entries as Array<Record<string, unknown>>) {
+    const linked = entry.linkedEntityIds;
+    if (entry.place === undefined && Array.isArray(linked)) {
+      const place = linked.map((id) => placeById.get(id as string)).find((found) => found !== undefined);
+      if (place !== undefined) entry.place = place;
+    }
+    delete entry.linkedEntityIds;
+  }
+  delete candidate.entities;
+}
+
+function placeOf(raw: unknown): Place | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const source = raw as Record<string, unknown>;
+  if (typeof source.fullName !== "string" || source.fullName === "") return undefined;
+  const place: Place = { fullName: source.fullName };
+  const coordinates = source.coordinates as Record<string, unknown> | undefined;
+  if (Number.isFinite(coordinates?.lat) && Number.isFinite(coordinates?.lon)) {
+    place.coordinates = { lat: coordinates!.lat as number, lon: coordinates!.lon as number };
+  }
+  for (const key of ["street", "city", "country"] as const) {
+    if (typeof source[key] === "string") place[key] = source[key];
+  }
+  return place;
 }
 
 // v8 migration: events arrive. There is nothing to convert — no earlier version

@@ -17,6 +17,15 @@ without a `?? []`. The two places that still need that fallback are the ones
 handed untyped JSON: `mergeDatasets` and `namespaceWithPrefix`, for
 `public-data/` files written before the field existed.
 
+**v1's links also go on every import.** v1/v2 kept places and people as
+separate `entities`, linked from entries by `linkedEntityIds`; v3 stopped
+reading both but no step ever deleted them, so a v1 record carried them through
+every later bump and the app's own v11 exports still hold them. Signed in, every
+field of a record goes to the server, which refuses a field it does not know —
+so `foldLinkedPlaces` runs whatever the file's version: an entry's first linked
+place moves onto its `place` (only `Place`'s fields; one it already has wins), a
+linked person has no equivalent and goes, and both keys are deleted.
+
 **The v7 trap.** v1–v3 wrote `visibility`/`defaultVisibility`; v4 removed them
 and old exports still carry them. v7 adds a publish flag doing the same *kind*
 of job, so: the new fields are named `shared`/`shareByDefault` (a name collision
