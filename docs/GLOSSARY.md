@@ -107,8 +107,7 @@ stale owner after being moved. Folded into `Group` in schema v6, extended to
 `TimelineRow` in v9. `birthDateForRow()` in `src/model/dataset.ts` is the one
 place "whose life is this row" gets resolved — the row's own date first, else
 the nearest ancestor group's.
-→ `types.ts` (`Group.birthDate`, `TimelineRow.birthDate`),
-`src/storage/exportImport.ts` (`foldPeopleIntoGroups`)
+→ `types.ts` (`Group.birthDate`, `TimelineRow.birthDate`)
 
 **Category** — **gone.** Removed from the model; colour and icon moved onto the
 row. If you see "category" today it means only the *wording group* the add-entry
@@ -172,11 +171,11 @@ people), loaded from `public-data/*.json` at build time. Every id is prefixed
 `pub:<file>:` so it can never collide with, or be written over, your own data.
 → `src/publicData/`
 
-**Schema version** — a number stored in the dataset so an old export can be
-recognised and either upgraded or honestly rejected. Never a silent migration.
-The dataset in IndexedDB goes through the same upgrade as an imported file —
-it used to be discarded on any mismatch, which made every schema bump a
-silent wipe of the one copy of your data.
+**Schema version** — a number stored in the dataset so a file from another
+version is honestly rejected rather than half-read. Only the current version is
+accepted; there is no upgrade path from older ones. The dataset in IndexedDB
+goes through the same check, so a schema bump must bring its upgrade step with
+it or it wipes the one copy of a signed-out device's data.
 → `types.ts` (`SCHEMA_VERSION`), `src/storage/exportImport.ts`
 
 ---

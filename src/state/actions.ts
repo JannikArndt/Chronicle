@@ -871,8 +871,8 @@ export function commitPickedDate(ms: number, precision: Precision): void {
 
 export function replaceDataset(dataset: TimelineDataset): void {
   // Normalized on the way in, like every other write: a dataset can arrive
-  // from an import, a test fixture or an older schema with no sibling `order`
-  // on it at all.
+  // from a hand-edited import or a test fixture with no sibling `order` on it
+  // at all.
   const state = appStore.getState();
   if (!isSignedIn()) {
     appStore.setState({ dataset: normalizeChildOrder(dataset) });

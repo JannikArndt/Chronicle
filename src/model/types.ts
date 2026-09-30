@@ -46,8 +46,8 @@ export interface Group {
   // mixed in any order — before v10 the layout drew every row first and every
   // group after, which made "a group above a timeline" unreachable by drag.
   // Normalized to 0..n-1 per container by `normalizeChildOrder()`; a record
-  // that arrives without one (an older export, a public dataset) sorts after
-  // the ordered ones, which reproduces the pre-v10 picture exactly.
+  // that arrives without one (a public dataset) sorts after the ordered ones,
+  // timelines before groups.
   order?: number;
   // --- sharing (v7) ---
   // Absent/false is private. NOT called `visibility`: v1–v3 had a field by that
@@ -136,8 +136,8 @@ export interface TimelineDataset {
   groups: Group[];
   rows: TimelineRow[];
   entries: TimelineEntry[];
-  // Moments on those rows. Added in schema v8; an older export has no such
-  // array, and the importer fills one in rather than rejecting the file.
+  // Moments on those rows. Always present — the importer rejects a file
+  // without the array.
   events: TimelineEvent[];
   // The group that is "you" — set once the identity onboarding step completes.
   // Needed because a birth date alone doesn't say *whose*: a partner you added

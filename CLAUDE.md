@@ -103,8 +103,8 @@ what's true across the whole codebase.
   `normalizeChildOrder()` after every mutation. Nothing may go back to reading
   array position as render order, and nothing may draw all the rows before all
   the groups: a group above a timeline was literally unrepresentable that way.
-  A record with no `order` (an older export, a public dataset) still sorts
-  last, rows before groups, which is exactly the pre-v10 picture.
+  A record with no `order` (a public dataset) sorts last, rows before
+  groups.
 - **Breaking out and collapsing are inverses on screen** — a timeline breaks
   out into a group of timelines, one per entry (`src/model/breakOut.ts`), and a
   collapsed group draws one summary bar per *direct child* rather than one band

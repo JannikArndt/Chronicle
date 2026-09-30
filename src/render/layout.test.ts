@@ -47,8 +47,7 @@ describe("computeLayout", () => {
   });
 
   test("without any `order`, a container still draws its rows before its sub-groups", () => {
-    // The pre-v10 arrangement, and what an older export or a public dataset
-    // (whose records carry no order at all) still gets.
+    // What a public dataset (whose records carry no order at all) gets.
     const { items } = computeLayout(fixture(), new Set());
     expect(items.filter((i) => i.depth === 0).map((i) => i.id)).toEqual(["r-top", "g-me", "g-family"]);
   });
