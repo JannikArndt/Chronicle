@@ -7,6 +7,8 @@
 //   DATA_DIR     default /data — must be a persistent volume in production
 //   STATIC_DIR   default <this file>/../dist
 //   TRUST_PROXY  default true — CapRover's nginx sets X-Forwarded-*
+//   PUBLIC_ORIGIN optional, e.g. https://chronicle.timpanini.com — the origin
+//                passkeys are bound to; read off each request when unset
 
 import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -30,6 +32,7 @@ const app = createApp({
   buildId: readBuildId(),
   version: process.env.npm_package_version ?? "2.0.0",
   trustProxy: process.env.TRUST_PROXY !== "false",
+  publicOrigin: process.env.PUBLIC_ORIGIN || undefined,
 });
 
 const server = createServer((req, res) => app.handle(req, res));

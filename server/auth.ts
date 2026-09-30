@@ -1,8 +1,10 @@
 // Accounts and sessions.
 //
-// A handle and a password — no email, so there is no mail server to run and
-// no address on file to leak. The password is stored as scrypt; the session is
-// a random 256-bit token in an HttpOnly cookie, stored as its SHA-256 so a copy
+// A handle, and a passkey or a password (or both) — no email, so there is no
+// mail server to run and no address on file to leak. A password is stored as
+// scrypt, and an account made with a passkey stores none (an empty hash, which
+// no password matches); passkeys live in `passkeys.ts`. The session is a
+// random 256-bit token in an HttpOnly cookie, stored as its SHA-256 so a copy
 // of the database does not sign anyone in.
 
 import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
@@ -22,6 +24,11 @@ const scryptAsync = promisify(scrypt) as (
 export const SESSION_COOKIE = "chronicle_session";
 const SESSION_MAX_AGE_S = 365 * 24 * 60 * 60;
 const TOUCH_INTERVAL_MS = 60 * 60 * 1000;
+// How long signing in, or confirming with a password or passkey, counts as
+// proof for changes that could take an account over: a new passkey, a new
+// password, deleting the account. A session stolen a week later cannot make
+// them without the password or a passkey.
+const RECENTLY_VERIFIED_MS = 10 * 60 * 1000;
 
 const SCRYPT = { N: 1 << 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 const KEY_LENGTH = 64;
@@ -31,6 +38,7 @@ export interface Account {
   handle: string;
   name: string;
   selfGroupId: string | null;
+  hasPassword: boolean;
 }
 
 export function accountInfo(account: Account): AccountInfo {
@@ -39,6 +47,7 @@ export function accountInfo(account: Account): AccountInfo {
     handle: account.handle,
     name: account.name,
     ...(account.selfGroupId === null ? {} : { selfGroupId: account.selfGroupId }),
+    hasPassword: account.hasPassword,
   };
 }
 
@@ -88,7 +97,13 @@ interface AccountRow {
 }
 
 function toAccount(row: AccountRow): Account {
-  return { id: row.id, handle: row.handle, name: row.name, selfGroupId: row.self_group_id };
+  return {
+    id: row.id,
+    handle: row.handle,
+    name: row.name,
+    selfGroupId: row.self_group_id,
+    hasPassword: row.password_hash !== "",
+  };
 }
 
 export class Auth {
@@ -98,11 +113,14 @@ export class Auth {
     private readonly passwordCost: number = SCRYPT.N,
   ) {}
 
-  async createAccount(handle: string, password: string, name: string): Promise<Account> {
-    const existing = this.db.prepare("SELECT 1 FROM accounts WHERE handle = ?").get(handle);
-    if (existing !== undefined) throw new HttpError(409, "That handle is taken — pick another one.");
-    const id = randomUUID();
-    const passwordHash = await hashPassword(password, this.passwordCost);
+  isHandleTaken(handle: string): boolean {
+    return this.db.prepare("SELECT 1 FROM accounts WHERE handle = ?").get(handle) !== undefined;
+  }
+
+  // `password` null: an account made with a passkey, which has none yet.
+  async createAccount(handle: string, password: string | null, name: string, id: string = randomUUID()): Promise<Account> {
+    if (this.isHandleTaken(handle)) throw new HttpError(409, "That handle is taken — pick another one.");
+    const passwordHash = password === null ? "" : await hashPassword(password, this.passwordCost);
     try {
       this.db
         .prepare("INSERT INTO accounts (id, handle, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)")
@@ -111,12 +129,12 @@ export class Auth {
       // Two sign-ups racing for the same handle across the scrypt above.
       throw new HttpError(409, "That handle is taken — pick another one.");
     }
-    return { id, handle, name, selfGroupId: null };
+    return { id, handle, name, selfGroupId: null, hasPassword: password !== null };
   }
 
   async checkPassword(handle: string, password: string): Promise<Account | null> {
     const row = this.db.prepare("SELECT * FROM accounts WHERE handle = ?").get(handle) as AccountRow | undefined;
-    if (row === undefined) {
+    if (row === undefined || row.password_hash === "") {
       await verifyPassword(password, await dummyPasswordHash(this.passwordCost));
       return null;
     }
@@ -136,9 +154,23 @@ export class Auth {
     const token = newToken();
     const now = Date.now();
     this.db
-      .prepare("INSERT INTO sessions (token_hash, account_id, created_at, last_seen_at) VALUES (?, ?, ?, ?)")
-      .run(sha256(token), accountId, now, now);
+      .prepare("INSERT INTO sessions (token_hash, account_id, created_at, last_seen_at, verified_at) VALUES (?, ?, ?, ?, ?)")
+      .run(sha256(token), accountId, now, now, now);
     this.setCookie(req, res, token, SESSION_MAX_AGE_S);
+  }
+
+  // The session just proved who it is again (a password or a passkey).
+  markVerified(req: IncomingMessage): void {
+    const token = parseCookies(req)[SESSION_COOKIE] ?? "";
+    this.db.prepare("UPDATE sessions SET verified_at = ? WHERE token_hash = ?").run(Date.now(), sha256(token));
+  }
+
+  isRecentlyVerified(req: IncomingMessage): boolean {
+    const token = parseCookies(req)[SESSION_COOKIE] ?? "";
+    const row = this.db.prepare("SELECT verified_at FROM sessions WHERE token_hash = ?").get(sha256(token)) as
+      | { verified_at: number | null }
+      | undefined;
+    return row?.verified_at != null && Date.now() - row.verified_at < RECENTLY_VERIFIED_MS;
   }
 
   endSession(req: IncomingMessage, res: ServerResponse): void {

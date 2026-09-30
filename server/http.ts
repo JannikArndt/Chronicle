@@ -10,6 +10,9 @@ export class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    // Machine-readable, for the few errors a client acts on rather than just
+    // shows (see ERROR_CONFIRM_IDENTITY in the protocol).
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -101,12 +104,12 @@ export function sendJson(req: IncomingMessage, res: ServerResponse, status: numb
   res.end(raw);
 }
 
-export function sendError(req: IncomingMessage, res: ServerResponse, status: number, message: string): void {
+export function sendError(req: IncomingMessage, res: ServerResponse, status: number, message: string, code?: string): void {
   if (res.headersSent) {
     res.end();
     return;
   }
-  sendJson(req, res, status, { error: message });
+  sendJson(req, res, status, code === undefined ? { error: message } : { error: message, code });
 }
 
 export function parseCookies(req: IncomingMessage): Record<string, string> {

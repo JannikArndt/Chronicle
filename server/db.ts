@@ -107,7 +107,41 @@ CREATE TABLE IF NOT EXISTS public_links (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS public_links_owner ON public_links(owner);
+
+-- WebAuthn credentials. The id is the credential id (base64url) the
+-- authenticator made up; the public key is all the server ever holds, so a
+-- copy of this table signs nobody in.
+CREATE TABLE IF NOT EXISTS passkeys (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  public_key BLOB NOT NULL,
+  counter INTEGER NOT NULL,
+  transports TEXT NOT NULL,
+  backed_up INTEGER NOT NULL DEFAULT 0,
+  name TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS passkeys_account ON passkeys(account_id);
 `;
+
+// Columns added after a table first shipped. `CREATE TABLE IF NOT EXISTS`
+// leaves an existing table alone, so a new column on an old table has to be
+// added explicitly — once, and harmlessly on every later start.
+const ADDED_COLUMNS: Array<[table: string, column: string, declaration: string]> = [
+  // When this session last proved who it is (signing in, or confirming with
+  // a password or passkey) — what "confirm it's you" checks.
+  ["sessions", "verified_at", "INTEGER"],
+];
+
+function addMissingColumns(db: DatabaseSyncType): void {
+  for (const [table, column, declaration] of ADDED_COLUMNS) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (!columns.some((existing) => existing.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${declaration}`);
+    }
+  }
+}
 
 // `:memory:` for tests; otherwise a file in dataDir, which in production is
 // a CapRover persistent directory.
@@ -122,6 +156,7 @@ export function openDatabase(dataDir: string | ":memory:"): Database {
   db.exec("PRAGMA foreign_keys = ON");
   db.exec("PRAGMA busy_timeout = 5000");
   db.exec(SCHEMA);
+  addMissingColumns(db);
   return db;
 }
 
