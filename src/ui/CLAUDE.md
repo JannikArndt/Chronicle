@@ -36,6 +36,14 @@ via `SignInForm.tsx`, sync status, connections, requests, suggestions, what is
 shared with you and what you share, account settings), rendered by two frames:
 `AccountMenu.tsx` in the desktop top bar and the mobile ⋯ menu's sub-view in
 `MobileShell.tsx` — one component, so the disclosures cannot drift apart.
+`SignInForm.tsx` is passkey-first: a new account is a handle, a name and a
+passkey ("Use a password instead" is one tap away), and sign-in offers "Sign
+in with a passkey" above the password form, plus saved passkeys in the handle
+field's autofill. `AccountSettings.tsx` lists the passkeys (rename, remove,
+add one on this device) and sets or changes the password; when the server
+asks to "confirm it's you", it parks the action, shows `ConfirmIdentity`
+(passkey or password, whichever the account has) and then runs it again.
+A dismissed passkey sheet is never shown as an error.
 Sharing one group or timeline is `ShareSection.tsx`: the publish switch, who
 has access (direct grants with a view/edit pill, plus access inherited from a
 containing group or "everything"), adding a connection, invite links, public

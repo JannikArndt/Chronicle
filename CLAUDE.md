@@ -28,6 +28,14 @@ branch. The app's CapRover config needs HTTPS on and a persistent directory at
 `/data` (the SQLite database); see `server/CLAUDE.md`. Open tabs pick up a new
 build on their own at a quiet moment (`src/ui/fresh.ts`).
 
+Product page: `site/` is the static page at https://jannikarndt.github.io/Chronicle/
+(plain HTML + CSS, no build, no JS), published by `.github/workflows/pages.yml`
+on pushes to `main` that touch it; the repo's Pages source is "GitHub Actions".
+Its screenshots are real renders of the app with a made-up family —
+`npm run build && CHROMIUM_PATH=/opt/pw-browsers/chromium node
+scripts/site-screenshots.mjs` rewrites `site/img/`. The page carries its own
+copy of the palette (it cannot load the app's CSS); keep the two in step.
+
 ## Architecture map
 
 Each directory below has its own `CLAUDE.md` with the detail — this file only holds
@@ -145,12 +153,16 @@ what's true across the whole codebase.
   `window.__chronicleEngine` (read `plusHits`/`entryHits` for canvas hit
   coordinates), `window.__chronicleStore` and `window.__chronicleActions` are
   exposed exactly for this. A reference script lives outside the repo; entry titles are canvas text,
-  so assert persistence via the store, not `getByText`.
+  so assert persistence via the store, not `getByText`. Passkeys are driven with
+  Chromium's virtual authenticator (CDP `WebAuthn.addVirtualAuthenticator`, one
+  per context = one per device); it answers the handle field's autofill request
+  on its own, so a sign-in test must accept either path.
 
 ## Scope cuts (deliberate — do not "fix" unasked)
 
-- v2 sharing (`plans/v2-server-design.md`): accounts are a handle and a password —
-  no email, so no password reset (a second signed-in device is the backup). No
+- v2 sharing (`plans/v2-server-design.md`): accounts are a handle plus a passkey,
+  a password, or both — no email, so no reset (a passkey synced by the person's
+  own password manager, or a second signed-in device, is the backup). No
   end-to-end encryption. One audience per owner: publishing is per timeline, not
   per person. Suggestions are connections of connections and never grant
   anything; there is no discovery or search of people. Two people typing into the
