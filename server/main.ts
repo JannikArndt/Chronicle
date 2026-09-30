@@ -25,6 +25,7 @@ const port = Number(process.env.PORT ?? 80);
 const staticDir = process.env.STATIC_DIR ?? join(here, "..", "dist");
 
 const app = createApp({
+  dataDir: process.env.DATA_DIR ?? "/data",
   staticDir: existsSync(staticDir) ? staticDir : undefined,
   buildId: readBuildId(),
   version: process.env.npm_package_version ?? "2.0.0",
