@@ -191,7 +191,10 @@ function PeopleSection() {
 }
 
 function SharedWithMe() {
-  const received = useAppState((s) => s.sync.social?.grants.received ?? []);
+  // Select the stable object and derive from it: a selector that built a
+  // fresh `[]` on every call would never compare equal and re-render forever.
+  const social = useAppState((s) => s.sync.social);
+  const received = social?.grants.received ?? [];
   const dataset = useAppState((s) => s.dataset);
   if (received.length === 0) return null;
   return (

@@ -16,12 +16,13 @@ export interface TestServer {
   close(): Promise<void>;
 }
 
-export async function startTestServer(): Promise<TestServer> {
+export async function startTestServer(options: { staticDir?: string; trustProxy?: boolean } = {}): Promise<TestServer> {
   const app = createApp({
     dataDir: ":memory:",
+    staticDir: options.staticDir,
     buildId: "test-build",
     version: "test",
-    trustProxy: false,
+    trustProxy: options.trustProxy ?? false,
     limits: { signUpsPerHour: 1000, signInsPer10Min: 1000 },
     passwordCost: 1024,
   });

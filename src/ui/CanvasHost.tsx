@@ -15,6 +15,7 @@ import {
   selectRow,
   startDraft,
 } from "../state/actions";
+import * as actions from "../state/actions";
 import { appStore, mergedDataset } from "../state/store";
 import { computeEmphasis, computeEventEmphasis } from "../state/emphasis";
 
@@ -90,10 +91,17 @@ export function CanvasHost({
       },
     });
     engineRef.current = engine;
-    // Exposed for end-to-end tests driving the canvas by coordinates.
-    const testHooks = window as unknown as { __chronicleEngine?: TimelineEngine; __chronicleStore?: typeof appStore };
+    // Exposed for end-to-end tests driving the canvas by coordinates, and
+    // making the same edits a click would (the actions) where clicking a
+    // canvas pixel would only make a test brittle.
+    const testHooks = window as unknown as {
+      __chronicleEngine?: TimelineEngine;
+      __chronicleStore?: typeof appStore;
+      __chronicleActions?: typeof actions;
+    };
     testHooks.__chronicleEngine = engine;
     testHooks.__chronicleStore = appStore;
+    testHooks.__chronicleActions = actions;
 
     const feedEngine = () => {
       engine.setInput(engineInputFor(layoutRef.current, axisTopRef.current, showRowLabelsRef.current));

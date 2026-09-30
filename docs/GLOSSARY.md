@@ -183,12 +183,16 @@ silent wipe of the one copy of your data.
 
 ## Sharing (who else can see it)
 
-**Shared** *(also: **published**)* — a timeline you have explicitly made visible
-to the people you've invited. Publishing it publishes its entries **and its
-events**: neither has a flag of its own, both follow their row. New timelines are **private**; publishing is always
-a deliberate act. Stored as `shared` on the row — deliberately *not* the
-`visibility` field v1–v3 had and v4 removed, so an old export can never be
-mistaken for a publish instruction.
+**Account** — a handle, a display name and a password. Signing in keeps all of
+your timelines on the server and on every device you sign in on; signed out,
+Chronicle is local-only and makes no network calls. There is no email on file.
+→ `server/auth.ts`, `src/sync/engine.ts`
+
+**Shared** *(also: **published**)* — a timeline visible to everyone who can
+**view** the group it sits in. Publishing it publishes its entries **and its
+events**: neither has a flag of its own, both follow their row. New timelines
+are **private**; publishing is always a deliberate act. Stored as `shared` on
+the row — deliberately *not* the `visibility` field v1–v3 had and v4 removed.
 → `types.ts` (`TimelineRow.shared`), `src/model/sharing.ts`
 
 **Share by default** — a group-level override saying that timelines created
@@ -196,34 +200,52 @@ mistaken for a publish instruction.
 timeline starts as and never reaches back to publish the ones already there.
 → `types.ts` (`Group.shareByDefault`)
 
-**Grant** — one person's read access to one group or one timeline. Lives on the
-server only, never in the dataset: an export is a file people pass around, and
-other people's identities have no business in it.
+**Connection** — two accounts that know each other: made when an invite link is
+redeemed, or a request accepted. You can only share with a connection. Mutual,
+and disconnecting ends everything shared between the two.
+→ `server/social.ts`
 
-**Invite** — a link carrying an unguessable token, which you send however you
-like. Chronicle sends no email. Redeeming it turns it into a grant, or into
-co-ownership if it was a "can edit" invite.
+**Suggestion** — a connection of one of your connections ("Anna, via Dad"). It
+lets you send a request; it never grants anything.
+
+**Grant** — one connection's access to one of your groups, one timeline, or
+everything, as a **viewer** (published things only) or an **editor**
+(everything in it, and changes to it). Lives on the server only, never in the
+dataset.
+→ `server/access.ts` (who sees what), `server/social.ts`
+
+**Invite** — a link carrying an unguessable single-use token, which you send
+however you like. Redeeming it connects you, and — if it names a group or a
+timeline — grants access to it in the same step.
 → `src/ui/InviteLanding.tsx`
 
-**Mirror** — someone else's shared timelines, as they arrive on your device. A
-read-only dataset merged into the view alongside public data, with every id
-prefixed `shared:<account>:`. **Never merged into your own dataset** — which is
-what keeps them out of your export and makes revoking a delete of one object.
-→ `src/sharing/mirror.ts`
+**Public link** — a read-only view of the published part of one group or
+timeline for anyone holding the link: no account, no cookie.
 
-**Sync subset** — the set of records eligible to leave your device. The privacy
-gate: every push goes through it, and it fails closed.
-→ `src/model/sharing.ts` (`syncSubset`)
+**Owner / access** — every record in your dataset has an owner (whose tree it
+is in) and your access to it: `own`, `edit` or `read`. Someone else's records
+sit in the same dataset as yours; the access level is what keeps a
+view-only one read-only, and what lets an editor change Dad's group in place.
+→ `src/state/store.ts` (`sync.meta`, `isReadOnlyId`)
 
-**HLC** *(hybrid logical clock)* — the timestamp on a synced record. Wall-clock
-time plus a counter plus the writer's account id, so two phones with drifting
-clocks still agree on which edit came last.
-→ `src/sharing/hlc.ts`
+**Replica** — a signed-in device's copy of the server: `base` (the server's
+last word) plus `pending` (field changes made here and not yet acknowledged).
+What you see is the two combined.
+→ `src/sync/replica.ts`
 
-**Tombstone** — the record left behind by a delete, so that a delete arriving
-before a concurrent older edit isn't undone by it. Kept server-side; readers
-just stop seeing the thing.
-→ `src/sharing/lww.ts`
+**HLC** *(hybrid logical clock)* — the stamp on every changed field. Wall-clock
+time plus a counter plus the device, so two phones with drifting clocks still
+agree on which edit came last.
+→ `src/sync/hlc.ts`
+
+**Tombstone** — what a delete leaves on the server, permanently, so that an
+edit arriving late from an offline phone cannot bring back something that was
+deliberately removed.
+→ `server/records.ts`
+
+**Presence** — who else has an entry, event or timeline open right now, shown
+only to people who can see that same record.
+→ `src/ui/PresenceChips.tsx`, `server/hub.ts`
 
 ---
 

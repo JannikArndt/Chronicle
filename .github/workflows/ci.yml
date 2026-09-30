@@ -1,8 +1,9 @@
-# Tests and typecheck on every pull request.
+# Tests, typecheck and both builds (client and server) on every pull request.
 #
-# deploy.yml also runs `npm test`, but only on push to main — which gates the
-# *deploy*, not the PR. README.md and CLAUDE.md both claimed a bad contributed
-# public-data file "fails PRs"; until this workflow existed, it didn't.
+# deploy.yml runs the same checks, but only on push to main — which gates the
+# deploy, not the PR. The server's access rules are ordinary TypeScript now and
+# `npm test` exercises them against a real SQLite, so there is no separate SQL
+# job any more.
 name: CI
 
 on:
@@ -16,33 +17,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm test
       - run: npm run build
-
-  # The row-level-security policies are the sharing feature's access control,
-  # and `npm test` cannot exercise them: there they are re-implemented in
-  # TypeScript (src/sharing/fakeBackend.ts) so the suite needs no database. This
-  # job runs the real SQL against a real Postgres. It caught three genuine bugs
-  # the day it was written, including a read-only grant that carried write
-  # access — so it is not ceremony.
-  sql:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        # Matching what Supabase runs, so a green build here means something.
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready --health-interval 10s
-          --health-timeout 5s --health-retries 5
-        ports:
-          - 5432:5432
-    steps:
-      - uses: actions/checkout@v4
-      - run: npm run verify:sql
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres

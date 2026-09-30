@@ -31,14 +31,22 @@ for one entry. All four confirm first with `describeBreakOut()` — the same
 shape as `describeCascade()` on the deletes — because there is no undo and this
 restructures the tree.
 
-Sharing's contents live in `SharingPanel.tsx` (sign in, invite links, who can
-see what, the disclosures) and are rendered by two frames: `SharingMenu.tsx`,
-the desktop top-bar popover, and the mobile ⋯ menu's sharing sub-view in
-`MobileShell.tsx`. One component rather than two, because the part that would
-drift is the text saying published data is server-readable and not recallable.
-`InviteLanding.tsx` is the `#/invite/<token>` route. The per-timeline publish
-switch is `ShareToggle` in `RowRail.tsx` and a row in `RowPane.tsx` on mobile.
-All of it is absent when the build has no Supabase project configured.
+Accounts and people live in `AccountPanel.tsx` (sign in or create an account
+via `SignInForm.tsx`, sync status, connections, requests, suggestions, what is
+shared with you and what you share, account settings), rendered by two frames:
+`AccountMenu.tsx` in the desktop top bar and the mobile ⋯ menu's sub-view in
+`MobileShell.tsx` — one component, so the disclosures cannot drift apart.
+Sharing one group or timeline is `ShareSection.tsx`: the publish switch, who
+has access (direct grants with a view/edit pill, plus access inherited from a
+containing group or "everything"), adding a connection, invite links, public
+links. It opens from "👥 Share…" in the group's and the row's ⚙ on desktop and
+from the timeline pane on mobile. `InviteLanding.tsx` is the `#/invite/<token>`
+route (who invited you to what, with sign-up in the same card); `#/view/<token>`
+opens a public link as a read-only overlay (`linkDatasets`), no account needed.
+`PresenceChips.tsx` shows who else has the same record open; `SharedMark` in
+`RowRail.tsx` marks someone else's group or timeline (✎ you may edit, 👁 view
+only) without changing how its name is drawn. The per-timeline publish switch
+is still `ShareToggle` in `RowRail.tsx` and a row in `RowPane.tsx` on mobile.
 
 🌟 Famous people picking is private to `RowRail.tsx` (see pre-release TODOs in
 `src/publicData/CLAUDE.md`, since the debug panel and collapse-state issues
@@ -157,14 +165,19 @@ is desktop-only now.
   row's right edge), so the ≡ and the ⚙ are hit targets rather than glyphs to
   aim at. Every pixel of that comes out of the margin *inside* the row
   background — the row box, its height and the name's position are unchanged.
-- **The share toggle stays visible while it is on**, unlike every other
-  hover-revealed rail action. "Who can see this" has to be legible at a glance;
-  a share control that hides itself is how someone forgets what they published.
-- **Read-only checks use `isForeignId`, not `isPublicId`.** Mirrored timelines
-  from other people are read-only for the same reason bundled public data is
-  (the co-owned case is checked against the mirror's `role` instead). Using
-  `isPublicId` for a new read-only check makes someone else's data editable, and
-  the edit then goes nowhere.
+- **The share toggle and the shared mark stay visible**, unlike every other
+  hover-revealed rail action. "Who can see this" and "whose is this" have to be
+  legible at a glance; a share control that hides itself is how someone
+  forgets what they published.
+- **Read-only checks use `isReadOnlyId`, not `isPublicId`.** A timeline shared
+  with you for viewing is read-only for the same reason bundled public data is;
+  one shared with you for editing is not. Moving, copying, breaking out and
+  deleting are further gated by `canRestructure` / `canMoveInto` (trees never
+  mix; the group you were invited into cannot be moved or deleted from your
+  side) — including the rail's drop slots, which are filtered per drag.
+- **A `useAppState` selector returns a stable reference.** `?? []` or a
+  `.filter()` inside the selector makes a new value on every call and React
+  re-renders forever (error #185). Select the object; derive after.
 - **Every label in the rail is the same label.** A group's name and a
   timeline's name share one `font-size` declaration (on the `.rail-group,
   .rail-row` block), carry no colour and no extra weight, and start at the same
@@ -223,7 +236,5 @@ is desktop-only now.
   where "It was a moment" sits beside "Still ongoing" and "It ended". Everything
   before that step is identical for both, which is why the flow has no branch in
   it until `commitAndFinish`.
-- **A co-owned mirror is still read-only.** `isForeignId` blocks the edit and
-  there is no write-back path, so the "Shared with you" list says editing comes
-  later rather than offering it. Don't loosen the `isForeignId` check to "fix"
-  this: the edit would land in the store and go nowhere.
+- **Sharing a group has no mobile home yet** — groups have no settings pane on
+  mobile at all (see above); sharing a timeline does, in its pane.

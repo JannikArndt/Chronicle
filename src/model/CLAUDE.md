@@ -2,7 +2,7 @@
 
 Pure data logic, no DOM. `types.ts` (schema, `SCHEMA_VERSION`), `fuzzyDate.ts`
 (precision fuzz + fade ramps), `cascade.ts` (delete cascades), `sharing.ts`
-(what may leave the device).
+(publishing defaults and wording).
 
 Every row is concurrent — entries on the same row may freely overlap, with no
 insert-time conflict check (the exclusive-row concept was removed).
@@ -50,7 +50,7 @@ so the tests get stable ids. Two rules are load-bearing rather than cosmetic:
 the new group takes the row's presentation (label, colour, icon, birth date)
 but is **never `shared`**, while the new rows inherit the row's own flag — so
 exactly the entries that were published stay published and nothing new becomes
-public, which `breakOut.test.ts` asserts against `syncSubset` itself. And
+public, which `breakOut.test.ts` asserts. And
 events never move: the row keeps every one of them, because guessing which span
 owns a point in time is a guess.
 
@@ -67,8 +67,8 @@ owns a point in time is a guess.
 - **UTC everywhere**: every stored `ms` is a UTC instant; parsing, formatting,
   and ticks all use `Date.UTC`/`getUTC*`. Never introduce local-time methods.
   This is enforced across `model`, `storage`, `render`, and `ui` — not just here.
-- **`sharing.ts` is the privacy gate.** `syncSubset` is the only path by which
-  data reaches a server, so it fails closed (private unless something says
-  otherwise) and strips every reference pointing outside the subset. It is the
-  most heavily tested function here; treat a change to it as a security change.
-  Publishing is per-row: entries have no flag of their own and follow their row.
+- **`sharing.ts` is about publishing, not about access.** It answers what a
+  new timeline starts as (`defaultSharedFor`) and what publishing one reveals
+  (`describePublishImpact`). Who may actually see a record is decided on the
+  server, by `server/access.ts`; publishing is per-row and entries have no
+  flag of their own, they follow their row.
