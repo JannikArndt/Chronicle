@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { breakOut, canBreakOut, describeBreakOut } from "./breakOut";
 import { emptyDataset, normalizeChildOrder, orderedChildren } from "./dataset";
-import { syncSubset } from "./sharing";
 import type { TimelineDataset, TimelineEntry, TimelineEvent } from "./types";
 
 // A deterministic stand-in for `newId`: one counter per prefix, so tests can
@@ -291,12 +290,12 @@ describe("describeBreakOut", () => {
   });
 });
 
-// The privacy gate (src/model/sharing.ts) must not notice a break-out at all:
-// entries keep their ids and their row's `shared` flag is carried onto the
-// row(s) they land on, so what leaves the device is exactly the same before
-// and after.
+// Publishing must not notice a break-out at all: entries keep their ids and
+// their row's `shared` flag is carried onto the row(s) they land on, so a
+// viewer sees exactly the same entries before and after — and the new group
+// itself is never published by it.
 describe("breakOut is a no-op for sharing", () => {
-  test("syncSubset yields the same entry ids and the same published/unpublished split before and after", () => {
+  test("the same entries sit on published rows before and after", () => {
     const dataset = emptyDataset();
     dataset.groups = [
       { id: "family", label: "Family", collapsed: false },
@@ -312,29 +311,15 @@ describe("breakOut is a no-op for sharing", () => {
       makeEntry("e-c", "r1", 3000, "Job C"),
       makeEntry("e-d", "r2", 4000, "Secret"),
     ];
+    const published = (d: typeof dataset) => {
+      const rows = new Set(d.rows.filter((row) => row.shared === true).map((row) => row.id));
+      return d.entries.filter((entry) => rows.has(entry.rowId)).map((entry) => entry.id).sort();
+    };
 
-    const before = syncSubset(dataset, "shared-only");
-    const beforeIds = new Set(before.entries.map((e) => e.id));
-    const beforeRowIds = new Set(before.rows.map((r) => r.id));
-
-    const { dataset: after } = breakOut(dataset, "r1", undefined, idFactory())!;
-    const afterSubset = syncSubset(after, "shared-only");
-    const afterIds = new Set(afterSubset.entries.map((e) => e.id));
-
-    // Same universe of entries considered at all.
-    expect(dataset.entries.map((e) => e.id).sort()).toEqual(after.entries.map((e) => e.id).sort());
-    // Same set of entries actually published.
-    expect(afterIds).toEqual(beforeIds);
-    expect(afterIds.has("e-a")).toBe(true);
-    expect(afterIds.has("e-b")).toBe(true);
-    expect(afterIds.has("e-c")).toBe(true);
-    expect(afterIds.has("e-d")).toBe(false); // stayed private throughout
-
-    // r1 is gone (nothing left on it) and replaced by three published rows —
-    // the row-level split changed shape, but the row that was published
-    // before break-out is unpublished nowhere, and vice versa.
-    expect(beforeRowIds.has("r1")).toBe(true);
-    expect(afterSubset.rows.every((r) => r.shared === true)).toBe(true);
-    expect(afterSubset.rows.some((r) => r.id === "r2")).toBe(false);
+    const result = breakOut(dataset, "r1", undefined, idFactory())!;
+    expect(published(result.dataset)).toEqual(published(dataset));
+    expect(published(result.dataset)).toEqual(["e-a", "e-b", "e-c"]);
+    expect(result.dataset.groups.find((group) => group.id === result.groupId)?.shared).toBeUndefined();
+    expect(result.dataset.rows.find((row) => row.id === "r2")?.shared).toBeUndefined();
   });
 });

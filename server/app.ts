@@ -4,7 +4,7 @@
 
 import { Auth, RateLimiter, accountInfo } from "./auth";
 import { openDatabase } from "./db";
-import { HttpError, Router, clientAddress, readJson, sendError, sendJson } from "./http";
+import { HttpError, Router, clientAddress, isSecureRequest, readJson, sendError, sendJson } from "./http";
 import { Hub } from "./hub";
 import { RecordStore } from "./records";
 import { Social, parseRole, parseSubject } from "./social";
@@ -91,6 +91,15 @@ export function createApp(config: AppConfig): App {
   const router = new Router();
   const site = createStaticSite(config.staticDir, config.buildId);
   const address = (req: IncomingMessage) => clientAddress(req, config.trustProxy);
+  // Behind the production proxy, a password never travels in the clear: if
+  // HTTPS is not switched on for the app yet, signing in says so instead of
+  // quietly working over plain HTTP. (Local development talks to the server
+  // directly, without the proxy, and is not affected.)
+  const requireHttps = (req: IncomingMessage) => {
+    if (config.trustProxy && !isSecureRequest(req, true)) {
+      throw new HttpError(403, "Chronicle only signs in over HTTPS — switch HTTPS on for this app first.");
+    }
+  };
 
   // ---------- version ----------
 
@@ -103,6 +112,7 @@ export function createApp(config: AppConfig): App {
   // ---------- accounts ----------
 
   router.on("POST", "/api/auth/signup", async ({ req, res }) => {
+    requireHttps(req);
     signUpLimit.hit(address(req));
     const body = await readJson<{ handle?: unknown; password?: unknown; name?: unknown }>(req);
     const handle = text(body.handle).toLowerCase();
@@ -115,6 +125,7 @@ export function createApp(config: AppConfig): App {
   });
 
   router.on("POST", "/api/auth/signin", async ({ req, res }) => {
+    requireHttps(req);
     const body = await readJson<{ handle?: unknown; password?: unknown }>(req);
     const handle = text(body.handle).toLowerCase();
     signInLimit.hit(address(req));
@@ -306,6 +317,7 @@ export function createApp(config: AppConfig): App {
     const url = new URL(req.url ?? "/", "http://localhost");
     const pathname = url.pathname;
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
+    if (isSecureRequest(req, config.trustProxy)) res.setHeader("strict-transport-security", "max-age=31536000");
 
     const method = req.method ?? "GET";
     const isApi = pathname.startsWith("/api/");

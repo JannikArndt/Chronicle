@@ -1,28 +1,32 @@
 # Chronicle — project guide for Claude sessions
 
 Chronicle is a personal life-timeline web app: parallel horizontal timelines on one
-shared time axis. React + TypeScript + Vite, custom Canvas renderer, IndexedDB storage,
-deployed to GitHub Pages at https://jannikarndt.github.io/Chronicle/. Local-first: the
-only backend is the optional Supabase project behind sharing, and without it configured
-the app makes no network calls at all.
+shared time axis. React + TypeScript + Vite, custom Canvas renderer, IndexedDB on the
+device, and — since v2 — its own server: https://chronicle.timpanini.com, one Node
+container on the owner's CapRover. Local-first still: signed out, the app makes no
+network calls at all; signed in, the account's timelines sync to every device and to
+the people they are shared with, live.
 
 ## Commands
 
 ```
-npm run dev            # dev server
-npm test               # vitest (300+ unit tests)
-npm run build          # tsc -b && vite build  (tsc also typechecks test files)
-npm run setup:supabase # optional: sharing backend, local Docker stack or a hosted project
-npm run verify:sql     # apply supabase/migrations to a real Postgres, assert the RLS rules
+npm run dev            # Vite dev server (proxies /api and /version to :8787)
+npm run dev:server     # the Chronicle server on :8787, rebuilt on change, data in .data/
+npm test               # vitest — client and server (580+ tests)
+npm run build          # tsc -b && vite build && esbuild server  (tsc also typechecks tests)
+npm run buildid        # the build id /version must report after a deploy
 ```
 
-`npm test` does not cover the RLS policies — there they are re-implemented in
-TypeScript so the suite needs no database. `verify:sql` runs the real SQL, and CI
-runs it on every PR. Setup and the rest: `supabase/README.md`.
+The server's tests run a real server on port 0 with an in-memory SQLite and talk
+to it over HTTP (`server/testkit.ts`) — the access rules are tested as they run.
 
-Deploy: push to `main` → `.github/workflows/deploy.yml` builds and publishes Pages.
-The local folder is `Timeline/` but the GitHub repo is `Chronicle` → Vite `base` is
-`/Chronicle/`. Don't "fix" that mismatch.
+Deploy: push to `main` → `.github/workflows/deploy.yml` runs the tests, sends the
+commit to CapRover (`caprover deploy` with the per-app token in the
+`CAPROVER_*` secrets), then polls `/version` until the new build answers — a
+deploy that never came up fails the workflow. `workflow_dispatch` deploys any
+branch. The app's CapRover config needs HTTPS on and a persistent directory at
+`/data` (the SQLite database); see `server/CLAUDE.md`. Open tabs pick up a new
+build on their own at a quiet moment (`src/ui/fresh.ts`).
 
 ## Architecture map
 
@@ -34,8 +38,10 @@ what's true across the whole codebase.
 - `src/render/` — the framework-agnostic canvas engine.
 - `src/state/` — the observable store and all mutations.
 - `src/publicData/` — read-only shared datasets loaded from `public-data/*.json`.
-- `src/sharing/` — publish/subscribe sync against Supabase (phase 1: invite +
-  read-only sharing). `supabase/` holds the SQL, the RLS tests and the setup guide.
+- `src/sync/` — the client side of the server: replica, diff, push/pull, live
+  stream, presence, people. `src/sync/protocol.ts` is shared with the server.
+- `server/` — the server: accounts, records with field-level merge, access
+  rules, live events, invites/connections/grants/public links, static client.
 - `src/storage/` — IndexedDB and export/import, including schema upgrades.
 - `src/ui/` — the React shell: desktop rail/panels and the mobile shell.
 - `src/onboarding/` — conversational onboarding and the entry/timeline add-flows.
@@ -50,12 +56,17 @@ what's true across the whole codebase.
   rule with a hardcoded hex color renders correctly in light mode and wrong (or
   invisible) in dark mode — always reuse or extend the variable set instead.
 - **Privacy**: personal data lives in IndexedDB, in user-initiated exports, and —
-  since sharing — in whatever the user has *explicitly published*, and nowhere
-  else. Nothing personal may ever be written to the repo/filesystem; only
-  `public-data/` is repo-tracked data. Signed out, the app makes no network
-  calls at all. Everything that leaves the device goes through `syncSubset` in
-  `src/model/sharing.ts`, and other people's data never enters `state.dataset`
-  (see `src/sharing/CLAUDE.md`).
+  for a signed-in account — on Chronicle's server, where `server/access.ts` is
+  the one function deciding who may read or change each record (fails closed;
+  viewers see only published timelines, editors only the subtree they were
+  granted). Nothing personal may ever be written to the repo/filesystem; only
+  `public-data/` is repo-tracked data. Signed out, the app makes no network calls
+  at all. An export is your own records only (`ownDataset`), never what others
+  share with you. The UI says plainly that the server can read what it stores.
+- **Trees never mix**: every record has an owner, and nothing moves between two
+  owners' trees — an entry added to Dad's timeline is Dad's record, written by
+  you. Enforced on the server (`checkStructure`) and refused before sending on
+  the client (`diffView`, `canMoveInto`). See `src/sync/CLAUDE.md`.
 - **No dropdowns under ~7 options** — use `PillSelector`. No Save/Cancel buttons —
   autosave per field change. No browse/edit mode toggle, no modal create screen.
 - **A favicon replaces the emoji, it never joins it** — an entry, a timeline and
@@ -125,34 +136,30 @@ what's true across the whole codebase.
 - `src/publicData/schemaValidation.test.ts` Ajv-validates every `public-data/*.json`
   against `public-data/schema.json`; CI runs this, so a bad contributed file fails
   PRs.
-- **The RLS policies are tested in SQL, not in TypeScript.** `supabase/tests/rls.test.sql`
-  runs the migration against a real Postgres with the identity switched per statement;
-  `src/sharing/fakeBackend.ts` mirrors the same rule in TypeScript purely so the vitest
-  suite needs no database. Changing the visibility rule means changing both, and running
-  both — the TypeScript copy passing proves nothing about the policy that actually
-  guards the data.
-- E2E: drive the dev server with playwright-core against system Chrome
-  (`channel: "chrome"`). `window.__chronicleEngine` (read `plusHits`/`entryHits` for
-  canvas hit coordinates) and `window.__chronicleStore` are exposed exactly for
-  this. A reference script lives outside the repo; entry titles are canvas text,
+- **The server is tested through HTTP.** `server/api.test.ts` and
+  `src/sync/engine.test.ts` start a real server (`server/testkit.ts`); the engine
+  test runs the browser-side sync against it with a second person as a plain API
+  client, so live co-editing is asserted end to end in `npm test`.
+- E2E: build, run `node dist-server/main.mjs` with `TRUST_PROXY=false`, and drive
+  it with playwright-core (Chromium; several contexts are several people).
+  `window.__chronicleEngine` (read `plusHits`/`entryHits` for canvas hit
+  coordinates), `window.__chronicleStore` and `window.__chronicleActions` are
+  exposed exactly for this. A reference script lives outside the repo; entry titles are canvas text,
   so assert persistence via the store, not `getByText`.
 
-## v1 scope cuts (deliberate — do not "fix" unasked)
+## Scope cuts (deliberate — do not "fix" unasked)
 
-- Publish/subscribe sharing **exists now** (schema v7, `src/sharing/`) — phase 1
-  only: invite links, per-timeline publishing, one-way propagation to readers,
-  co-owned groups. Co-ownership is granted and enforced server-side, but the client
-  has no write-back path for a timeline shared *with* you, so a co-owned mirror is
-  still read-only. Not built: opt-in full-account sync, invite chaining, live
-  co-editing, public profiles via QR. The publish flag is `shared`/
-  `shareByDefault`, deliberately *not* the `visibility` name that v1–v3 used and
-  v4 removed; the v7 migration deletes the dead keys and never converts them.
-  No Gist sync — still a marked, honest gap (PAT flow unsolved
-  for non-technical users). No keyboard-only/screen-reader path. Groups nest
-  arbitrarily deep now (`computeLayout` is recursive) — the former one-level
-  cap is gone, and with it timeline-in-timeline nesting (`TimelineRow` no
-  longer has a `parentRowId`): a "sub-timeline" is now a sub-group holding one
-  row instead.
+- v2 sharing (`plans/v2-server-design.md`): accounts are a handle and a password —
+  no email, so no password reset (a second signed-in device is the backup). No
+  end-to-end encryption. One audience per owner: publishing is per timeline, not
+  per person. Suggestions are connections of connections and never grant
+  anything; there is no discovery or search of people. Two people typing into the
+  *same field* at once: the later keystroke wins that field (presence chips are
+  the mitigation). The publish flag is `shared`/`shareByDefault`, deliberately
+  *not* the `visibility` name that v1–v3 used and v4 removed.
+- No keyboard-only/screen-reader path. Groups nest arbitrarily deep
+  (`computeLayout` is recursive); a "sub-timeline" is a sub-group holding one row
+  (`TimelineRow` has no `parentRowId`).
 - Hover-revealed rail controls on fine pointers vs always-visible on touch is an
   intentional split, not an inconsistency.
 

@@ -1,10 +1,10 @@
 # Chronicle 🕰️
 
-**Live at [jannikarndt.github.io/Chronicle](https://jannikarndt.github.io/Chronicle/)**
+**Live at [chronicle.timpanini.com](https://chronicle.timpanini.com)**
 
 A personal life-timeline web app: your life — and the lives of people around you, and the
 world — as parallel horizontal timelines on one shared time axis. Canvas-rendered,
-local-first, statically hosted on GitHub Pages.
+local-first, with an optional account for your other devices and the people you share with.
 
 - **Parallel timelines**: one row per person, group, or topic, all sharing one time axis
   you pan and zoom.
@@ -20,12 +20,17 @@ local-first, statically hosted on GitHub Pages.
   read-only, alongside your private data.
 - **A dedicated mobile shell** (bottom sheets, a mini-map, touch gestures), not a
   responsive reflow of the desktop layout.
-- **Sharing, if you want it**: publish individual timelines and invite someone by link —
-  to read them, or to co-own a group and fill in their own life. Private by default, one
-  timeline at a time. Signed out (and in any build with no backend configured) the app
-  makes no network calls at all.
-- **Everything local-first**: nothing leaves the device until you publish it; see the
-  privacy section below.
+- **An account, if you want one**: your timelines on every device you sign in on, synced
+  live. A handle and a password — no email needed.
+- **Sharing and live editing**: invite your dad by link to fill in his own group and watch
+  his entries appear as he types them; let your family view the timelines you publish;
+  edit a trip together on two phones — both edits survive, field by field, and you see
+  who has what open.
+- **Connecting with people**: invite links connect you; connections of your connections
+  are suggested, never shared with automatically. A public link shows one published
+  group to anyone, no account needed.
+- **Local-first**: signed out, nothing leaves the device and the app makes no network
+  calls; see the privacy section below.
 
 See [`docs/GLOSSARY.md`](./docs/GLOSSARY.md) for the core terms (`Group`,
 `TimelineRow`, `TimelineEntry`, `TimelineEvent`) and `CLAUDE.md` for the fuller
@@ -33,27 +38,24 @@ architecture map.
 
 ## Privacy boundary (important)
 
-**Personal data never touches this repo.** Your entries live in your browser's IndexedDB,
-in export files you explicitly download, and — since sharing — in whatever you have
-explicitly published. Nothing else, no filesystem folder. The only data tracked in the
-repo is [`public-data/`](./public-data): world/topic timelines everyone sees (read-only,
-merged into the view under namespaced ids).
+**Personal data never touches this repo.** Signed out, your entries live in your
+browser's IndexedDB and in export files you explicitly download — nothing else, no
+network. The only data tracked in the repo is [`public-data/`](./public-data):
+world/topic timelines everyone sees (read-only, merged into the view).
 
-What sharing does and does not change:
+Signed in:
 
-- **Private by default.** A new timeline is not published; publishing is a per-timeline
-  act, and the only code path by which anything reaches a server is `syncSubset` in
-  [`src/model/sharing.ts`](./src/model/sharing.ts).
-- **Signed out is silent.** No account, no requests. A build with no backend configured
-  does not even ship the client SDK.
-- **Other people's data stays separate.** Timelines shared *with* you are cached under
-  their own key, never merged into your dataset, and never appear in your exports.
-- **Published is not encrypted, and not recallable.** The server can read what you
-  publish, and revoking stops future access but cannot un-see what someone already saw.
-  The app says both, in those words, at the point of publishing.
-
-Back up or move devices via **Data ▾ → Export JSON / Import JSON** (works on iOS Safari).
-Signing in is not a backup: only what you publish is uploaded.
+- **Your timelines are stored on Chronicle's server** so every device you sign in on has
+  them. Nobody else can read any of them unless you share them; the one function that
+  decides is [`server/access.ts`](./server/access.ts), and it fails closed.
+- **Private by default.** A viewer only ever sees timelines you have *published*, in
+  groups you shared with them. An editor sees everything in the one group they were
+  invited to, and nothing above or beside it.
+- **Not end-to-end encrypted, and not recallable.** The server can read what it stores,
+  and stopping a share ends future access but cannot un-see what someone already saw.
+  The app says both, in those words.
+- **No email on file**, so no password reset — let your browser save the password.
+- **An export is your own timelines only**, never what others share with you.
 
 ## Contributing public datasets
 
@@ -66,22 +68,19 @@ to be unique within your file; the loader prefixes them with `pub:<filename>:` o
 
 ```
 npm install
-npm run dev       # local dev server
-npm test          # unit tests (model, storage, schema validation, render math)
-npm run build     # typecheck + production build
+npm run dev:server   # the Chronicle server on :8787 (data in .data/)
+npm run dev          # the client, proxying /api to the server
+npm test             # client and server tests (the server's run a real server in-process)
+npm run build        # typecheck + client build + server bundle
 ```
 
-Sharing is optional and off unless a backend is configured — see
-[`supabase/README.md`](./supabase/README.md):
+The server is one dependency-free Node process (`node:http`, `node:sqlite`) — see
+[`server/CLAUDE.md`](./server/CLAUDE.md) and [`plans/v2-server-design.md`](./plans/v2-server-design.md).
 
-```
-npm run setup:supabase    # local Supabase stack in Docker, writes .env.local
-npm run verify:sql        # apply the migration to a real Postgres and assert the RLS rules
-```
-
-Deployment: pushes to `main` build and publish to GitHub Pages via
-[`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml). The Vite `base` is
-`/Chronicle/` (project pages, matching the GitHub repo name).
+Deployment: pushes to `main` run the tests and deploy to CapRover via
+[`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml), which then waits until
+`/version` reports the new build. The CapRover app needs HTTPS enabled and a persistent
+directory mounted at `/data`.
 
 ## Conventions
 
@@ -93,16 +92,15 @@ Deployment: pushes to `main` build and publish to GitHub Pages via
 - The canvas engine (`src/render/engine.ts`) is a plain framework-agnostic TS module;
   React only owns the DOM rail, panels, and popovers.
 
-## v1 scope cuts & known gaps (deliberate, not oversights)
+## Scope cuts & known gaps (deliberate, not oversights)
 
-- **Sharing is phase 1 only** — invite links, per-timeline publishing, one-way
-  propagation to readers, co-owned groups. Not built: opt-in full-account sync, invite
-  chaining, live co-editing, public profiles via QR. Co-ownership is granted and enforced
-  server-side, but the client has no write-back path for a timeline shared *with* you yet,
-  so a co-owned timeline is read-only on your side.
-  See [`plans/sharing-feature-design.md`](./plans/sharing-feature-design.md).
-- **GitHub Gist sync is an open problem**: pasting a personal access token is fine for
-  power users but is not a solution for non-technical users. The Data menu marks it as
-  planned; it is deliberately not faked.
+- **No password reset** — there is no email on file, by design. A second signed-in device
+  (or an export) is the backup.
+- **No end-to-end encryption** — the server reads what it stores; the UI says so.
+- **One field typed by two people at the same moment**: the later keystroke wins that
+  field. Different fields of the same entry merge fine; presence chips show who else is
+  there.
+- **No discovery**: people are only ever reachable through invite links and the
+  connections you share.
 - **No keyboard-only / screen-reader support**: the canvas with mouse/touch input is the
-  only interaction path in v1 — an accepted scope cut.
+  only interaction path — an accepted scope cut.

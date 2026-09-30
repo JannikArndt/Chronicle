@@ -1,7 +1,10 @@
 # Sharing — design doc
 
-Status: **Phase 0 signed off (§4). Phase 1 built — see §5 for what landed and
-what is still outstanding.** Phases 1b, 2, 3 and 4 not started.
+Status: **Superseded by `plans/v2-server-design.md`.** Chronicle now runs its
+own server instead of Supabase, syncs a signed-in account's whole dataset, and
+has built what this doc called phases 1b (full sync), 2 (suggestions), 3 (live
+co-editing) and 4 (public links). Kept for its reasoning — most of the privacy
+thinking below still applies — and for the history of the decisions.
 
 This is the design for the feature the root `CLAUDE.md` has been deferring under
 "No publish/subscribe sharing… No Gist sync — it's a marked, honest gap." It is

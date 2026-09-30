@@ -64,7 +64,7 @@ Group "Me"                            Group "Me"
 - The **new group is never `shared`**, whatever the row was. Publishing is
   per-row and always deliberate; the new rows inherit the row's own `shared`
   flag, so exactly the entries that were published stay published and no others.
-  `syncSubset` parity across a break-out is asserted in the tests.
+  That the same entries stay published across a break-out is asserted in the tests.
 - Entries keep every field, including their title and their `parentEntryId`.
   Only `rowId` changes.
 - New rows are created in start-date order.

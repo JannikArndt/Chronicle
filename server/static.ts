@@ -128,9 +128,10 @@ export function createStaticSite(distDir: string | undefined, buildId: string): 
         send(req, res, file);
         return true;
       }
-      // A missing hashed asset is a real 404 (a stale tab asking for last
-      // build's chunk); anything else is a client-side route and gets the app.
-      if (relativePath.startsWith("assets/")) return false;
+      // A missing file is a real 404 — a stale tab asking for last build's
+      // chunk must not be handed HTML with a JavaScript file's name. Only a
+      // path that looks like a route (no file extension) gets the app.
+      if (relativePath.startsWith("assets/") || /\.[A-Za-z0-9]+$/.test(relativePath)) return false;
       const index = load("index.html");
       if (index === undefined) return false;
       send(req, res, index);

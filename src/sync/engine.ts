@@ -55,7 +55,7 @@ let node = "device";
 let skewMs = 0;
 let stream: LiveStream | undefined;
 let connectionId: string | undefined;
-let pushing = false;
+let pushing: Promise<void> | undefined;
 let pushTimer: ReturnType<typeof setTimeout> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -92,7 +92,7 @@ export function isSignedIn(): boolean {
 export async function initSync(): Promise<boolean> {
   if (!initialized) {
     initialized = true;
-    registerBusyCheck(() => replica !== undefined && (replica.pending.size > 0 || pushing));
+    registerBusyCheck(() => replica !== undefined && (replica.pending.size > 0 || pushing !== undefined));
     appStore.subscribe(trackFocus);
   }
   const stored = await loadSync().catch(() => null);
@@ -251,13 +251,20 @@ function schedulePush(delay = PUSH_DELAY_MS): void {
   pushTimer = setTimeout(() => void push(), delay);
 }
 
-async function push(): Promise<void> {
-  if (replica === undefined || pushing || appStore.getState().sync.status !== "online") return;
+// One push at a time; a second caller waits for the one in flight.
+function push(): Promise<void> {
+  pushing ??= pushOnce().finally(() => {
+    pushing = undefined;
+  });
+  return pushing;
+}
+
+async function pushOnce(): Promise<void> {
+  if (replica === undefined || appStore.getState().sync.status !== "online") return;
   capture();
   const batch = pendingBatch(replica, MAX_BATCH);
   if (batch.length === 0) return;
   const current = generation;
-  pushing = true;
   try {
     const { results } = await api.push(batch, connectionId);
     if (current !== generation || replica === undefined) return;
@@ -281,8 +288,21 @@ async function push(): Promise<void> {
       handleFailure(error);
       if (!(error instanceof NetworkError)) schedulePush(RETRY_MS);
     }
-  } finally {
-    if (current === generation) pushing = false;
+  }
+}
+
+// Everything done on this device reaches the server before something that
+// depends on it — sharing a group made a moment ago must not ask the server
+// about a group it has not heard of yet.
+async function settle(): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    capture();
+    if (replica === undefined || replica.pending.size === 0) return;
+    if (appStore.getState().sync.status !== "online") {
+      throw new Error("You are offline — sharing needs a connection to the server.");
+    }
+    clearTimeout(pushTimer);
+    await push();
   }
 }
 
@@ -424,7 +444,7 @@ async function forgetEverything(): Promise<void> {
   replica = undefined;
   view = undefined;
   prefs = { foreignCollapsed: new Map() };
-  pushing = false;
+  pushing = undefined;
   await clearSync();
   await clearDataset();
   appStore.setState({
@@ -507,6 +527,7 @@ function appUrl(hash: string): string {
 // A capability URL: the token IS the permission, so it rides in the fragment,
 // which browsers never send to any server.
 export async function createInviteLink(subject: Subject | null, role: Role | null): Promise<string> {
+  if (subject !== null) await settle();
   const { token } = await api.createInvite(subject, role);
   void refreshSocial();
   return appUrl(`invite/${token}`);
@@ -526,6 +547,7 @@ export async function redeemInvite(token: string): Promise<PersonRef> {
 }
 
 export async function grantAccess(granteeId: string, subject: Subject, role: Role): Promise<void> {
+  await settle();
   patchSocial({ grants: await api.grant(granteeId, subject, role) });
 }
 
@@ -534,6 +556,7 @@ export async function revokeGrant(grantId: string): Promise<void> {
 }
 
 export async function createPublicLink(subject: Subject): Promise<string> {
+  await settle();
   const { token } = await api.createLink(subject);
   patchSocial({ links: (await api.links()).links });
   return appUrl(`view/${token}`);

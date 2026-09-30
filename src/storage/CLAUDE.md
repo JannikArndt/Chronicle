@@ -33,21 +33,14 @@ silent wipe of the only copy of the user's data.
 `triggerImportFlow()` is the shared file-picker → parse → callback helper used
 by both the top-bar Data menu and the rail's "+ Import".
 
-Three keys now: `main` (your dataset), `overlays` (public-data picks) and
-`mirrors` (other people's shared timelines, cached for offline). `mirrors` is
-deliberately separate from `main` — it is someone else's personal data, it must
-never reach an export, and revoking has to be a delete that cannot take your own
-records with it. Signing out clears it.
+Three keys: `main` (a signed-out device's own dataset), `overlays` (public-data
+picks and view preferences) and `sync` (a signed-in device's replica of its
+account — `src/sync/replica.ts` — plus the account and names). First sign-in
+adopts `main` into the account and clears it; signing out deletes `sync` and
+`main` both, so nothing — yours or anyone else's — stays on a device nobody is
+signed in to.
 
 Tests import `fake-indexeddb/auto`.
-
-## Keys in the `datasets` store
-
-`main` (the user's dataset), `overlays` (which public data is switched on, plus
-the view preferences: hidden rows and groups, and the tree overlay),
-and `mirrors` (other people's shared timelines — deliberately never part of
-`main`, so revoking access cannot take the user's own records with it). Only
-`main` is ever exported.
 
 ## Migrations
 

@@ -11,6 +11,9 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 // nginx closes an idle proxied response after 60 s by default.
 const HEARTBEAT_MS = 25_000;
+// Open tabs per account. Generous for real use (phones, laptops, forgotten
+// tabs), and a bound on what one account can make the server hold open.
+const MAX_STREAMS_PER_ACCOUNT = 20;
 
 interface LiveConnection {
   id: string;
@@ -41,6 +44,16 @@ export class Hub {
   }
 
   open(req: IncomingMessage, res: ServerResponse, accountId: string, name: string): string {
+    // Over the limit, the oldest stream makes way: it is the tab most likely
+    // to have been forgotten, and it reconnects by itself if it is not.
+    const existing = this.byAccount.get(accountId);
+    if (existing !== undefined && existing.size >= MAX_STREAMS_PER_ACCOUNT) {
+      const oldest = existing.values().next().value;
+      if (oldest !== undefined) {
+        this.connections.get(oldest)?.res.end();
+        this.close(oldest);
+      }
+    }
     const id = randomUUID();
     res.writeHead(200, {
       "content-type": "text/event-stream; charset=utf-8",

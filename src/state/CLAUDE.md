@@ -1,10 +1,11 @@
 # src/state — the store
 
 Hand-rolled observable store (`useSyncExternalStore`), all mutations in
-`actions.ts` with a 250ms debounced IndexedDB autosave. That same debounced save
-is what drives the sharing push: the sync layer diffs the shareable subset
-against what it last sent rather than being told which record changed, which is
-why none of the mutations here carry a sync call. Entries created by
+`actions.ts` behind a 250ms debounced save. Signed out, that save writes the
+dataset to IndexedDB `main`; signed in, it calls the sync engine's
+`datasetChanged()`, which diffs the dataset against the last view rather than
+being told which record changed — which is why none of the mutations here
+carry a sync call (`src/sync/CLAUDE.md`). Entries created by
 direct manipulation are drafts (`state.draft`) and only enter the dataset once
 titled; `addEntry()` is the other path, for an assistant that asks everything
 first and writes once.
@@ -36,12 +37,16 @@ nothing half-made to hold. Don't add one "for symmetry".
 - **`setInput` must not clear `emptyRowClick`** on the state update caused by
   the very click that stored it (guard compares against
   `emptyRowClick.rowId`).
-- **`state.dataset` means "my data" and nothing else.** Public datasets and
-  mirrors of other people's shared timelines are siblings, merged only for
-  display by `mergedDataset()`. Every privacy guarantee in the project is stated
-  in terms of that object — an export is literally `state.dataset` — so nothing
-  foreign may be merged into it. Use `isForeignId` (public **or** mirrored) for
-  read-only checks in the UI, not `isPublicId`.
+- **`state.dataset` is everything you can see that is not public data** — your
+  own records and, signed in, other people's records shared with you, in one
+  dataset with globally unique ids. `state.sync.meta` says, per id, whose it is
+  and what you may do (`own` / `edit` / `read`). Read-only checks use
+  `isReadOnlyId` (public, or shared for viewing), never `isPublicId` alone —
+  that would make someone's view-only timeline editable here. Anything that
+  moves, copies, breaks out or deletes goes through `canRestructure` /
+  `canMoveInto`: trees never mix, and a group you were invited into cannot be
+  moved or deleted from your side. An export is `ownDataset(state)` — your
+  own records only — and an import replaces only your own records.
 - **View preferences are not data.** `hiddenRowIds`, `hiddenGroupIds` and
   `showTreeLines` live in the store and are persisted in the IndexedDB
   `overlays` record beside the public-data picks — never in `state.dataset`. An

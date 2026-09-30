@@ -143,10 +143,4 @@ export interface TimelineDataset {
   // Needed because a birth date alone doesn't say *whose*: a partner you added
   // has one too.
   selfGroupId?: string;
-  // --- sharing (v7) ---
-  // The signed-in account this dataset belongs to. An opaque uuid, never an
-  // email: the dataset is the thing users export and pass around, so no
-  // identity — theirs or anyone else's — is allowed to live in it. Grants,
-  // co-owners and invites are server-side only.
-  accountId?: string;
 }

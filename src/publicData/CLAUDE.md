@@ -28,7 +28,7 @@ but must be revisited before a real release:
   toggling 🎂 alignment**, since the key flips between `pub:famous-x:` and
   `pub:famous-x-aligned:` — key collapse on the base group/row key instead.
   (Since v9, "Career"/"Children" lanes are sub-groups — see below — so this is
-  the same pre-existing gap public/mirror group collapse always had, not a new
+  the same pre-existing gap public group collapse always had, not a new
   one; it used to also apply to the now-removed parent-row collapse.)
 - **Lanes render as sub-groups, since v9**: `WIKIDATA_ROWS` specs with
   `layout: "lanes"` (Career, Children) each become a sub-group (`g-<key>`)
