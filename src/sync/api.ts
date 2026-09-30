@@ -3,8 +3,15 @@
 
 import { CSRF_HEADER } from "./protocol";
 import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+  AuthenticationResponseJSON,
+} from "@simplewebauthn/browser";
+import type {
   AccountInfo,
   GrantsResponse,
+  PasskeyInfo,
   InviteInfo,
   InvitePreview,
   PeopleResponse,
@@ -22,9 +29,18 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    // Set for the few errors the client acts on (ERROR_CONFIRM_IDENTITY).
+    readonly code?: string,
   ) {
     super(message);
   }
+}
+
+// A WebAuthn ceremony the server started: its id comes back with the
+// browser's answer, and the options go to navigator.credentials.
+export interface Ceremony<Options> {
+  ceremonyId: string;
+  options: Options;
 }
 
 // A request that never got an answer — offline, or the server restarting
@@ -63,12 +79,15 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   }
   if (!response.ok) {
     let message = `The server said ${response.status}.`;
+    let code: string | undefined;
     try {
-      message = ((await response.json()) as { error?: string }).error ?? message;
+      const body = (await response.json()) as { error?: string; code?: string };
+      message = body.error ?? message;
+      code = body.code;
     } catch {
       // not JSON — keep the status line
     }
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, message, code);
   }
   return (await response.json()) as T;
 }
@@ -80,8 +99,28 @@ export const api = {
   signOut: () => call<{ ok: true }>("POST", "/api/auth/signout"),
   me: () => call<{ me: AccountInfo }>("GET", "/api/me"),
   updateMe: (patch: { name?: string; selfGroupId?: string | null }) => call<{ me: AccountInfo }>("PATCH", "/api/me", patch),
-  changePassword: (current: string, next: string) => call<{ ok: true }>("POST", "/api/me/password", { current, next }),
-  deleteAccount: (password: string) => call<{ ok: true }>("DELETE", "/api/me", { password }),
+  // Without `current`, the session must have confirmed it's you recently.
+  changePassword: (current: string | undefined, next: string) =>
+    call<{ me: AccountInfo }>("POST", "/api/me/password", { current, next }),
+  deleteAccount: (password: string | undefined) => call<{ ok: true }>("DELETE", "/api/me", { password }),
+  confirmOptions: () => call<Ceremony<PublicKeyCredentialRequestOptionsJSON>>("POST", "/api/auth/confirm/options"),
+  confirm: (proof: { password: string } | { ceremonyId: string; response: AuthenticationResponseJSON }) =>
+    call<{ ok: true }>("POST", "/api/auth/confirm", proof),
+
+  passkeySignUpOptions: (handle: string, name: string) =>
+    call<Ceremony<PublicKeyCredentialCreationOptionsJSON>>("POST", "/api/passkeys/signup/options", { handle, name }),
+  passkeySignUp: (ceremonyId: string, response: RegistrationResponseJSON, passkeyName: string) =>
+    call<{ me: AccountInfo }>("POST", "/api/passkeys/signup", { ceremonyId, response, passkeyName }),
+  passkeySignInOptions: () => call<Ceremony<PublicKeyCredentialRequestOptionsJSON>>("POST", "/api/passkeys/signin/options"),
+  passkeySignIn: (ceremonyId: string, response: AuthenticationResponseJSON) =>
+    call<{ me: AccountInfo }>("POST", "/api/passkeys/signin", { ceremonyId, response }),
+  passkeys: () => call<{ passkeys: PasskeyInfo[] }>("GET", "/api/passkeys"),
+  addPasskeyOptions: () => call<Ceremony<PublicKeyCredentialCreationOptionsJSON>>("POST", "/api/passkeys/options"),
+  addPasskey: (ceremonyId: string, response: RegistrationResponseJSON, name: string) =>
+    call<{ passkeys: PasskeyInfo[] }>("POST", "/api/passkeys", { ceremonyId, response, name }),
+  renamePasskey: (id: string, name: string) =>
+    call<{ passkeys: PasskeyInfo[] }>("PATCH", `/api/passkeys/${encodeURIComponent(id)}`, { name }),
+  removePasskey: (id: string) => call<{ passkeys: PasskeyInfo[] }>("DELETE", `/api/passkeys/${encodeURIComponent(id)}`),
 
   pull: () => call<PullResponse>("GET", "/api/pull"),
   push: (records: PushRecord[], connectionId: string | undefined) =>
