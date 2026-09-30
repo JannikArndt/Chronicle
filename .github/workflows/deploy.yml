@@ -1,4 +1,13 @@
-name: Deploy to GitHub Pages
+# Deploys Chronicle to CapRover (https://chronicle.timpanini.com) on every
+# push to main, and fails loudly if the new build never actually comes up.
+#
+# Secrets: CAPROVER_URL (the captain.* host), CAPROVER_APP, CAPROVER_APP_TOKEN
+# (the app's deploy token — scoped to this one app, never the server password).
+# Optional repo variable APP_URL overrides the URL the last step polls.
+#
+# workflow_dispatch deploys whichever ref it is started on — used to try a
+# branch on the real server before merging it.
+name: Deploy
 
 on:
   push:
@@ -7,35 +16,60 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: deploy
+  cancel-in-progress: false
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
 
   deploy:
-    needs: build
+    needs: verify
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      APP_URL: ${{ vars.APP_URL || 'https://chronicle.timpanini.com' }}
     steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/checkout@v4
+
+      # A tarball of exactly the committed tree: CapRover builds the image
+      # from it server-side (captain-definition → Dockerfile), and the build
+      # id below is computed over the same files.
+      - name: Pack the commit
+        run: git archive --format=tar -o deploy.tar HEAD
+
+      - name: Deploy to CapRover
+        env:
+          CAPROVER_URL: ${{ secrets.CAPROVER_URL || 'https://captain.timpanini.com' }}
+          CAPROVER_APP: ${{ secrets.CAPROVER_APP }}
+          CAPROVER_APP_TOKEN: ${{ secrets.CAPROVER_APP_TOKEN }}
+          CAPROVER_TAR_FILE: deploy.tar
+        # Pinned to an exact version: a published npm version cannot change
+        # under us. The token travels only as an env var, never as a flag
+        # another step could read out of argv.
+        run: npx --yes caprover@2.4.4 deploy
+
+      - name: Confirm the new build is live
+        run: |
+          want="$(node server/buildid.mjs)"
+          got=""
+          for i in $(seq 1 36); do
+            got="$(curl -fsSL "$APP_URL/version" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{console.log(JSON.parse(d).build)}catch{console.log("")}})' || true)"
+            if [ "$got" = "$want" ]; then
+              echo "live: $got at $APP_URL"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::deploy finished but $APP_URL/version never reported build $want (saw: '$got')"
+          exit 1
