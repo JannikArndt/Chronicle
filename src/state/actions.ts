@@ -10,14 +10,13 @@ import {
   collectRowCascade,
 } from "../model/cascade";
 import { breakOut } from "../model/breakOut";
-import { emptyDataset, newId, normalizeChildOrder, orderForInsert } from "../model/dataset";
+import { emptyDataset, newId, normalizeChildOrder, orderForInsert, rekeyDataset } from "../model/dataset";
 import { defaultSharedFor } from "../model/sharing";
-import { initializeSharing, notifyDatasetChanged } from "../sharing/sync";
+import { datasetChanged, initSync, isSignedIn } from "../sync/engine";
 import { loadDataset, loadOverlays, saveDataset, saveOverlays } from "../storage/db";
 import { loadPublicCatalog } from "../publicData/loader";
 import { buildFamousDataset, parseFamousGroupId, remainingRowKeys } from "../publicData/famous/alignToAge";
-import { isMirrorId } from "../sharing/mirror";
-import { appStore, isForeignId, userBirthMs } from "./store";
+import { appStore, isAnchoredId, isOwnId, isPublicId, isReadOnlyId, ownerOfId, userBirthMs } from "./store";
 import type { AppState, PickableDateField } from "./store";
 import type { FamousPerson } from "../publicData/famous/types";
 import type { RailChildRef } from "../model/dataset";
@@ -36,12 +35,12 @@ let persistTimer: ReturnType<typeof setTimeout> | undefined;
 function persistSoon(): void {
   clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
-    void saveDataset(appStore.getState().dataset);
-    // Sharing rides the save that already existed: the sync layer diffs the
-    // shareable subset against what it last sent rather than being told which
-    // record changed, which is why none of the mutations below had to grow a
-    // sync call. Signed out, this returns immediately and no network happens.
-    notifyDatasetChanged();
+    // Signed in, the sync engine diffs the dataset against the last view and
+    // keeps its own copy — which is why none of the mutations below had to
+    // grow a sync call. Signed out, the dataset is saved to this device and
+    // nothing else happens: no account, no network.
+    if (isSignedIn()) datasetChanged();
+    else void saveDataset(appStore.getState().dataset);
   }, 250);
 }
 
@@ -67,7 +66,12 @@ function updateDataset(mutate: (dataset: TimelineDataset) => TimelineDataset): v
 }
 
 export async function initializeApp(): Promise<void> {
-  const dataset = normalizeChildOrder((await loadDataset()) ?? emptyDataset());
+  // A signed-in device's dataset is built from its copy of the account (the
+  // engine sets it and starts connecting); a signed-out one reads `main`.
+  const signedIn = await initSync();
+  const dataset = signedIn
+    ? appStore.getState().dataset
+    : normalizeChildOrder((await loadDataset()) ?? emptyDataset());
   // Public data is opt-in: nothing is merged until picked from the rail's "+"
   // menu — but a previous session's picks are restored here so the overlay
   // survives a reload.
@@ -83,10 +87,6 @@ export async function initializeApp(): Promise<void> {
     loaded: true,
   });
   rebuildPublicDatasets(appStore.getState());
-  // Sharing comes last and never blocks the first paint. With no backend
-  // configured — a fresh clone, or any build without the Supabase env vars —
-  // this sets `configured: false` and returns without touching the network.
-  void initializeSharing();
 }
 
 // ---------- optional public data (world events + famous people) ----------
@@ -474,15 +474,6 @@ export function setGroupShareByDefault(groupId: string, shareByDefault: boolean)
   updateGroup(groupId, { shareByDefault: shareByDefault ? true : undefined });
 }
 
-// Records which account this dataset belongs to, so a device that signs in as
-// someone else does not diff one person's data against another's.
-export function setDatasetAccount(accountId: string | undefined): void {
-  updateDataset((dataset) => {
-    dataset.accountId = accountId;
-    return dataset;
-  });
-}
-
 // Returns the new row's id so a caller that has to put something on it right
 // away (the add-entry assistant) doesn't have to search for it afterwards.
 // `groupId` undefined creates a top-level timeline — a timeline needs no
@@ -513,6 +504,7 @@ export function updateRow(rowId: string, patch: Partial<TimelineRow>): void {
 }
 
 export function deleteRowWithCascade(rowId: string): void {
+  if (!canRestructure(rowId)) return;
   const cascade = collectRowCascade(appStore.getState().dataset, rowId);
   updateDataset((dataset) => applyDelete(dataset, cascade));
   clearSelection();
@@ -528,11 +520,28 @@ function clearSelectionIfRowGone(dataset: TimelineDataset, rowId: string): void 
   if (selectedRowId === rowId && !dataset.rows.some((row) => row.id === rowId)) clearSelection();
 }
 
+// Whether a record can change its place in the tree from here: not public or
+// view-only data, and not someone else's record anchored at the top of this
+// view (its real container is out of sight, so there is nowhere to put what a
+// restructure would create around it).
+export function canRestructure(id: string): boolean {
+  return !isReadOnlyId(id) && !isAnchoredId(id);
+}
+
+// Whether `id` may be put inside `containerId` (null = the top level). Trees
+// never mix: my timeline cannot go into a group shared with me, nor Dad's into
+// mine — the record would have to change owner, and nothing does that.
+export function canMoveInto(id: string, containerId: string | null): boolean {
+  if (!canRestructure(id)) return false;
+  if (containerId === null) return isOwnId(id);
+  return !isReadOnlyId(containerId) && ownerOfId(containerId) === ownerOfId(id);
+}
+
 // Turns every entry on a timeline into its own timeline, grouped under a new
 // group named after the original row. Returns the new group's id, or
 // undefined if the row is foreign or has no entries to break out.
 export function breakOutRow(rowId: string): string | undefined {
-  if (isForeignId(rowId)) return undefined;
+  if (!canRestructure(rowId)) return undefined;
   let groupId: string | undefined;
   updateDataset((dataset) => {
     const result = breakOut(dataset, rowId);
@@ -548,9 +557,9 @@ export function breakOutRow(rowId: string): string | undefined {
 // everything else on its original row untouched. Returns the new row's id, or
 // undefined if the entry is foreign or doesn't exist.
 export function breakOutEntry(entryId: string): string | undefined {
-  if (isForeignId(entryId)) return undefined;
+  if (isReadOnlyId(entryId)) return undefined;
   const entry = appStore.getState().dataset.entries.find((e) => e.id === entryId);
-  if (!entry) return undefined;
+  if (!entry || !canRestructure(entry.rowId)) return undefined;
   const sourceRowId = entry.rowId;
   let newRowId: string | undefined;
   updateDataset((dataset) => {
@@ -605,6 +614,7 @@ export function moveGroup(
 ): void {
   if (groupId === targetParentGroupId) return;
   if (before !== null && before.kind === "group" && before.id === groupId) return;
+  if (!canMoveInto(groupId, targetParentGroupId)) return;
   updateDataset((dataset) => {
     const movingGroup = dataset.groups.find((g) => g.id === groupId);
     if (!movingGroup) return dataset;
@@ -624,6 +634,7 @@ export function moveGroup(
 // Same-group reorder is the same code path.
 export function moveRow(rowId: string, targetGroupId: string | null, before: RailChildRef | null): void {
   if (before !== null && before.kind === "row" && before.id === rowId) return;
+  if (!canMoveInto(rowId, targetGroupId)) return;
   updateDataset((dataset) => {
     const movingRow = dataset.rows.find((r) => r.id === rowId);
     if (!movingRow) return dataset;
@@ -643,6 +654,7 @@ export function moveRow(rowId: string, targetGroupId: string | null, before: Rai
 // always a deliberate act, and a copy of something published is not that act.
 // Returns the new group's id.
 export function copyGroup(groupId: string): string | undefined {
+  if (!canRestructure(groupId)) return undefined;
   let newGroupId: string | undefined;
   updateDataset((dataset) => {
     const source = dataset.groups.find((g) => g.id === groupId);
@@ -705,6 +717,7 @@ export function copyGroup(groupId: string): string | undefined {
 // sub-rows any more) as a sibling immediately after the original, with fresh
 // ids throughout. Always private, like `copyGroup`. Returns the new row's id.
 export function copyRow(rowId: string): string | undefined {
+  if (!canRestructure(rowId)) return undefined;
   let newRowId: string | undefined;
   updateDataset((dataset) => {
     const source = dataset.rows.find((r) => r.id === rowId);
@@ -746,6 +759,7 @@ export function updateGroup(groupId: string, patch: Partial<Group>): void {
 }
 
 export function deleteGroupWithCascade(groupId: string): void {
+  if (!canRestructure(groupId)) return;
   const cascade = collectGroupCascade(appStore.getState().dataset, groupId);
   updateDataset((dataset) => applyDelete(dataset, cascade));
   clearSelection();
@@ -753,9 +767,13 @@ export function deleteGroupWithCascade(groupId: string): void {
 
 // ---------- visibility / collapse / search / filters ----------
 
+// Collapsing is an edit like any other for your own groups (so it follows you
+// to your other devices). For a group shared with you it goes through the
+// same edit, and the sync engine files it as this device's preference rather
+// than sending it — it would fold the group on its owner's screen too.
 export function toggleGroupCollapsed(groupId: string): void {
   const state = appStore.getState();
-  if (!isForeignId(groupId)) {
+  if (!isPublicId(groupId)) {
     updateGroup(groupId, {
       collapsed: !state.dataset.groups.find((g) => g.id === groupId)?.collapsed,
     });
@@ -765,19 +783,9 @@ export function toggleGroupCollapsed(groupId: string): void {
     ...dataset,
     groups: dataset.groups.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)),
   });
-  // Someone else's shared data is read-only for the same reason public data is,
-  // so its collapse state lives in memory only — and is lost on the next pull,
-  // the same known gap public data has.
-  if (isMirrorId(groupId)) {
-    appStore.setState({
-      sharing: {
-        ...state.sharing,
-        mirrors: state.sharing.mirrors.map((mirror) => ({ ...mirror, dataset: toggle(mirror.dataset) })),
-      },
-    });
-    return;
-  }
-  appStore.setState({ publicDatasets: state.publicDatasets.map(toggle) });
+  // Public data is never written back, so its collapse state lives in memory
+  // only — a known gap.
+  appStore.setState({ publicDatasets: state.publicDatasets.map(toggle), linkDatasets: state.linkDatasets.map(toggle) });
 }
 
 // ---------- hiding (a view preference, see src/model/hidden.ts) ----------
@@ -865,7 +873,27 @@ export function replaceDataset(dataset: TimelineDataset): void {
   // Normalized on the way in, like every other write: a dataset can arrive
   // from an import, a test fixture or an older schema with no sibling `order`
   // on it at all.
-  appStore.setState({ dataset: normalizeChildOrder(dataset) });
+  const state = appStore.getState();
+  if (!isSignedIn()) {
+    appStore.setState({ dataset: normalizeChildOrder(dataset) });
+  } else {
+    // Signed in, an import replaces your own records and nothing else: what
+    // others share with you stays exactly as it is (deleting it here would
+    // try to delete it on their side). Imported ids are made fresh, because
+    // the server keeps an id with its first owner — re-importing your own
+    // export would otherwise collide with the records it replaces.
+    const imported = rekeyDataset(dataset);
+    const foreign = (id: string) => !isOwnId(id, state);
+    appStore.setState({
+      dataset: normalizeChildOrder({
+        ...imported,
+        groups: [...imported.groups, ...state.dataset.groups.filter((g) => foreign(g.id))],
+        rows: [...imported.rows, ...state.dataset.rows.filter((r) => foreign(r.id))],
+        entries: [...imported.entries, ...state.dataset.entries.filter((e) => foreign(e.id))],
+        events: [...imported.events, ...state.dataset.events.filter((e) => foreign(e.id))],
+      }),
+    });
+  }
   persistSoon();
   clearSelection();
 }

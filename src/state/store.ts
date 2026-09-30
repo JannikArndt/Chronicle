@@ -3,11 +3,17 @@
 
 import { useSyncExternalStore } from "react";
 import { emptyDataset, mergeDatasets } from "../model/dataset";
-import { isMirrorId } from "../sharing/mirror";
 import type { TimelineDataset, TimelineEntry, Precision } from "../model/types";
 import type { FamousPerson } from "../publicData/famous/types";
-import type { Grant, SharingSession } from "../sharing/backend";
-import type { Mirror } from "../sharing/mirror";
+import type { RecordMeta } from "../sync/replica";
+import type {
+  AccountInfo,
+  GrantsResponse,
+  InviteInfo,
+  Peer,
+  PeopleResponse,
+  PublicLinkInfo,
+} from "../sync/protocol";
 
 export interface TimeRangeFilter {
   startMs: number;
@@ -23,8 +29,15 @@ export type PickableDateField = "start" | "end" | "date";
 
 export interface AppState {
   loaded: boolean;
-  dataset: TimelineDataset; // the user's private data — the only part that persists
+  // Everything this account can see and that is not public data: its own
+  // records, and — once signed in — other people's records shared with it,
+  // each with its owner and access level in `sync.meta`. Signed out, it is
+  // exactly the device's own data, as it always was.
+  dataset: TimelineDataset;
   publicDatasets: TimelineDataset[]; // read-only, merged into the view
+  // Someone's timelines opened from a public link (#/view/<token>): read-only,
+  // in memory for this visit, never part of `dataset`.
+  linkDatasets: TimelineDataset[];
   selectedEntryId?: string;
   // Events are their own selection, not a second kind of entry id: the two are
   // edited by different panels and looked up in different arrays, and one
@@ -68,21 +81,35 @@ export interface AppState {
   // from that person's overlay — a single timeline can be taken away without
   // removing the whole person.
   activeFamous: { person: FamousPerson; aligned: boolean; removedRowKeys: string[] }[];
-  sharing: SharingState;
+  sync: SyncState;
 }
 
-export interface SharingState {
-  // False when the build has no Supabase project configured — which is the
-  // state of a fresh clone, and must leave the rest of the app untouched.
-  configured: boolean;
-  session?: SharingSession;
-  // Other people's shared timelines. A sibling of `publicDatasets`, never
-  // merged into `dataset` — see plans/sharing-feature-design.md §D8.
-  mirrors: Mirror[];
-  // Who can see what of mine, for the "shared with" list.
-  grants: Grant[];
-  status: "off" | "idle" | "syncing" | "error";
+export interface SocialState {
+  people: PeopleResponse;
+  grants: GrantsResponse;
+  invites: InviteInfo[];
+  links: PublicLinkInfo[];
+}
+
+export interface SyncState {
+  // "local": no account on this device — the app is local-first and makes no
+  // network calls. The other three are a signed-in device's connection.
+  status: "local" | "connecting" | "online" | "offline";
+  account?: AccountInfo;
+  // The session ended (password changed elsewhere, account deleted) while
+  // this device still holds the account's data: sign in again to go on.
+  sessionExpired: boolean;
+  // Local changes the server has not acknowledged yet.
+  pending: number;
   error?: string;
+  // Owner and access of every record in `dataset` that came from, or is
+  // going to, the server. Absent for a signed-out device's records.
+  meta: ReadonlyMap<string, RecordMeta>;
+  // Display names of the accounts whose records are in `dataset`.
+  names: Readonly<Record<string, string>>;
+  // Who else is online, and what they have open.
+  peers: Peer[];
+  social?: SocialState;
 }
 
 const initialState: AppState = {
@@ -96,7 +123,8 @@ const initialState: AppState = {
   showTreeLines: false,
   activeWorldKeys: [],
   activeFamous: [],
-  sharing: { configured: false, mirrors: [], grants: [], status: "off" },
+  linkDatasets: [],
+  sync: { status: "local", sessionExpired: false, pending: 0, meta: new Map(), names: {}, peers: [] },
 };
 
 type Listener = () => void;
@@ -126,31 +154,25 @@ export function useAppState<T>(selector: (state: AppState) => T): T {
 let mergedCache: {
   dataset: TimelineDataset;
   publics: TimelineDataset[];
-  mirrors: Mirror[];
+  links: TimelineDataset[];
   merged: TimelineDataset;
 } | null = null;
 
-// Your data first, then people you know, then the public datasets — array order
-// drives layout (§5), so this is the on-screen order too. Mirrors sit between
-// the two because a shared timeline from your dad belongs nearer your own life
-// than Mozart's does.
+// Your data (and what is shared with you) first, then anything opened from a
+// public link, then the public datasets. Records without an `order` sort in
+// array order after every ordered sibling, so this is the on-screen order of
+// everything that is not yours to arrange.
 export function mergedDataset(state: AppState): TimelineDataset {
   if (
     mergedCache &&
     mergedCache.dataset === state.dataset &&
     mergedCache.publics === state.publicDatasets &&
-    mergedCache.mirrors === state.sharing.mirrors
+    mergedCache.links === state.linkDatasets
   ) {
     return mergedCache.merged;
   }
-  const mirrorDatasets = state.sharing.mirrors.map((mirror) => mirror.dataset);
-  const merged = mergeDatasets(state.dataset, ...mirrorDatasets, ...state.publicDatasets);
-  mergedCache = {
-    dataset: state.dataset,
-    publics: state.publicDatasets,
-    mirrors: state.sharing.mirrors,
-    merged,
-  };
+  const merged = mergeDatasets(state.dataset, ...state.linkDatasets, ...state.publicDatasets);
+  mergedCache = { dataset: state.dataset, publics: state.publicDatasets, links: state.linkDatasets, merged };
   return merged;
 }
 
@@ -158,12 +180,46 @@ export function isPublicId(id: string): boolean {
   return id.startsWith("pub:");
 }
 
-// Anything that isn't yours: bundled public data, or a mirror of someone
-// else's shared timelines. The UI uses this to decide whether to offer an edit
-// at all — a co-owned mirror is the one exception, and it is checked against
-// the mirror's `role` rather than against the id.
-export function isForeignId(id: string): boolean {
-  return isPublicId(id) || isMirrorId(id);
+// Whether an edit to this record can stick: bundled public data and anything
+// shared with you for viewing cannot. Someone else's record you were given
+// edit access to CAN — the whole point of an editor grant.
+export function isReadOnlyId(id: string, state: AppState = appStore.getState()): boolean {
+  return isPublicId(id) || state.sync.meta.get(id)?.access === "read";
+}
+
+// Whose tree a record lives in — an account id, "public" for public data, or
+// "me" for a signed-out device's own records. Two records with different
+// owners never nest inside each other; the drag-and-drop targets use this.
+export function ownerOfId(id: string, state: AppState = appStore.getState()): string {
+  if (isPublicId(id)) return "public";
+  return state.sync.meta.get(id)?.owner ?? state.sync.account?.id ?? "me";
+}
+
+export function isOwnId(id: string, state: AppState = appStore.getState()): boolean {
+  if (isPublicId(id)) return false;
+  const owner = state.sync.meta.get(id)?.owner;
+  return owner === undefined || owner === state.sync.account?.id;
+}
+
+// Someone else's record drawn at the top level of this view because its real
+// container is out of sight (the group you were invited to, say): it can be
+// edited, but not moved, broken out or deleted from here.
+export function isAnchoredId(id: string, state: AppState = appStore.getState()): boolean {
+  return state.sync.meta.get(id)?.rootProjected === true;
+}
+
+// Only your own records: what an export contains, and what a signed-out
+// device holds anyway.
+export function ownDataset(state: AppState): TimelineDataset {
+  if (state.sync.meta.size === 0) return state.dataset;
+  const own = (id: string) => isOwnId(id, state);
+  return {
+    ...state.dataset,
+    groups: state.dataset.groups.filter((g) => own(g.id)),
+    rows: state.dataset.rows.filter((r) => own(r.id)),
+    entries: state.dataset.entries.filter((e) => own(e.id)),
+    events: state.dataset.events.filter((e) => own(e.id)),
+  };
 }
 
 // The user's own birth instant, used to align a famous person's life "to your

@@ -22,7 +22,7 @@ async function pullRecord(c: TestClient, id: string): Promise<WireRecord | undef
   return (await c.ok<PullResponse>("GET", "/api/pull")).records.find((r) => r.id === id);
 }
 
-const entry = (id: string, rowId: string, title: string) =>
+const entry = (_id: string, rowId: string, title: string) =>
   ({ rowId, title, start: { ms: Date.UTC(2020, 0, 1), precision: "year" } }) as Record<string, unknown>;
 
 describe("accounts", () => {

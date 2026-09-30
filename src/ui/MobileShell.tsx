@@ -12,12 +12,12 @@ import type { Layout } from "../render/layout";
 import { AddEntryAssistant } from "../onboarding/AddEntryAssistant";
 import { AddTimelineAssistant } from "../onboarding/AddTimelineAssistant";
 import { clearSelection, selectEntry, selectEvent, setSearch, setShowTreeLines } from "../state/actions";
-import { appStore, isPublicId, mergedDataset, useAppState } from "../state/store";
+import { appStore, isPublicId, mergedDataset, ownDataset, useAppState } from "../state/store";
 import { triggerDownload } from "../storage/exportImport";
 import { AssistantSheet } from "./AssistantSheet";
 import { CanvasHost } from "./CanvasHost";
 import { importDatasetWithConfirmation } from "./importFlow";
-import { SharingPanel } from "./SharingPanel";
+import { AccountPanel } from "./AccountPanel";
 import { WorldEventsPicker } from "./WorldEventsPicker";
 import { centerOnEntry, centerOnEvent } from "./centerOnEntry";
 import { MiniMap } from "./MiniMap";
@@ -358,8 +358,7 @@ function MobileSearchChip({ open, setOpen }: { open: boolean; setOpen: (open: bo
 function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOnboarding: () => void }) {
   const [showingWorldEvents, setShowingWorldEvents] = useState(false);
   const [showingSharing, setShowingSharing] = useState(false);
-  const sharingConfigured = useAppState((s) => s.sharing.configured);
-  const signedIn = useAppState((s) => s.sharing.session !== undefined);
+  const account = useAppState((s) => s.sync.account);
   const showTreeLines = useAppState((s) => s.showTreeLines);
 
   const handleImport = () => {
@@ -390,7 +389,7 @@ function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOn
           <button type="button" className="menu-item" onClick={() => setShowingSharing(false)}>
             ‹ Back
           </button>
-          <SharingPanel />
+          <AccountPanel />
         </div>
       </>
     );
@@ -412,16 +411,14 @@ function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOn
         <button type="button" className="menu-item" onClick={() => setShowTreeLines(!showTreeLines)}>
           {showTreeLines ? "☑" : "☐"} 🌳 Tree lines
         </button>
-        {sharingConfigured && (
-          <button type="button" className="menu-item" onClick={() => setShowingSharing(true)}>
-            {signedIn ? "🔗 Sharing…" : "🔗 Share with someone…"}
-          </button>
-        )}
+        <button type="button" className="menu-item" onClick={() => setShowingSharing(true)}>
+          {account === undefined ? "👤 Sign in or create an account…" : `👥 ${account.name} — people & sharing…`}
+        </button>
         <button
           type="button"
           className="menu-item"
           onClick={() => {
-            triggerDownload(appStore.getState().dataset);
+            triggerDownload(ownDataset(appStore.getState()));
             close();
           }}
         >
@@ -441,7 +438,9 @@ function MobileMenu({ close, onStartOnboarding }: { close: () => void; onStartOn
           ✨ Replay setup assistant
         </button>
         <div className="hint">
-          Your data lives only in this browser — export regularly to back it up or move devices.
+          {account === undefined
+            ? "Your data lives only in this browser — export regularly, or create an account to keep it on every device."
+            : "Your timelines are kept in your account and on this device. An export holds only your own."}
         </div>
       </div>
     </>

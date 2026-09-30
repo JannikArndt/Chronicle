@@ -9,15 +9,17 @@
 import type { TimelineEvent } from "../model/types";
 import { snapMsToPrecision } from "../model/fuzzyDate";
 import { updateEvent } from "../state/actions";
-import { isForeignId } from "../state/store";
+import { isReadOnlyId } from "../state/store";
 import { DateBlock } from "./DateRangeEditor";
+import { PresenceChips } from "./PresenceChips";
 
 export function EventPane({ event }: { event: TimelineEvent }) {
-  const readOnly = isForeignId(event.id);
+  const readOnly = isReadOnlyId(event.id);
   const change = (patch: Partial<TimelineEvent>) => updateEvent(event.id, patch);
 
   return (
     <>
+      <PresenceChips ids={[event.id]} />
       <div className="sheet-section">When</div>
       <div className="date-editor">
         <div className="date-editor-blocks">

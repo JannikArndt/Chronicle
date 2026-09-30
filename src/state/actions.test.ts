@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   addEvent,
   addOnboardingPlaceEntry,
@@ -15,6 +15,7 @@ import {
   copyGroup,
   copyRow,
   deleteEvent,
+  deleteGroupWithCascade,
   deleteRowWithCascade,
   moveGroup,
   moveRow,
@@ -29,9 +30,8 @@ import {
   updateEvent,
   updateOnboardingPlaceEntry,
 } from "./actions";
-import { appStore, mergedDataset } from "./store";
+import { appStore, mergedDataset, ownDataset } from "./store";
 import { serializeDataset } from "../storage/exportImport";
-import { SCHEMA_VERSION } from "../model/types";
 import { setGroupHidden, setRowHidden, unhideChild } from "./actions";
 import { emptyDataset, orderedChildren } from "../model/dataset";
 import type { RailChildRef } from "../model/dataset";
@@ -690,40 +690,58 @@ describe("sharing defaults (schema v7)", () => {
   });
 });
 
-describe("mirrors stay out of the user's own data", () => {
-  const mirror = {
-    ownerAccountId: "acct-dad",
-    ownerName: "Dad",
-    role: "reader" as const,
-    dataset: {
-      schemaVersion: SCHEMA_VERSION,
-      groups: [{ id: "shared:acct-dad:g1", label: "Dad", collapsed: false }],
-      rows: [{ id: "shared:acct-dad:r1", groupId: "shared:acct-dad:g1", label: "His jobs" }],
-      entries: [],
-      events: [],
-    },
-  };
-
+describe("records shared with you stay out of your own data", () => {
+  // Dad's group, which I may edit and which sits at my top level because its
+  // real container is out of my sight, and a timeline of his I may only view.
   beforeEach(() => {
-    replaceDataset(fixture());
-    appStore.setState({ sharing: { ...appStore.getState().sharing, mirrors: [mirror] } });
+    const dataset = fixture();
+    dataset.groups.push({ id: "g-dad", label: "Dad", collapsed: false });
+    dataset.rows.push({ id: "r-dad", groupId: "g-dad", label: "His jobs" });
+    replaceDataset(dataset);
+    appStore.setState({
+      sync: {
+        ...appStore.getState().sync,
+        account: { id: "acct-me", handle: "me", name: "Me" },
+        meta: new Map([
+          ["g-dad", { owner: "acct-dad", access: "edit" as const, rootProjected: true }],
+          ["r-dad", { owner: "acct-dad", access: "read" as const, rootProjected: false }],
+        ]),
+      },
+    });
   });
 
-  test("a mirror is drawn — it is merged into the view", () => {
+  afterEach(() => {
+    appStore.setState({ sync: { ...appStore.getState().sync, account: undefined, meta: new Map() } });
+  });
+
+  test("they are drawn — they are part of the view", () => {
     expect(mergedDataset(appStore.getState()).rows.map((row) => row.label)).toContain("His jobs");
   });
 
-  // The privacy guarantee that makes §D8 worth the indirection: an export
-  // serialises `state.dataset`, so someone else's timelines cannot be in it.
-  test("a mirror is not in the export", () => {
-    const exported = serializeDataset(appStore.getState().dataset);
+  // An export is your own data: someone else's timelines cannot be in it.
+  test("they are not in the export", () => {
+    const exported = serializeDataset(ownDataset(appStore.getState()));
     expect(exported).not.toContain("His jobs");
-    expect(exported).not.toContain("acct-dad");
+    expect(exported).not.toContain("g-dad");
   });
 
-  test("dropping the mirror leaves the user's own data untouched", () => {
-    appStore.setState({ sharing: { ...appStore.getState().sharing, mirrors: [] } });
-    expect(mergedDataset(appStore.getState()).rows.map((row) => row.label)).toEqual(["Job"]);
+  test("my timeline cannot be moved into someone else's group — trees never mix", () => {
+    moveRow("r1", "g-dad", null);
+    expect(appStore.getState().dataset.rows.find((row) => row.id === "r1")?.groupId).toBe("g1");
+  });
+
+  test("a view-only timeline cannot be moved, copied, broken out or deleted", () => {
+    moveRow("r-dad", null, null);
+    expect(copyRow("r-dad")).toBeUndefined();
+    expect(breakOutRow("r-dad")).toBeUndefined();
+    deleteRowWithCascade("r-dad");
+    expect(appStore.getState().dataset.rows.find((row) => row.id === "r-dad")).toMatchObject({ groupId: "g-dad" });
+  });
+
+  test("the group I was invited into cannot be moved or deleted from here", () => {
+    moveGroup("g-dad", "g1", null);
+    deleteGroupWithCascade("g-dad");
+    expect(appStore.getState().dataset.groups.find((group) => group.id === "g-dad")?.parentGroupId).toBeUndefined();
   });
 });
 

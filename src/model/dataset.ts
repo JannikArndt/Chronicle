@@ -11,11 +11,46 @@ export function emptyDataset(): TimelineDataset {
   };
 }
 
-let idCounter = 0;
-
+// Globally unique, not just unique on this device: once signed in, a record's
+// id is its identity on the server, across every account — an entry Dad adds
+// to my timeline is keyed by the id his phone made up. The time prefix keeps
+// ids roughly sortable and readable in a debugger; the random part is what
+// makes two devices in the same millisecond not collide.
 export function newId(prefix: string): string {
-  idCounter += 1;
-  return `${prefix}-${Date.now().toString(36)}-${idCounter.toString(36)}`;
+  const random = Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => byte.toString(36).padStart(2, "0")).join("");
+  return `${prefix}-${Date.now().toString(36)}-${random}`;
+}
+
+// Fresh ids for every record, with every reference between them remapped —
+// for data about to become someone's account data (an import, or a device's
+// local timelines on first sign-in). Ids that came from a file might already
+// exist on the server under someone else, and the server keeps an id with
+// its first owner.
+export function rekeyDataset(dataset: TimelineDataset): TimelineDataset {
+  const map = new Map<string, string>();
+  const remap = (id: string, prefix: string): string => {
+    let next = map.get(id);
+    if (next === undefined) map.set(id, (next = newId(prefix)));
+    return next;
+  };
+  dataset.groups.forEach((group) => remap(group.id, "group"));
+  dataset.rows.forEach((row) => remap(row.id, "row"));
+  dataset.entries.forEach((entry) => remap(entry.id, "entry"));
+  dataset.events.forEach((event) => remap(event.id, "event"));
+  const ref = (id: string | undefined): string | undefined => (id === undefined ? undefined : (map.get(id) ?? id));
+  return {
+    ...dataset,
+    groups: dataset.groups.map((group) => ({ ...group, id: map.get(group.id)!, parentGroupId: ref(group.parentGroupId) })),
+    rows: dataset.rows.map((row) => ({ ...row, id: map.get(row.id)!, groupId: ref(row.groupId) })),
+    entries: dataset.entries.map((entry) => ({
+      ...entry,
+      id: map.get(entry.id)!,
+      rowId: ref(entry.rowId)!,
+      parentEntryId: ref(entry.parentEntryId),
+    })),
+    events: dataset.events.map((event) => ({ ...event, id: map.get(event.id)!, rowId: ref(event.rowId)! })),
+    selfGroupId: ref(dataset.selfGroupId),
+  };
 }
 
 // Public datasets are appended after the private one; array order is what the

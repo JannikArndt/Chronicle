@@ -13,12 +13,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "buildid": "node server/buildid.mjs",
-    "setup:supabase": "bash scripts/setup-supabase.sh",
-    "verify:sql": "bash scripts/verify-sql.sh"
+    "buildid": "node server/buildid.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

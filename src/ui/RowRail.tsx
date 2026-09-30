@@ -38,7 +38,10 @@ import {
   updateGroup,
   updateRow,
 } from "../state/actions";
-import { isForeignId, mergedDataset, useAppState, userBirthMs } from "../state/store";
+import { canMoveInto, canRestructure } from "../state/actions";
+import { isOwnId, isPublicId, isReadOnlyId, mergedDataset, ownerOfId, useAppState, userBirthMs } from "../state/store";
+import { ShareSection } from "./ShareSection";
+import { PresenceChips } from "./PresenceChips";
 import { formatFuzzyDate } from "../model/fuzzyDate";
 import { ACCEPTED_DATE_FORMATS_HINT, parseDateInput } from "../model/parseDateInput";
 import type { Group, TimelineRow } from "../model/types";
@@ -273,8 +276,10 @@ function analyzeContainers(elements: RailElementInfo[]): {
   const containerAtDepth: (string | null)[] = [null];
   const containerId: (string | null)[] = [];
   const groupBottom = new Map<string, number>();
-  // Open private groups, deepest last — a foreign (public/mirror) group is
-  // never pushed, since nothing under it is a valid drop target.
+  // Open editable groups, deepest last — a read-only (public, or shared for
+  // viewing) group is never pushed, since nothing under it is a valid drop
+  // target. Whose tree a group is in is checked per drag, in
+  // `computeDropSlots`.
   const openGroups: { id: string; depth: number }[] = [];
 
   const closeGroupsAtOrBelow = (depth: number) => {
@@ -286,7 +291,7 @@ function analyzeContainers(elements: RailElementInfo[]): {
     for (const group of openGroups) groupBottom.set(group.id, element.rect.bottom);
     containerId[index] = containerAtDepth[element.depth] ?? null;
     if (element.kind === "group") {
-      const isPrivate = !isForeignId(element.id);
+      const isPrivate = !isReadOnlyId(element.id);
       if (isPrivate) openGroups.push({ id: element.id, depth: element.depth });
       containerAtDepth[element.depth + 1] = isPrivate ? element.id : null;
     }
@@ -304,7 +309,7 @@ function computeDropSlots(elements: RailElementInfo[], dragged: DragDescriptor):
   const { containerId, groupBottom } = analyzeContainers(elements);
   const slots: DropSlot[] = [];
   elements.forEach((element, index) => {
-    if (isForeignId(element.id)) return;
+    if (isReadOnlyId(element.id)) return;
     if (element.kind === dragged.kind && element.id === dragged.id) return;
     slots.push({
       drop: {
@@ -320,7 +325,15 @@ function computeDropSlots(elements: RailElementInfo[], dragged: DragDescriptor):
   }
   const last = elements[elements.length - 1];
   if (last) slots.push({ drop: { parentGroupId: null, before: null }, clientY: last.rect.bottom });
-  return slots;
+  // Trees never mix: a slot is only offered where the dragged thing could
+  // actually land — inside its own owner's tree, next to its own owner's
+  // records. Offering the rest would show a drop that then snaps back.
+  const owner = ownerOfId(dragged.id);
+  return slots.filter(
+    (slot) =>
+      canMoveInto(dragged.id, slot.drop.parentGroupId) &&
+      (slot.drop.before === null || ownerOfId(slot.drop.before.id) === owner),
+  );
 }
 
 function nearestDropSlot(slots: DropSlot[], clientY: number): DropSlot | null {
@@ -543,7 +556,7 @@ function RailItem({
   // it sits at exactly the same pixel whether the group is open or shut.
   // Collapsing a group must not make its own name move.
   const style = { top: item.y, height: collapsed ? groupHeaderHeight(item.depth) : item.height };
-  const readOnly = isForeignId(item.id);
+  const readOnly = isReadOnlyId(item.id);
   // Whether the "align to my age" toggle can do anything (needs the user's birth date).
   const canAlignFamous = useAppState((s) => userBirthMs(s) !== undefined);
   const key = `${item.kind}:${item.id}`;
@@ -586,7 +599,7 @@ function RailItem({
               🎂
             </button>
           )}
-          {readOnly && item.depth === 0 && (
+          {isPublicId(group.id) && item.depth === 0 && (
             <button
               type="button"
               className={`${hoverReveal(visible)} remove-overlay`}
@@ -609,13 +622,16 @@ function RailItem({
               ⇔
             </button>
           )}
+          <SharedMark id={group.id} />
           {!readOnly && (
             <>
-              <RailDragHandle
-                className={hoverReveal(visible)}
-                dragController={dragController}
-                descriptor={{ kind: "group", id: group.id }}
-              />
+              {canRestructure(group.id) && (
+                <RailDragHandle
+                  className={hoverReveal(visible)}
+                  dragController={dragController}
+                  descriptor={{ kind: "group", id: group.id }}
+                />
+              )}
               <button
                 type="button"
                 className={hoverReveal(visible)}
@@ -663,14 +679,22 @@ function RailItem({
           <span className="label-initial">{row.label.slice(0, 1)}</span>
           {age !== null && <span className="age-badge">{age}</span>}
         </span>
-        {!isForeignId(row.id) && (
+        {!isPublicId(row.id) && isReadOnlyId(row.id) && (
           <span className="rail-actions">
+            <SharedMark id={row.id} />
+          </span>
+        )}
+        {!isReadOnlyId(row.id) && (
+          <span className="rail-actions">
+            <SharedMark id={row.id} />
             <ShareToggle row={row} visible={visible} />
-            <RailDragHandle
-              className={hoverReveal(visible)}
-              dragController={dragController}
-              descriptor={{ kind: "row", id: row.id }}
-            />
+            {canRestructure(row.id) && (
+              <RailDragHandle
+                className={hoverReveal(visible)}
+                dragController={dragController}
+                descriptor={{ kind: "row", id: row.id }}
+              />
+            )}
             <button
               type="button"
               className={hoverReveal(visible)}
@@ -1216,9 +1240,27 @@ function GroupEditor({ groupId, close }: { groupId: string; close: () => void })
   // Adding a child takes over the same popover rather than opening a second
   // one: it is the ⚙ asking one more question, not a new place to be.
   const [adding, setAdding] = useState<"group" | "row" | null>(null);
+  const [sharing, setSharing] = useState(false);
   const [label, setLabel] = useState("");
   const group = dataset.groups.find((g) => g.id === groupId);
   if (!group) return null;
+
+  if (sharing) {
+    return (
+      <div className="popover-form">
+        <div className="popover-title">Share “{group.label}”</div>
+        <ShareSection kind="group" id={groupId} />
+        <div className="popover-footer">
+          <button type="button" className="small-button" onClick={() => setSharing(false)}>
+            Back
+          </button>
+          <button type="button" className="small-button" onClick={close}>
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (adding !== null) {
     const submit = () => {
@@ -1307,6 +1349,9 @@ function GroupEditor({ groupId, close }: { groupId: string; close: () => void })
         <button type="button" className="menu-item" onClick={() => setAdding("row")}>
           <span className="menu-item-icon">＋</span>Timeline
         </button>
+        <button type="button" className="menu-item" onClick={() => setSharing(true)}>
+          <span className="menu-item-icon">👥</span>Share…
+        </button>
         {/* Hiding sits directly above deleting, and says how it differs: one is
             a view of your own, the other is the data. A group hides with
             everything in it, and comes back from the list its container offers
@@ -1321,19 +1366,21 @@ function GroupEditor({ groupId, close }: { groupId: string; close: () => void })
         >
           <span className="menu-item-icon">🙈</span>Hide — this group and everything in it
         </button>
-        <button
-          type="button"
-          className="menu-item menu-item-danger"
-          onClick={() => {
-            const cascade = collectGroupCascade(dataset, groupId);
-            if (window.confirm(`Delete “${group.label}”? ${describeCascade(cascade)}`)) {
-              deleteGroupWithCascade(groupId);
-              close();
-            }
-          }}
-        >
-          <span className="menu-item-icon">🗑</span>Delete…
-        </button>
+        {canRestructure(groupId) && (
+          <button
+            type="button"
+            className="menu-item menu-item-danger"
+            onClick={() => {
+              const cascade = collectGroupCascade(dataset, groupId);
+              if (window.confirm(`Delete “${group.label}”? ${describeCascade(cascade)}`)) {
+                deleteGroupWithCascade(groupId);
+                close();
+              }
+            }}
+          >
+            <span className="menu-item-icon">🗑</span>Delete…
+          </button>
+        )}
       </div>
       {/* What this group is holding back, offered by name — the only way back
           for something taken out of the picture, and now reached the same way
@@ -1355,9 +1402,27 @@ function GroupEditor({ groupId, close }: { groupId: string; close: () => void })
 
 function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
   const dataset = useAppState((s) => s.dataset);
+  const [sharing, setSharing] = useState(false);
   const row = dataset.rows.find((r) => r.id === rowId);
   if (!row) return null;
   const birthValue = row.birthDate !== undefined ? new Date(row.birthDate).toISOString().slice(0, 10) : "";
+
+  if (sharing) {
+    return (
+      <div className="popover-form">
+        <div className="popover-title">Share “{row.label}”</div>
+        <ShareSection kind="row" id={rowId} />
+        <div className="popover-footer">
+          <button type="button" className="small-button" onClick={() => setSharing(false)}>
+            Back
+          </button>
+          <button type="button" className="small-button" onClick={close}>
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="popover-form">
@@ -1406,8 +1471,12 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
       />
       {/* The same one list as a group's ⚙, in the same order: what this can
           become, then hiding, then deleting last and in the danger colour. */}
+      <PresenceChips ids={[rowId]} />
       <div className="popover-actions">
-        {canBreakOut(dataset, rowId) && (
+        <button type="button" className="menu-item" onClick={() => setSharing(true)}>
+          <span className="menu-item-icon">👥</span>Share…
+        </button>
+        {canBreakOut(dataset, rowId) && canRestructure(rowId) && (
           <button
             type="button"
             className="menu-item"
@@ -1431,19 +1500,21 @@ function RowEditor({ rowId, close }: { rowId: string; close: () => void }) {
         >
           <span className="menu-item-icon">🙈</span>Hide this timeline
         </button>
-        <button
-          type="button"
-          className="menu-item menu-item-danger"
-          onClick={() => {
-            const cascade = collectRowCascade(dataset, rowId);
-            if (window.confirm(`Delete “${row.label}”? ${describeCascade(cascade)}`)) {
-              deleteRowWithCascade(rowId);
-              close();
-            }
-          }}
-        >
-          <span className="menu-item-icon">🗑</span>Delete…
-        </button>
+        {canRestructure(rowId) && (
+          <button
+            type="button"
+            className="menu-item menu-item-danger"
+            onClick={() => {
+              const cascade = collectRowCascade(dataset, rowId);
+              if (window.confirm(`Delete “${row.label}”? ${describeCascade(cascade)}`)) {
+                deleteRowWithCascade(rowId);
+                close();
+              }
+            }}
+          >
+            <span className="menu-item-icon">🗑</span>Delete…
+          </button>
+        )}
       </div>
       <div className="popover-footer">
         <button type="button" className="small-button" onClick={close}>
@@ -1523,9 +1594,9 @@ function toHexColor(color: string): string {
 // Absent entirely when signed out, so a local-only Chronicle looks exactly as
 // it did before sharing existed.
 function ShareToggle({ row, visible }: { row: TimelineRow; visible: boolean }) {
-  const signedIn = useAppState((s) => s.sharing.session !== undefined);
+  const signedIn = useAppState((s) => s.sync.account !== undefined);
   const dataset = useAppState((s) => s.dataset);
-  if (!signedIn) return null;
+  if (!signedIn || !isOwnId(row.id)) return null;
 
   const shared = row.shared === true;
   const impact = describePublishImpact(dataset, row.id);
@@ -1537,8 +1608,8 @@ function ShareToggle({ row, visible }: { row: TimelineRow; visible: boolean }) {
       }
       title={
         shared
-          ? `Shared with the people you have invited. Click to make it private again.\n\nSharing is not recallable — anyone who could already see it may have kept a copy.`
-          : `Private. Click to share it with the people you have invited.\n\n${impact}`
+          ? `Published: everyone who can view the group it is in sees it. Click to make it private again.\n\nSharing is not recallable — anyone who could already see it may have kept a copy.`
+          : `Private. Click to publish it to everyone who can view the group it is in.\n\n${impact}`
       }
       onClick={(e) => {
         e.stopPropagation();
@@ -1547,5 +1618,29 @@ function ShareToggle({ row, visible }: { row: TimelineRow; visible: boolean }) {
     >
       {shared ? "🔗" : "🔒"}
     </button>
+  );
+}
+
+// Someone else's group or timeline says whose it is, without saying it in the
+// type — every name in the rail is the same name. The mark stays visible like
+// the share toggle does: "this is Dad's, and you may only look" has to be
+// legible without hovering.
+function SharedMark({ id }: { id: string }) {
+  const meta = useAppState((s) => s.sync.meta.get(id));
+  const names = useAppState((s) => s.sync.names);
+  const me = useAppState((s) => s.sync.account?.id);
+  const peers = useAppState((s) => s.sync.peers);
+  if (meta === undefined || meta.owner === me) {
+    return peers.some((peer) => peer.focusId === id) ? <span className="icon-button rail-presence" title="Someone has this open">●</span> : null;
+  }
+  const owner = names[meta.owner] ?? "someone";
+  const busy = peers.some((peer) => peer.focusId === id);
+  return (
+    <span
+      className={`icon-button shared-mark ${busy ? "rail-presence" : ""}`}
+      title={`${owner}’s — shared with you to ${meta.access === "edit" ? "edit" : "view"}`}
+    >
+      {meta.access === "edit" ? "✎" : "👁"}
+    </span>
   );
 }

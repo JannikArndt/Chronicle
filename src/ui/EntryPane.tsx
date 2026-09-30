@@ -6,15 +6,17 @@
 
 import type { TimelineEntry } from "../model/types";
 import { updateEntry } from "../state/actions";
-import { isForeignId } from "../state/store";
+import { isReadOnlyId } from "../state/store";
 import { DateRangeEditor } from "./DateRangeEditor";
+import { PresenceChips } from "./PresenceChips";
 
 export function EntryPane({ entry }: { entry: TimelineEntry }) {
-  const readOnly = isForeignId(entry.id);
+  const readOnly = isReadOnlyId(entry.id);
   const change = (patch: Partial<TimelineEntry>) => updateEntry(entry.id, patch);
 
   return (
     <>
+      <PresenceChips ids={[entry.id]} />
       <div className="sheet-section">When</div>
       <DateRangeEditor start={entry.start} end={entry.end} disabled={readOnly} onChange={change} />
 

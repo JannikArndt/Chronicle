@@ -2611,6 +2611,167 @@ textarea {
   justify-content: space-between;
 }
 
+/* ---------- accounts, people, live presence (v2) ---------- */
+
+.account-popover {
+  width: 320px;
+  max-height: 80vh;
+}
+
+.account-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.account-name {
+  font-weight: 600;
+}
+
+.account-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* Connection state at a glance: green in sync, amber on the way, grey while
+   offline — offline is a normal state for a local-first app, not an error. */
+.sync-dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-faint);
+}
+
+.sync-status-online .sync-dot,
+.sync-dot.sync-status-online {
+  background: var(--color-success);
+}
+
+.sync-status-connecting .sync-dot,
+.sync-dot.sync-status-connecting {
+  background: var(--color-warning-border);
+}
+
+.online-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: var(--color-success);
+  vertical-align: middle;
+}
+
+.peer-count {
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.request-badge {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 11px;
+}
+
+.presence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.presence-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: 1px solid var(--color-success-border);
+  border-radius: 999px;
+  background: var(--color-success-bg);
+  color: var(--color-text);
+  font-size: 11px;
+}
+
+.copyable-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.copyable-link input {
+  width: 100%;
+  font-size: 12px;
+}
+
+.share-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sheet-share {
+  padding: 4px 8px 8px;
+}
+
+/* Someone else's group or timeline. Visible without hovering, like the share
+   toggle: whose it is and whether you may change it must be legible at a
+   glance. */
+.shared-mark {
+  opacity: 1;
+  color: var(--color-info);
+  cursor: default;
+}
+
+.rail-presence {
+  color: var(--color-success);
+}
+
+/* What a public link is showing, floating over the canvas until dismissed. */
+.view-note {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 6px 10px;
+  border: 1px solid var(--color-info);
+  border-radius: 8px;
+  background: var(--color-info-bg);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
 /* ---------- sharing (schema v7) ---------- */
 
 /* The one rail action that stays visible when it is on: a published timeline
