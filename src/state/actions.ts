@@ -356,70 +356,34 @@ export function completeIdentityStep(name: string): IdentitySetupResult {
   return result;
 }
 
-export interface OnboardingPlaceAnswer {
-  label: string; // short display title — kept as `label` for backward compatibility with existing tests/call sites
-  startMs: number;
-  endMs?: number; // absent = "still living here" (ongoing)
-  subtitle?: string;
-  fullName?: string;
-  coordinates?: { lat: number; lon: number };
-  street?: string;
-  city?: string;
-  country?: string;
+// One first-run screen's answer, reconciled against its timeline
+// (src/onboarding/sequenceRecords.ts): what to create, change and delete.
+export interface EntryChanges {
+  creates: Array<Omit<TimelineEntry, "id" | "rowId">>;
+  updates: Array<{ id: string; patch: Partial<TimelineEntry> }>;
+  deletes: string[];
 }
 
-// Onboarding places loop: entries are built directly (not through the
-// click-driven startDraft flow). Returns the created entry's id, for the
-// caller to track for later edits.
-export function addOnboardingPlaceEntry(rowId: string, place: OnboardingPlaceAnswer): string {
-  const draft: TimelineEntry = {
-    id: newId("entry"),
-    rowId,
-    title: place.label,
-    subtitle: place.subtitle,
-    place: place.fullName
-      ? {
-          fullName: place.fullName,
-          coordinates: place.coordinates,
-          street: place.street,
-          city: place.city,
-          country: place.country,
-        }
-      : undefined,
-    start: { ms: place.startMs, precision: "year" },
-    end: place.endMs !== undefined ? { ms: place.endMs, precision: "year" } : undefined,
-  };
+// Applies it as ONE change — one save, one sync push — rather than one per
+// entry. A deleted entry takes its sub-timeline entries with it, as anywhere.
+export function applyEntryChanges(rowId: string, changes: EntryChanges): void {
   updateDataset((dataset) => {
-    dataset.entries.push(draft);
-    return dataset;
-  });
-  return draft.id;
-}
-
-// Onboarding places TABLE (unlike addOnboardingPlaceEntry's append-only path):
-// every row stays live-editable, so editing an earlier row's place or year has
-// to update its already-saved entry directly. Chaining consistency (row N's
-// start = row N-1's end) is kept by the caller always recomputing and
-// rewriting every row's start from the edited row forward, not by any check
-// in here.
-export function updateOnboardingPlaceEntry(entryId: string, place: OnboardingPlaceAnswer): void {
-  updateDataset((dataset) => {
-    const entry = dataset.entries.find((e) => e.id === entryId);
-    if (!entry) return dataset;
-    entry.title = place.label;
-    entry.subtitle = place.subtitle;
-    entry.place = place.fullName
-      ? {
-          fullName: place.fullName,
-          coordinates: place.coordinates,
-          street: place.street,
-          city: place.city,
-          country: place.country,
-        }
-      : undefined;
-    entry.start = { ms: place.startMs, precision: "year" };
-    entry.end = place.endMs !== undefined ? { ms: place.endMs, precision: "year" } : undefined;
-    return dataset;
+    let next = dataset;
+    changes.deletes.forEach((entryId) => {
+      next = applyDelete(next, collectEntryCascade(next, entryId));
+    });
+    changes.updates.forEach(({ id, patch }) => {
+      const entry = next.entries.find((e) => e.id === id);
+      if (!entry) return;
+      // `end: undefined` means "now ongoing": drop the field rather than
+      // storing an explicit undefined.
+      Object.entries(patch).forEach(([key, value]) => {
+        if (value === undefined) delete (entry as unknown as Record<string, unknown>)[key];
+        else (entry as unknown as Record<string, unknown>)[key] = value;
+      });
+    });
+    changes.creates.forEach((fields) => next.entries.push({ ...fields, id: newId("entry"), rowId }));
+    return next;
   });
 }
 
@@ -435,12 +399,22 @@ export function addGroup(label: string, birthDate?: number, color?: string, icon
 }
 
 // Nest a group inside another, at any depth — "Finn" inside "Family", or
-// "Finn's kid" inside "Finn".
-export function addSubGroup(parentGroupId: string, label: string, birthDate?: number, color?: string, icon?: string): void {
+// "Finn's kid" inside "Finn". Returns the new group's id (undefined when the
+// parent is gone), so the first-run assistant can put a grandchild inside a
+// child it has only just created.
+export function addSubGroup(
+  parentGroupId: string,
+  label: string,
+  birthDate?: number,
+  color?: string,
+  icon?: string,
+): string | undefined {
+  let created: string | undefined;
   updateDataset((dataset) => {
     const parent = dataset.groups.find((g) => g.id === parentGroupId);
     if (!parent) return dataset;
     const id = newId("group");
+    created = id;
     // No `order`: `updateDataset` gives it the next one in the parent, i.e.
     // last among that parent's children — array position draws nothing.
     dataset.groups.push({ id, parentGroupId, label, birthDate, color, icon, collapsed: false });
@@ -455,6 +429,7 @@ export function addSubGroup(parentGroupId: string, label: string, birthDate?: nu
     });
     return dataset;
   });
+  return created;
 }
 
 // ---------- sharing (schema v7) ----------
@@ -477,14 +452,15 @@ export function setGroupShareByDefault(groupId: string, shareByDefault: boolean)
 // Returns the new row's id so a caller that has to put something on it right
 // away (the add-entry assistant) doesn't have to search for it afterwards.
 // `groupId` undefined creates a top-level timeline — a timeline needs no
-// container at all.
-export function addRow(groupId: string | undefined, label: string, icon = "🏷️"): string {
+// container at all. `color` is for a caller with a fixed colour per kind of
+// timeline (the first-run assistant's Education, Work…); otherwise a pastel.
+export function addRow(groupId: string | undefined, label: string, icon = "🏷️", color?: string): string {
   const id = newId("row");
   updateDataset((dataset) => {
     // Private unless the group (or one of its ancestors) says otherwise. A new
     // timeline is never shared by accident — that is the whole rule.
     const shared = defaultSharedFor(dataset, groupId) ? true : undefined;
-    dataset.rows.push({ id, groupId, color: randomPastelColor(), icon, label, shared });
+    dataset.rows.push({ id, groupId, color: color ?? randomPastelColor(), icon, label, shared });
     return dataset;
   });
   return id;

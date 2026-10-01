@@ -18,7 +18,8 @@ import { MobileShell } from "./MobileShell";
 import { RowRail } from "./RowRail";
 import { SearchBar } from "./SearchBar";
 import { useIsMobile } from "./useIsMobile";
-import { IdentityBirthPlacesAssistant } from "../onboarding/IdentityBirthPlacesAssistant";
+import { OnboardingAssistant } from "../onboarding/OnboardingAssistant";
+import type { LifeRange } from "../onboarding/OnboardingAssistant";
 import { shouldShowOnboarding } from "../onboarding/shouldShowOnboarding";
 
 export function App() {
@@ -136,6 +137,16 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onboardingOpen]);
 
+  // The assistant ran to the end: show the life it just drew, birth to now,
+  // from the top of the canvas.
+  const finishOnboarding = (range?: LifeRange) => {
+    setOnboardingOpen(false);
+    const engine = engineRef.current;
+    if (!range || !engine) return;
+    engine.zoomToRange(range.startMs, range.endMs);
+    engine.panPixels(0, -Number.MAX_SAFE_INTEGER);
+  };
+
   if (!loaded) {
     return <div className="loading">Loading…</div>;
   }
@@ -186,7 +197,7 @@ export function App() {
       )}
       {onboardingOpen && (
         <div className="assistant-overlay">
-          <IdentityBirthPlacesAssistant onFinished={() => setOnboardingOpen(false)} />
+          <OnboardingAssistant onFinished={finishOnboarding} />
         </div>
       )}
     </>
