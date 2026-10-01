@@ -2454,7 +2454,7 @@ textarea {
 
 .seq-strip {
   position: relative;
-  padding: 4px 0 70px;
+  padding: 4px 0 64px;
   touch-action: none;
 }
 
@@ -2575,11 +2575,64 @@ textarea {
   height: 58px;
 }
 
+/* The year being dragged to, over the age axis right above the dot. */
+.seq-tip {
+  position: absolute;
+  top: -1px;
+  z-index: 2;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--seq);
+  color: var(--color-on-accent);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.seq-tip small {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+/* Cropped at 16: the left edge fades, saying there is more before it. An
+   overlay rather than a mask — a mask would also cut off the dots, which hang
+   below the bar. */
+.seq-bar-cropped::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  width: 22px;
+  border-radius: 8px 0 0 8px;
+  background: linear-gradient(to right, var(--color-surface), transparent);
+  pointer-events: none;
+}
+
+.seq-early {
+  align-self: flex-start;
+  margin-top: -6px;
+}
+
+.seq-note {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 .seq-knob-active {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
 }
 
+/* Above the strip, where a finger on a dot can't cover it. */
 .seq-bubble {
   min-height: 1.4em;
   font-size: 13px;
@@ -2849,6 +2902,23 @@ textarea {
 }
 
 @media (max-width: 640px) {
+  /* Sized to the visible viewport (OnboardingAssistant sets these): under
+     Safari's toolbar and above the keyboard, never behind either. */
+  .assistant-overlay:has(.onboarding-shell) {
+    top: var(--onboarding-vv-top, 0px);
+    bottom: auto;
+    height: var(--onboarding-vv-height, 100%);
+  }
+
+  /* Keyboard open: no stretching, so the prompt stays above the field. */
+  .onboarding-shell-keyboard .assistant-input-area {
+    flex: none;
+  }
+
+  .onboarding-shell-keyboard .onboarding-go {
+    margin-top: 0;
+  }
+
   .onboarding-shell {
     max-height: none;
     justify-content: flex-start;

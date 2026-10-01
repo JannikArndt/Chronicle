@@ -36,6 +36,18 @@ everything answered so far; there is no separate reveal screen. The parts:
   (`applyEntryChanges` writes one screen as one change).
 - `previewLayout.ts` — what the preview draws where (lanes thin out before it
   scrolls). `FamilyEditors.tsx` — the kids and grandkids rows.
+- `schoolSystems.ts` — which schools "School and after" offers (Grundschule in
+  Germany, Primary school in the UK…), from the country of the place you lived
+  at 6, else any place, else the browser language, else a neutral set.
+
+The strip shows the year being dragged to right above the dot and the line
+describing it (with how long that period lasts) above the strip — never below,
+where the thumb is. Work and partners start the strip at 16 (`lateStart`,
+"◂ Show from birth" undoes it) so a short job isn't a sliver, and the first job
+starts where education ended. On a phone the overlay is sized to the visible
+viewport (`--onboarding-vv-*`), so neither Safari's toolbar nor the keyboard
+covers it, and with the keyboard open the screen stops stretching so the
+prompt stays above the field.
 
 `PlaceAutocompleteInput`/`nominatim.ts` hit OpenStreetMap Nominatim directly
 (no API key, no backend to hide one behind), request `addressdetails=1`, and

@@ -96,11 +96,12 @@ const browser = await chromium.launch(
 );
 mkdirSync(OUT, { recursive: true });
 
-async function open({ width = 1440, height = 860, scale = 1, dark = false } = {}) {
+async function open({ width = 1440, height = 860, scale = 1, dark = false, locale = "en-US" } = {}) {
   const context = await browser.newContext({
     viewport: { width, height },
     deviceScaleFactor: scale,
     colorScheme: dark ? "dark" : "light",
+    locale,
     isMobile: width < 600,
     hasTouch: width < 600,
   });
@@ -166,7 +167,8 @@ try {
   // The setup assistant a new visitor meets, a few answers in: places lived,
   // then school and after, with the live preview drawing both.
   {
-    const page = await open({ width: 1180, height: 780, scale: 2 });
+    // German locale: Mara grew up in Hamburg, so the school chips are German.
+    const page = await open({ width: 1180, height: 780, scale: 2, locale: "de-DE" });
     await page.waitForSelector(".assistant-overlay input");
     await page.keyboard.type("Mara");
     await page.keyboard.press("Enter");
@@ -177,7 +179,7 @@ try {
       await page.locator(".seq-add input").press("Enter");
     }
     await page.locator(".onboarding-go").click();
-    for (const chip of ["School", "Bachelor", "Gap", "Master"]) {
+    for (const chip of ["Grundschule", "Gymnasium", "Bachelor", "Gap", "Master"]) {
       await page.locator(".seq-chip", { hasText: chip }).first().click();
     }
     await page.waitForTimeout(400);

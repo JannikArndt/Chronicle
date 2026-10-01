@@ -43,6 +43,7 @@ import {
 import { KIDS_COLOR, TOPIC_ORDER, TOPICS } from "./lifeTopics";
 import type { TopicId } from "./lifeTopics";
 import { previewLanes } from "./previewLayout";
+import { chooseSchoolSystem, educationChips } from "./schoolSystems";
 import { rebaseSequence } from "./sequence";
 import type { Sequence } from "./sequence";
 import type { SequenceLoad } from "./sequenceRecords";
@@ -98,18 +99,33 @@ function stepIndexOf(phase: Phase): number {
   }
 }
 
-// On phones the on-screen keyboard takes half the screen; the preview gives
-// way while it is open so the field being typed in stays visible.
-function useKeyboardOpen(): boolean {
-  const [open, setOpen] = useState(false);
+// On a phone the overlay is sized to the *visible* viewport, not the layout
+// one: otherwise Safari's toolbar covers the preview at the foot, and an open
+// keyboard pushes the whole page up so the prompt scrolls out of sight. While
+// the keyboard is open the preview gives way and the empty space in the
+// middle collapses, so the prompt stays at the top above the field.
+function useVisibleViewport(): boolean {
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport || !window.matchMedia("(pointer: coarse)").matches) return;
-    const check = () => setOpen(viewport.height < window.innerHeight - 150);
-    viewport.addEventListener("resize", check);
-    return () => viewport.removeEventListener("resize", check);
+    const root = document.documentElement;
+    const update = () => {
+      root.style.setProperty("--onboarding-vv-height", `${viewport.height}px`);
+      root.style.setProperty("--onboarding-vv-top", `${viewport.offsetTop}px`);
+      setKeyboardOpen(viewport.height < window.innerHeight - 150);
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+      root.style.removeProperty("--onboarding-vv-height");
+      root.style.removeProperty("--onboarding-vv-top");
+    };
   }, []);
-  return open;
+  return keyboardOpen;
 }
 
 export function OnboardingAssistant({ onFinished }: OnboardingAssistantProps) {
@@ -117,7 +133,7 @@ export function OnboardingAssistant({ onFinished }: OnboardingAssistantProps) {
   const nowYear = new Date(nowMs).getUTCFullYear();
   const dataset = useAppState((s) => s.dataset);
   const flow = useAssistantFlow<Phase>({ kind: "name" });
-  const keyboardOpen = useKeyboardOpen();
+  const keyboardOpen = useVisibleViewport();
 
   const [name, setName] = useState(() => findSelfGroup(appStore.getState().dataset)?.label ?? "");
   const [bornDraft, setBornDraft] = useState<BornDraft | undefined>(undefined);
@@ -155,6 +171,10 @@ export function OnboardingAssistant({ onFinished }: OnboardingAssistantProps) {
     return loadTopic(dataset, topic, birthYear, age);
   };
   const family = familyDraft ?? entryFamily;
+  const placesForSchools = () => {
+    const lived = topicLoad("lived", true);
+    return lived.ok ? lived.sequence : null;
+  };
   const hasKids = family.kids.length > 0;
   const totalSteps = hasKids ? 8 : 7;
 
@@ -222,7 +242,7 @@ export function OnboardingAssistant({ onFinished }: OnboardingAssistantProps) {
     stepIndex: stepIndexOf(phase),
     totalSteps,
     onBack: flow.canGoBack ? flow.back : undefined,
-    className: "onboarding-shell",
+    className: keyboardOpen ? "onboarding-shell onboarding-shell-keyboard" : "onboarding-shell",
   };
 
   // ---------- screens ----------
@@ -257,14 +277,15 @@ export function OnboardingAssistant({ onFinished }: OnboardingAssistantProps) {
             <span className="born-unit">years old</span>
           </div>
           <div className="born-row">
-            <button type="button" className="born-nudge" aria-label="One year earlier" onClick={() => setYear(birthYear - 1)}>
+            {/* Same direction as the slider below: left is younger, right older. */}
+            <button type="button" className="born-nudge" aria-label="One year younger" onClick={() => setYear(birthYear + 1)}>
               ‹
             </button>
             <span className="born-year">
               born {born.answer.month !== null ? `${MONTH_NAMES[born.answer.month]} ` : ""}
               {birthYear}
             </span>
-            <button type="button" className="born-nudge" aria-label="One year later" onClick={() => setYear(birthYear + 1)}>
+            <button type="button" className="born-nudge" aria-label="One year older" onClick={() => setYear(birthYear - 1)}>
               ›
             </button>
           </div>
@@ -314,6 +335,12 @@ export function OnboardingAssistant({ onFinished }: OnboardingAssistantProps) {
       const id = phase.topic;
       const topic = TOPICS[id];
       const load = topicLoad(id, false);
+      // School types follow where you lived as a child; a first job starts
+      // where education ended.
+      const schools =
+        id === "learned" ? chooseSchoolSystem(placesForSchools(), navigator.language) : undefined;
+      const education = id === "worked" ? topicLoad("learned", true) : undefined;
+      const firstStart = education?.ok && education.sequence.end !== null ? education.sequence.end : undefined;
       return (
         <AssistantStepShell prompt={topic.prompt} {...nav} onSkip={() => leaveTopic(id)} footer={preview}>
           <p className="onboarding-hint">{topic.hint}</p>
@@ -326,6 +353,9 @@ export function OnboardingAssistant({ onFinished }: OnboardingAssistantProps) {
               birthYear={birthYear}
               age={age}
               span={span}
+              chips={schools ? educationChips(schools.system) : undefined}
+              chipsNote={schools?.reason}
+              firstStart={firstStart}
             />
           ) : (
             <div className="onboarding-note">{UNREPRESENTABLE[load.reason]}</div>
