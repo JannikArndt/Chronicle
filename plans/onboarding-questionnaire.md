@@ -10,7 +10,7 @@ invented example.
 ✅ Story: "a life you'd have to type in" → "your life, drawn, in a few minutes"
 ✅ Blueprint: 8 screens confirmed (name + 7 topics), fixed order
 ✅ Copy: drafted in the prototype, see "Copy" below
-◻️ Implementation: not started
+✅ Implementation: built 2026-10-01 — see "What was built"
 ```
 
 ## Goal
@@ -248,4 +248,61 @@ analytics of any kind.
 
 ## What was built
 
-(fill in after implementation: files, deviations from this plan, open follow-ups)
+`OnboardingAssistant` replaces `IdentityBirthPlacesAssistant` in `App.tsx` (both shells);
+`PlacesTable`, `BirthDateInput` and the two `…OnboardingPlaceEntry` actions are gone.
+
+**Pure, tested** (`src/onboarding/`): `birthYear.ts` (year age, month, what to store),
+`sequence.ts` (clamp, add with typical lengths, move names, knobs, staggering, ticks,
+rebase), `sequenceRecords.ts` (entries ⇄ items, gaps, overlap detection, reconcile plan),
+`familyRecords.ts` (kids/grandkids load and plan), `previewLayout.ts`, `figurePose.ts`,
+and `firstRunRecords.ts` — the commits, tested against the real store (replay writes
+nothing, Back + change updates in place, reorder keeps every record).
+
+**Components**: `OnboardingAssistant.tsx`, `SequenceEditor.tsx` (Strip + List),
+`FamilyEditors.tsx`, `OnboardingPreview.tsx`, `AgeFigure.tsx`, `canvasTheme.ts`;
+`lifeTopics.ts` holds the four topics' rows, colours, chips and copy. `AssistantStepShell`
+gained `totalSteps` (all dots drawn), `className` and `footer` (the preview).
+
+**Elsewhere**: `addSubGroup` returns the new id; `addRow` takes an optional colour;
+`applyEntryChanges` writes one screen's plan as one change. `--color-figure-*` tokens in
+both themes; the first-run CSS block in `styles.css`. `scripts/site-screenshots.mjs`
+drives the new flow; `site/img/onboarding.png` and the product page's copy for it were
+updated.
+
+**Verified**: `npm test`, `npm run build`, and an E2E run at 390 × 844 in light and dark
+asserting through `window.__chronicleStore` — birth date with month; entries per topic
+with year precision, ongoing last items without `end`, no entry for a gap; a dragged
+strip dot; Family → kids → grandchild under the chosen parent; Back from Kids to Lived,
+a date changed, same entry ids; replay changing nothing; no request but the (stubbed)
+place search. A second run picks a place suggestion and checks the saved details.
+Screenshots of every screen from that run, light and dark: `plans/onboarding-screens/`.
+Every input in the flow measures 16 px at phone width.
+
+**Deviations from this plan**
+- The name screen's "Skip for now" still closes the assistant, as before: without a
+  name there is no self group to put anything on.
+- Skip on an *untouched* birth screen stores no birth date; the slider's starting
+  point (30) is not an answer. Later screens count ages from that shown year until a
+  birth year is saved. "That's me →" always stores what is shown.
+- Back keeps an uncommitted draft in memory (rebased if the birth year changed), so
+  going back and forward again loses nothing; Escape keeps every committed screen
+  and drops only the one on screen.
+- "No kids" / "None" are offered only while nothing is saved yet. Saved children are
+  removed one at a time with ✕, which on Next deletes that child's group with
+  everything in it; the Family group goes too once it is empty.
+- Besides overlaps, a timeline whose entries start in the same year or fall outside
+  birth…now also shows "edit it on the canvas" and is left alone.
+- Places and partners need a typed name to be added (no "Place 3" placeholders);
+  unnamed jobs are saved as "Job", as planned.
+- Strip/List and "whose child" use `PillSelector` rather than the prototype's
+  segmented control and plain pills. The kids' sliders run over years, not ages.
+- The strip's right edge is now (this year's fraction included), so something can
+  start this year.
+- Each child's group gets `addSubGroup`'s usual "General" starter timeline and the
+  kids' colour.
+
+**Open follow-ups**
+- Real-device iOS pass: dragging dots and ≡ handles inside the scrolling overlay.
+- Topic rows are found by label; one renamed on the canvas is not found on replay.
+- `Group.birthDate` still has no precision (a year reads as 1 January).
+- A grandchild of a child born less than 15 years ago can only be "born this year".

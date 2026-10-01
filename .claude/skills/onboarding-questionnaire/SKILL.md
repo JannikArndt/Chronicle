@@ -51,7 +51,8 @@ Read, don't assume. At minimum:
 - `CLAUDE.md`, `src/onboarding/CLAUDE.md`, `src/ui/CLAUDE.md`, `docs/GLOSSARY.md`,
   `site/index.html` (the product page's own copy).
 - The existing flow: `shouldShowOnboarding.ts` (auto-show predicate),
-  `IdentityBirthPlacesAssistant.tsx` (name → birth date → places),
+  `OnboardingAssistant.tsx` (name → born → lived → learned → worked → partner →
+  kids → grandkids, each screen a draft reconciled on Next — `firstRunRecords.ts`),
   `AddEntryAssistant.tsx`, `AddTimelineAssistant.tsx`, `AssistantStepShell.tsx`,
   `useAssistantFlow.ts` / `assistantFlowReducer.ts`, `addEntryCategories.ts`,
   `timelineSuggestions.ts`.
@@ -105,17 +106,19 @@ what gets created or shown?** If not, cut it. Typical archetypes, adapted:
 |---|------|---------|--------|
 | 1 | Welcome | One line on what they'll have at the end; a real render, not a mockup | Recommended |
 | 2 | Who is this for? | Self / family / someone else — decides whether to create a self group, a family group, or a person row | Recommended |
-| 3 | Identity | Name + birth date (exists: `IdentityBirthPlacesAssistant`) | Required |
+| 3 | Identity | Name + birth date (exists: `OnboardingAssistant`) | Required |
 | 4 | Goal / interests | "What do you want to see on it?" — multi-select of timeline kinds (places, work, education, relationships, pets, cars…). Each pick becomes a suggested `TimelineRow`, nothing more | Recommended |
-| 5 | First real content | The demo *is* the app: fill one timeline with real entries via a live-editable table (pattern: `PlacesTable`, `EntryTable`) | Required |
+| 5 | First real content | The demo *is* the app: fill one timeline with real entries via an editor that is the app's own data (patterns: `SequenceEditor`, `EntryTable`) | Required |
 | 6 | Reveal | Close the assistant onto the canvas, scrolled/zoomed to their life, with their first rows drawn | Required |
 | 7 | What's next (optional) | One quiet pointer: the "+" menu, or sync/sign-in if the user wants it mentioned | Optional |
 
 Rules for the blueprint:
 
 - **Respect the existing assistant contract**: assistants create nothing until the
-  last step, except live-editable tables; Back never crosses a commit boundary;
-  resume never re-creates identity (`findExistingSetup`).
+  last step, except live-editable tables and screens that reconcile a draft in
+  place (the first-run assistant); Back never crosses a commit boundary unless
+  the commit reconciles in place; resume never re-creates identity or anything
+  else (`firstRunRecords.ts` finds everything again from the dataset).
 - **Skippable everywhere.** Every step keeps "Skip for now"; skipping never loses
   what was already entered and never nags later.
 - **Short.** Aim for under two minutes to the reveal. Count the steps against that.
@@ -151,7 +154,7 @@ Build inside the existing structure, not beside it.
 2. **Controls**: `PillSelector` for any choice with fewer than ~7 options — no
    dropdowns. Autosave per field; no Save/Cancel buttons; no modal create screen.
 3. **Writes**: all mutations go through `src/state/` actions. Live tables keep rows
-   in a ref and never write inside a `setState` updater (see `PlacesTable`).
+   in a ref and never write inside a `setState` updater (see `AddTimelineAssistant`).
 4. **Model rules**: UTC only (`Date.UTC`, `getUTC*`); a span is an entry, a point is
    an event — never a zero-length entry; `birthDateForRow()` decides whose life a
    row belongs to; new rows/groups get an `order` and go through
