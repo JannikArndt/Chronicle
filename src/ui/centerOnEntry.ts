@@ -7,6 +7,7 @@
 import { DAY_MS, fuzzMs } from "../model/fuzzyDate";
 import { eventsVisible } from "../render/events";
 import type { TimelineEngine } from "../render/engine";
+import { rowCenterY } from "../render/layout";
 import type { Layout } from "../render/layout";
 import type { TimelineEntry, TimelineEvent } from "../model/types";
 
@@ -20,10 +21,11 @@ export function centerOnEntry(
   // The middle of the bar, so a long entry is framed rather than pinned to one
   // of its edges. An ongoing entry runs to today.
   engine.centerOnMs((entry.start.ms + (entry.end?.ms ?? nowMs)) / 2);
-  // A row that isn't in the layout yet (just created) simply keeps the current
-  // vertical position — better than scrolling somewhere arbitrary.
-  const item = layout.items.find((candidate) => candidate.id === entry.rowId);
-  if (item) engine.centerOnLayoutY(item.y + item.height / 2);
+  // A row under a collapsed group is found in that group's summary lane. One
+  // that isn't in the layout at all (just created, or hidden) simply keeps the
+  // current vertical position — better than scrolling somewhere arbitrary.
+  const y = rowCenterY(layout, entry.rowId);
+  if (y !== undefined) engine.centerOnLayoutY(y);
 }
 
 // The narrowest window worth zooming to for a moment: wide enough that the pin
@@ -45,6 +47,6 @@ export function centerOnEvent(engine: TimelineEngine | null, layout: Layout, eve
     const span = Math.max(fuzzMs(event.date) * 4, EVENT_FRAME_MIN_SPAN_MS);
     engine.zoomToRange(event.date.ms - span / 2, event.date.ms + span / 2);
   }
-  const item = layout.items.find((candidate) => candidate.id === event.rowId);
-  if (item) engine.centerOnLayoutY(item.y + item.height / 2);
+  const y = rowCenterY(layout, event.rowId);
+  if (y !== undefined) engine.centerOnLayoutY(y);
 }

@@ -28,6 +28,11 @@ branch. The app's CapRover config needs HTTPS on and a persistent directory at
 `/data` (the SQLite database); see `server/CLAUDE.md`. Open tabs pick up a new
 build on their own at a quiet moment (`src/ui/fresh.ts`).
 
+Home-screen icons: `public/` (copied into `dist/` as is) holds `icon.svg`,
+the PNGs rendered from it by `CHROMIUM_PATH=/opt/pw-browsers/chromium node
+scripts/app-icons.mjs` (iOS takes only `apple-touch-icon.png`) and the
+manifest Android reads. Re-render after changing the SVG.
+
 Product page: `site/` is the static page at https://jannikarndt.github.io/Chronicle/
 (plain HTML + CSS, no build, no JS), published by `.github/workflows/pages.yml`
 on pushes to `main` that touch it; the repo's Pages source is "GitHub Actions".
