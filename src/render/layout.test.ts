@@ -47,8 +47,7 @@ describe("computeLayout", () => {
   });
 
   test("without any `order`, a container still draws its rows before its sub-groups", () => {
-    // The pre-v10 arrangement, and what an older export or a public dataset
-    // (whose records carry no order at all) still gets.
+    // What a public dataset (whose records carry no order at all) gets.
     const { items } = computeLayout(fixture(), new Set());
     expect(items.filter((i) => i.depth === 0).map((i) => i.id)).toEqual(["r-top", "g-me", "g-family"]);
   });
@@ -166,6 +165,7 @@ describe("computeLayout", () => {
         endMs: Date.UTC(2020, 0, 1),
         ongoing: false,
         lane: 0,
+        rowIds: ["r2", "r3"],
       },
     ]);
   });
@@ -274,6 +274,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2012, 0, 1),
           ongoing: false,
           lane: 0,
+          rowIds: ["r-a"],
         },
         {
           kind: "row",
@@ -284,6 +285,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2016, 0, 1),
           ongoing: false,
           lane: 0,
+          rowIds: ["r-b"],
         },
       ]);
     });
@@ -365,6 +367,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2015, 0, 1),
           ongoing: true,
           lane: 0,
+          rowIds: ["r-og1", "r-og2"],
         },
       ]);
     });
@@ -400,6 +403,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2015, 0, 1),
           ongoing: false,
           lane: 0,
+          rowIds: ["r2"],
         },
         {
           kind: "group",
@@ -410,6 +414,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2020, 0, 1),
           ongoing: false,
           lane: 0,
+          rowIds: ["r3"],
         },
       ]);
 

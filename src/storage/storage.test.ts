@@ -4,7 +4,6 @@ import { loadDataset, saveDataset } from "./db";
 import { parseImportFile, serializeDataset, validateImport } from "./exportImport";
 import { emptyDataset } from "../model/dataset";
 import { SCHEMA_VERSION } from "../model/types";
-import type { TimelineDataset } from "../model/types";
 
 describe("IndexedDB round-trip", () => {
   test("save then load returns the same dataset", async () => {
@@ -28,183 +27,13 @@ describe("import validation", () => {
     if (!result.ok) expect(result.error).toContain("schemaVersion 99");
   });
 
-  test("accepts a v1 export and upgrades it to the current schemaVersion", () => {
-    const dataset = { ...emptyDataset(), schemaVersion: 1 };
-    const result = validateImport(dataset);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.dataset.schemaVersion).toBe(SCHEMA_VERSION);
+  test("rejects an older schemaVersion rather than upgrading it", () => {
+    const result = validateImport({ ...emptyDataset(), schemaVersion: SCHEMA_VERSION - 1 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain(`schemaVersion ${SCHEMA_VERSION - 1}`);
   });
 
-  // Stamped current on purpose: a v1 record kept these keys through every
-  // schema bump, so the app's own recent exports still carry them — and the
-  // server refuses an entry with a field it does not know.
-  function currentFileWithV1Links() {
-    return {
-      ...emptyDataset(),
-      groups: [{ id: "g1", label: "Me", collapsed: false }],
-      rows: [{ id: "r1", groupId: "g1", label: "Places" }],
-      entities: [
-        {
-          id: "ent-street",
-          kind: "place",
-          label: "Hauptstraße",
-          place: { fullName: "Hauptstraße, Musterstadt", coordinates: { lat: 50.1, lon: 8.6 }, subtitle: "Musterstadt", city: "Musterstadt" },
-        },
-        { id: "ent-town", kind: "place", label: "Lisbon", place: { fullName: "Lisbon" } },
-        { id: "ent-bare", kind: "place", label: "foo" },
-        { id: "ent-sam", kind: "person", label: "Sam" },
-      ],
-      entries: [
-        { id: "e-street", rowId: "r1", title: "Hauptstraße", start: { ms: 0, precision: "day" }, linkedEntityIds: ["ent-street"] },
-        { id: "e-person", rowId: "r1", title: "Moved in", start: { ms: 0, precision: "day" }, linkedEntityIds: ["ent-sam", "ent-town"] },
-        { id: "e-bare", rowId: "r1", title: "foo", start: { ms: 0, precision: "day" }, linkedEntityIds: ["ent-bare", "ent-sam"] },
-        { id: "e-empty", rowId: "r1", title: "Job", start: { ms: 0, precision: "day" }, linkedEntityIds: [] },
-        {
-          id: "e-own",
-          rowId: "r1",
-          title: "Kept",
-          start: { ms: 0, precision: "day" },
-          place: { fullName: "Porto" },
-          linkedEntityIds: ["ent-town"],
-        },
-      ],
-    };
-  }
-
-  test("moves an entry's linked v1 place onto the entry and drops the link fields, whatever the file's version", () => {
-    const result = validateImport(currentFileWithV1Links());
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const byId = new Map(result.dataset.entries.map((entry) => [entry.id, entry]));
-    expect(byId.get("e-street")!.place).toEqual({ fullName: "Hauptstraße, Musterstadt", coordinates: { lat: 50.1, lon: 8.6 }, city: "Musterstadt" });
-    expect(byId.get("e-person")!.place).toEqual({ fullName: "Lisbon" });
-    expect(byId.get("e-bare")!.place).toBeUndefined();
-    expect(byId.get("e-empty")!.place).toBeUndefined();
-    expect(byId.get("e-own")!.place).toEqual({ fullName: "Porto" });
-    for (const entry of result.dataset.entries) expect("linkedEntityIds" in entry).toBe(false);
-    expect("entities" in result.dataset).toBe(false);
-  });
-
-  test("a stored dataset holding v1 links loads without them", async () => {
-    await saveDataset(currentFileWithV1Links() as unknown as TimelineDataset);
-    const loaded = await loadDataset();
-    expect(loaded).not.toBeNull();
-    expect(loaded!.entries.some((entry) => "linkedEntityIds" in entry)).toBe(false);
-    expect(loaded!.entries.find((entry) => entry.id === "e-street")!.place?.fullName).toBe("Hauptstraße, Musterstadt");
-  });
-
-  test("folds a pre-v5 category color and icon onto each row and drops the categories array", () => {
-    const legacy = {
-      schemaVersion: 4,
-      people: [],
-      groups: [{ id: "g1", label: "Me", collapsed: false }],
-      categories: [{ id: "cat-1", label: "Job", color: "#abcdef", icon: "💼" }],
-      rows: [{ id: "r1", groupId: "g1", categoryId: "cat-1", label: "Job" }],
-      entries: [],
-    };
-    const result = validateImport(legacy);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.dataset.rows[0].color).toBe("#abcdef");
-      expect(result.dataset.rows[0].icon).toBe("💼");
-      expect("categoryId" in result.dataset.rows[0]).toBe(false);
-      expect("categories" in result.dataset).toBe(false);
-    }
-  });
-
-  // A v5 dataset covering both shapes Person could take: a group that IS a
-  // person ("Me"), and a person nested inside a container group ("Family" →
-  // "Finn"). Everything here is data a real user would lose if the fold went
-  // wrong, so each half is asserted.
-  function v5WithPeople() {
-    return {
-      schemaVersion: 5,
-      selfPersonId: "p-me",
-      people: [
-        { id: "p-me", label: "Me", birthDate: Date.UTC(1988, 2, 4) },
-        { id: "p-finn", label: "Finn", birthDate: Date.UTC(2015, 6, 9) },
-        { id: "p-unused", label: "Nobody" },
-      ],
-      groups: [
-        { id: "g-me", label: "Me", personId: "p-me", collapsed: false },
-        { id: "g-family", label: "Family", collapsed: false },
-      ],
-      rows: [
-        { id: "r-job", groupId: "g-me", label: "Job" },
-        { id: "r-shared", groupId: "g-family", label: "Holidays" },
-        { id: "r-school", groupId: "g-family", personId: "p-finn", label: "School" },
-      ],
-      entries: [],
-    };
-  }
-
-  test("folds a v5 person-group into a group carrying the birth date", () => {
-    const result = validateImport(v5WithPeople());
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const me = result.dataset.groups.find((group) => group.id === "g-me")!;
-    expect(me.birthDate).toBe(Date.UTC(1988, 2, 4));
-    expect(result.dataset.selfGroupId).toBe("g-me");
-    expect("people" in result.dataset).toBe(false);
-    expect("selfPersonId" in result.dataset).toBe(false);
-  });
-
-  test("folds a v5 nested person into a sub-group and re-files its rows", () => {
-    const result = validateImport(v5WithPeople());
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const finn = result.dataset.groups.find((group) => group.id === "p-finn")!;
-    expect(finn.label).toBe("Finn");
-    expect(finn.parentGroupId).toBe("g-family");
-    expect(finn.birthDate).toBe(Date.UTC(2015, 6, 9));
-    // The row that named Finn now lives in Finn; the group's own row stays put.
-    expect(result.dataset.rows.find((row) => row.id === "r-school")!.groupId).toBe("p-finn");
-    expect(result.dataset.rows.find((row) => row.id === "r-shared")!.groupId).toBe("g-family");
-    expect(result.dataset.rows.every((row) => !("personId" in row))).toBe(true);
-    // A person nothing referenced had no timelines, so it leaves no group.
-    expect(result.dataset.groups.some((group) => group.label === "Nobody")).toBe(false);
-  });
-
-  test("a stored v5 dataset survives a reload instead of being discarded", async () => {
-    await saveDataset(v5WithPeople() as unknown as TimelineDataset);
-    const loaded = await loadDataset();
-    expect(loaded?.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(loaded?.rows).toHaveLength(3);
-  });
-
-  // The v7 hazard: v1–v3 wrote a `visibility` field that v4 removed, and v7
-  // adds a publish flag doing the same kind of job. An old file that still
-  // carries the dead field must not be able to publish anything.
-  function v3WithVisibility() {
-    return {
-      schemaVersion: 3,
-      defaultVisibility: "public",
-      groups: [{ id: "g1", label: "Me", collapsed: false, visibility: "public" }],
-      rows: [{ id: "r1", groupId: "g1", label: "Therapy", visibility: "public" }],
-      entries: [{ id: "e1", rowId: "r1", title: "Session", start: { ms: 0, precision: "day" }, visibility: "public" }],
-    };
-  }
-
-  test("a pre-v4 `visibility: public` does not become shared — it migrates to private", () => {
-    const result = validateImport(v3WithVisibility());
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.dataset.rows[0].shared).toBeUndefined();
-    expect(result.dataset.groups[0].shared).toBeUndefined();
-    expect(result.dataset.groups[0].shareByDefault).toBeUndefined();
-  });
-
-  test("the dead visibility fields are deleted, so no later code can read them", () => {
-    const result = validateImport(v3WithVisibility());
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect("defaultVisibility" in result.dataset).toBe(false);
-    expect("visibility" in result.dataset.groups[0]).toBe(false);
-    expect("visibility" in result.dataset.rows[0]).toBe(false);
-    expect("visibility" in result.dataset.entries[0]).toBe(false);
-  });
-
-  test("a v7 export keeps the sharing flags it was written with", () => {
+  test("keeps the sharing flags it was written with", () => {
     const dataset = emptyDataset();
     dataset.groups.push({ id: "g1", label: "Me", collapsed: false, shareByDefault: true });
     dataset.rows.push({ id: "r1", groupId: "g1", label: "Job", shared: true });
@@ -216,38 +45,22 @@ describe("import validation", () => {
   });
 
   test("rejects structurally broken files", () => {
-    expect(validateImport({ schemaVersion: 1 }).ok).toBe(false);
+    expect(validateImport({ schemaVersion: SCHEMA_VERSION }).ok).toBe(false);
     expect(validateImport(null).ok).toBe(false);
     expect(validateImport([1, 2]).ok).toBe(false);
     expect(parseImportFile("{not json").ok).toBe(false);
+  });
+
+  test("rejects a file with no events array", () => {
+    const result = validateImport({ schemaVersion: SCHEMA_VERSION, groups: [], rows: [], entries: [] });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("events");
   });
 
   test("rejects malformed entries", () => {
     const ds = emptyDataset() as unknown as { entries: unknown[] };
     ds.entries.push({ id: 42 });
     expect(validateImport(ds).ok).toBe(false);
-  });
-
-  // v8: events arrive. Everything written before it lacks the array entirely,
-  // and every consumer reads `dataset.events` unguarded.
-  test("a v7 export with no events array gains an empty one", () => {
-    const legacy = {
-      schemaVersion: 7,
-      groups: [{ id: "g1", label: "Me", collapsed: false }],
-      rows: [{ id: "r1", groupId: "g1", label: "Job" }],
-      entries: [],
-    };
-    const result = validateImport(legacy);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.dataset.events).toEqual([]);
-  });
-
-  // Not only on an older file: a v8 file written by hand can be missing it too,
-  // and `events: undefined` would break the first row that tried to draw.
-  test("a file already claiming v8 also gets the array filled in", () => {
-    const result = validateImport({ schemaVersion: SCHEMA_VERSION, groups: [], rows: [], entries: [] });
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.dataset.events).toEqual([]);
   });
 
   test("events survive an export/import round trip", () => {
@@ -272,59 +85,5 @@ describe("import validation", () => {
     ds.events.push({ id: "v1", rowId: "r1" }); // no date
     expect(validateImport(ds).ok).toBe(false);
     expect(validateImport({ ...emptyDataset(), events: "nope" }).ok).toBe(false);
-  });
-
-  // v9: a timeline can no longer nest inside another timeline — a v8 file's
-  // sub-row (parentRowId) becomes a normal sibling in the same group, with
-  // every entry and event (which reference the row directly) untouched.
-  test("flattens a v8 sub-row into a plain sibling row, keeping its entries", () => {
-    const legacy = {
-      schemaVersion: 8,
-      groups: [{ id: "g1", label: "Me", collapsed: false }],
-      rows: [
-        { id: "r1", groupId: "g1", label: "Job" },
-        { id: "r1-sub", groupId: "g1", label: "Projects", parentRowId: "r1" },
-      ],
-      entries: [{ id: "e1", rowId: "r1-sub", title: "Kestrel", start: { ms: 0, precision: "day" } }],
-      events: [],
-    };
-    const result = validateImport(legacy);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const sub = result.dataset.rows.find((row) => row.id === "r1-sub")!;
-    expect("parentRowId" in sub).toBe(false);
-    expect(sub.groupId).toBe("g1");
-    expect(result.dataset.entries).toHaveLength(1);
-    expect(result.dataset.entries[0].rowId).toBe("r1-sub");
-  });
-
-  // v10: sibling order becomes explicit, and an older file must keep exactly
-  // the arrangement it was drawn with — every timeline of a container first,
-  // then every sub-group, each in array order.
-  test("numbers a v9 file's siblings, preserving the rows-then-groups order it was drawn in", () => {
-    const legacy = {
-      schemaVersion: 9,
-      groups: [
-        { id: "g1", label: "Me", collapsed: false },
-        { id: "g1a", parentGroupId: "g1", label: "Work", collapsed: false },
-        { id: "g2", label: "Family", collapsed: false },
-      ],
-      rows: [
-        { id: "r-top", label: "Top-level" },
-        { id: "r1", groupId: "g1", label: "Homes" },
-        { id: "r2", groupId: "g1", label: "Education" },
-      ],
-      entries: [],
-      events: [],
-    };
-    const result = validateImport(legacy);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const orderOf = (id: string) =>
-      result.dataset.rows.find((r) => r.id === id)?.order ?? result.dataset.groups.find((g) => g.id === id)?.order;
-    // Root: the top-level timeline, then the two groups.
-    expect([orderOf("r-top"), orderOf("g1"), orderOf("g2")]).toEqual([0, 1, 2]);
-    // Inside g1: both of its timelines, then its sub-group.
-    expect([orderOf("r1"), orderOf("r2"), orderOf("g1a")]).toEqual([0, 1, 2]);
   });
 });

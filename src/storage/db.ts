@@ -61,15 +61,15 @@ export async function loadDataset(): Promise<TimelineDataset | null> {
   try {
     return await new Promise((resolve, reject) => {
       const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(DATASET_KEY);
-      // The stored dataset goes through the same upgrade path as an imported
-      // file. It used to be dropped outright unless its schemaVersion matched
-      // exactly, which meant every schema bump silently discarded whatever the
-      // browser was holding — the one copy of the user's data.
+      // The stored dataset goes through the same check as an imported file,
+      // so a schema bump without an upgrade step in `validateImport` discards
+      // whatever the browser was holding — the one copy of a signed-out
+      // device's data. Bump the schema and add the step together.
       request.onsuccess = () => {
         const stored = request.result as TimelineDataset | undefined;
         if (stored === undefined) return resolve(null);
-        const upgraded = validateImport(stored);
-        resolve(upgraded.ok ? upgraded.dataset : null);
+        const checked = validateImport(stored);
+        resolve(checked.ok ? checked.dataset : null);
       };
       request.onerror = () => reject(request.error);
     });

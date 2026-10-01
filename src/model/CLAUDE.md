@@ -22,9 +22,8 @@ no container at all (a top-level timeline). Don't reintroduce an owner field
 beyond `groupId`: the row's group is the whole answer to "whose timeline is
 this", which is what stops a moved timeline keeping a stale owner. There is no
 `parentRowId` any more — a timeline cannot nest inside another timeline; model
-that as a sub-group holding one row instead (v9 migration flattens any
-existing sub-row into a plain sibling, `flattenSubRows` in
-`src/storage/exportImport.ts`). Full term list in `docs/GLOSSARY.md`.
+that as a sub-group holding one row instead. Full term list in
+`docs/GLOSSARY.md`.
 
 **An event is a point, an entry is a span**, and that single difference is why
 it is its own entity rather than an entry with `end === start`: a zero-width bar
