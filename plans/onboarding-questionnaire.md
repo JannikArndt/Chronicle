@@ -306,3 +306,16 @@ Every input in the flow measures 16 px at phone width.
 - Topic rows are found by label; one renamed on the canvas is not found on replay.
 - `Group.birthDate` still has no precision (a year reads as 1 January).
 - A grandchild of a child born less than 15 years ago can only be "born this year".
+
+### First feedback round (2026-10-01)
+
+- ‹ › on the birth screen now run like the slider: left is younger.
+- Phone overlay sized to the visible viewport; with the keyboard open the middle
+  no longer stretches, so the prompt stays in view (not yet tried on a real iPhone).
+- While a dot is dragged its year shows above it, over the age axis; the describing
+  line sits above the strip and says how long the period lasts.
+- School chips follow where you lived at 6 (`schoolSystems.ts`): DE, AT, CH, US, UK,
+  or a neutral set. This lifts the plan's "country-specific education lists" cut.
+- The first job starts where education ended.
+- Work and partner strips start at 16 with "◂ Show from birth".
+

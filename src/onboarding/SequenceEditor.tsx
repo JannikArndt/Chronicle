@@ -15,6 +15,8 @@ import type { PlaceSuggestion } from "./nominatim";
 import {
   addItem,
   ageTicks,
+  describeLength,
+  itemLength,
   itemName,
   knobsOf,
   knobValue,
@@ -29,7 +31,7 @@ import {
 } from "./sequence";
 import type { AddOptions, Knob, Sequence, SequencePlace } from "./sequence";
 import { describeEnd, describeStart } from "./lifeTopics";
-import type { LifeTopic } from "./lifeTopics";
+import type { AddChip, LifeTopic } from "./lifeTopics";
 import { PillSelector } from "../ui/PillSelector";
 
 interface SequenceEditorProps {
@@ -39,6 +41,9 @@ interface SequenceEditorProps {
   birthYear: number;
   age: number; // year age: this year − birth year
   span: number; // years from the start of the birth year to now, with the fraction
+  chips?: AddChip[]; // in place of the topic's own (education: by school system)
+  chipsNote?: string | null; // why these chips, under them
+  firstStart?: number; // where the first item starts, over its chip's typical start
 }
 
 type View = "strip" | "list";
@@ -68,27 +73,52 @@ function suggestionToPlace(suggestion: PlaceSuggestion): SequencePlace {
   };
 }
 
-export function SequenceEditor({ topic, sequence, onChange, birthYear, age, span }: SequenceEditorProps) {
+export function SequenceEditor({
+  topic,
+  sequence,
+  onChange,
+  birthYear,
+  age,
+  span,
+  chips,
+  chipsNote,
+  firstStart,
+}: SequenceEditorProps) {
   const [view, setView] = useState<View>("strip");
   const [bubble, setBubble] = useState("");
+  const [showEarly, setShowEarly] = useState(false);
   const { rules } = topic;
-  const pct = (at: number) => `${(clamp(at, 0, span) / span) * 100}%`;
+
+  // Work and partners rarely start before 16, and fifteen empty years squeeze
+  // a three-year job into a sliver. The strip starts there unless asked —
+  // or unless something already starts earlier.
+  const firstAt = sequence.items[0]?.at;
+  const canCrop = topic.lateStart !== undefined && age > topic.lateStart + 4;
+  const from = canCrop && !showEarly ? Math.min(topic.lateStart!, firstAt ?? topic.lateStart!) : 0;
+  const pct = (at: number) => `${((clamp(at, from, span) - from) / (span - from)) * 100}%`;
+
+  const describeIndex = (next: Sequence, index: number): string => {
+    const item = next.items[index];
+    if (!item) return "";
+    return `${describeStart(topic, itemName(item), item.at, index, birthYear)} · ${describeLength(itemLength(next, index, age))}`;
+  };
 
   const describeKnob = (next: Sequence, knob: Knob): string => {
-    if (knob.kind === "end") return next.end === null ? "" : describeEnd(next.end, birthYear);
-    const item = next.items[knob.index];
-    return item ? describeStart(topic, itemName(item), item.at, knob.index, birthYear) : "";
+    if (knob.kind !== "end") return describeIndex(next, knob.index);
+    if (next.end === null) return "";
+    const last = next.items.length - 1;
+    return `${describeEnd(next.end, birthYear)} · ${itemName(next.items[last])}, ${describeLength(itemLength(next, last, age))}`;
   };
 
   const add = (options: AddOptions) => {
-    const next = addItem(sequence, rules, age, options);
+    const start = sequence.items.length === 0 && firstStart !== undefined ? firstStart : options.start;
+    const next = addItem(sequence, rules, age, { ...options, start });
     if (!next) {
       setBubble(NO_ROOM);
       return false;
     }
     onChange(next);
-    const index = next.items.length - 1;
-    setBubble(describeStart(topic, itemName(next.items[index]), next.items[index].at, index, birthYear));
+    setBubble(describeIndex(next, next.items.length - 1));
     return true;
   };
 
@@ -115,6 +145,10 @@ export function SequenceEditor({ topic, sequence, onChange, birthYear, age, span
         )}
       </div>
 
+      <div className="seq-bubble" aria-live="polite">
+        {bubble || " "}
+      </div>
+
       {view === "strip" ? (
         <Strip
           topic={topic}
@@ -123,6 +157,7 @@ export function SequenceEditor({ topic, sequence, onChange, birthYear, age, span
           age={age}
           span={span}
           birthYear={birthYear}
+          from={from}
           pct={pct}
           onDescribe={(next, knob) => setBubble(describeKnob(next, knob))}
         />
@@ -137,9 +172,11 @@ export function SequenceEditor({ topic, sequence, onChange, birthYear, age, span
         />
       )}
 
-      <div className="seq-bubble" aria-live="polite">
-        {bubble || " "}
-      </div>
+      {view === "strip" && canCrop && (
+        <button type="button" className="onboarding-link seq-early" onClick={() => setShowEarly(!showEarly)}>
+          {showEarly ? `Start the strip at ${topic.lateStart}` : `◂ Show from birth`}
+        </button>
+      )}
       {view === "strip" && sequence.items.length > 6 && (
         <div className="seq-crowd">
           That's a lot for one strip.{" "}
@@ -149,7 +186,8 @@ export function SequenceEditor({ topic, sequence, onChange, birthYear, age, span
         </div>
       )}
 
-      <Adder topic={topic} onAdd={add} autoFocus={!hasItems} />
+      <Adder topic={topic} chips={chips ?? topic.chips} onAdd={add} autoFocus={!hasItems} />
+      {chipsNote && <div className="seq-note">{chipsNote}</div>}
     </div>
   );
 }
@@ -163,11 +201,12 @@ interface StripProps {
   age: number;
   span: number;
   birthYear: number;
+  from: number; // the age at the strip's left edge (0, or 16 when cropped)
   pct: (at: number) => string;
   onDescribe: (next: Sequence, knob: Knob) => void;
 }
 
-function Strip({ topic, sequence, onChange, age, span, birthYear, pct, onDescribe }: StripProps) {
+function Strip({ topic, sequence, onChange, age, span, birthYear, from, pct, onDescribe }: StripProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const [barWidth, setBarWidth] = useState(0);
   const [dragging, setDragging] = useState<number | null>(null);
@@ -184,8 +223,11 @@ function Strip({ topic, sequence, onChange, age, span, birthYear, pct, onDescrib
 
   const spans = spansOf(sequence);
   const knobs = knobsOf(sequence, rules);
-  const low = staggerKnobs(knobs.map((knob) => (clamp(knobValue(sequence, knob), 0, span) / span) * barWidth));
-  const ticks = ageTicks(span);
+  const toPixels = (at: number) => ((clamp(at, from, span) - from) / (span - from)) * barWidth;
+  const low = staggerKnobs(knobs.map((knob) => toPixels(knobValue(sequence, knob))));
+  const ticks = ageTicks(span, from);
+  const dragged = dragging !== null ? knobs[dragging] : undefined;
+  const draggedValue = dragged ? knobValue(sequence, dragged) : 0;
   let shade = 0;
 
   const moveKnob = (knob: Knob, value: number) => {
@@ -196,6 +238,13 @@ function Strip({ topic, sequence, onChange, age, span, birthYear, pct, onDescrib
 
   return (
     <div className="seq-strip">
+      {dragged && (
+        // Where the finger can't hide it: over the age axis, above the dot.
+        <div className="seq-tip" style={{ left: `clamp(28px, ${pct(draggedValue)}, calc(100% - 28px))` }}>
+          {birthYear + draggedValue}
+          <small>{draggedValue}</small>
+        </div>
+      )}
       <div className="seq-ticks" aria-hidden="true">
         {ticks.map((t) => (
           <span key={t} style={{ left: pct(t) }}>
@@ -204,7 +253,7 @@ function Strip({ topic, sequence, onChange, age, span, birthYear, pct, onDescrib
         ))}
         <span style={{ left: "100%" }}>{age}</span>
       </div>
-      <div className="seq-bar" ref={barRef}>
+      <div className={`seq-bar ${from > 0 ? "seq-bar-cropped" : ""}`} ref={barRef}>
         {spans.map((segment, index) => {
           const last = index === spans.length - 1;
           const classes = ["seq-seg"];
@@ -251,7 +300,7 @@ function Strip({ topic, sequence, onChange, age, span, birthYear, pct, onDescrib
                 if (dragging !== index || !barRef.current) return;
                 const rect = barRef.current.getBoundingClientRect();
                 const fraction = clamp((event.clientX - rect.left) / rect.width, 0, 1);
-                const next = Math.round(fraction * span);
+                const next = Math.round(from + fraction * (span - from));
                 if (next !== value) moveKnob(knob, next);
               }}
               onPointerUp={() => setDragging(null)}
@@ -447,10 +496,12 @@ function Stepper({
 
 function Adder({
   topic,
+  chips,
   onAdd,
   autoFocus,
 }: {
   topic: LifeTopic;
+  chips: AddChip[] | undefined;
   onAdd: (options: AddOptions) => boolean;
   autoFocus: boolean;
 }) {
@@ -460,10 +511,10 @@ function Adder({
   // in this render's closure is stale, so the pick travels through a ref.
   const pickedRef = useRef<PlaceSuggestion | null>(null);
 
-  if (topic.chips) {
+  if (chips) {
     return (
       <div className="seq-chips">
-        {topic.chips.map((chip) => (
+        {chips.map((chip) => (
           <button
             key={chip.text}
             type="button"

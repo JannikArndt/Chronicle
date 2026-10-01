@@ -220,17 +220,34 @@ export function spansOf(sequence: Sequence): Span[] {
   }));
 }
 
-// Age ticks for a strip of `span` years (fractional, to now): every 2 years
-// for a child, 5 up to 30, 10 after. A tick too close to the right edge is
-// dropped so it doesn't collide with "now".
-export function ageTicks(span: number): number[] {
-  const step = span <= 12 ? 2 : span <= 30 ? 5 : 10;
-  const ticks: number[] = [];
-  for (let t = 0; t <= span; t += step) {
-    if (t !== 0 && span - t < step * 0.45) continue;
+// Age ticks for a strip running from age `from` to `span` years (fractional,
+// to now): every 2 years for a short strip, 5 up to 30, 10 after. A tick too
+// close to the right edge is dropped so it doesn't collide with "now".
+export function ageTicks(span: number, from = 0): number[] {
+  const length = span - from;
+  const step = length <= 12 ? 2 : length <= 30 ? 5 : 10;
+  const ticks: number[] = [from];
+  for (let t = Math.ceil(from / step) * step; t <= span; t += step) {
+    if (t === from || t - from < step * 0.45) continue;
+    if (span - t < step * 0.45) continue;
     ticks.push(t);
   }
   return ticks;
+}
+
+// How long item `index` lasts, in whole years: until the next one starts,
+// until the end, or — for the last of an ongoing sequence — until now.
+export function itemLength(sequence: Sequence, index: number, age: number): { years: number; ongoing: boolean } {
+  const item = sequence.items[index];
+  const next = sequence.items[index + 1];
+  if (next) return { years: next.at - item.at, ongoing: false };
+  if (sequence.end !== null) return { years: sequence.end - item.at, ongoing: false };
+  return { years: Math.max(0, age - item.at), ongoing: true };
+}
+
+export function describeLength({ years, ongoing }: { years: number; ongoing: boolean }): string {
+  const amount = years === 0 ? "under a year" : years === 1 ? "1 year" : `${years} years`;
+  return ongoing ? `${amount} so far` : amount;
 }
 
 // Shifts a draft made against one birth year onto another, keeping every year

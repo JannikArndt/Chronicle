@@ -3,6 +3,8 @@ import {
   addItem,
   ageTicks,
   clampSequence,
+  describeLength,
+  itemLength,
   knobsOf,
   moveItem,
   rebaseSequence,
@@ -203,6 +205,23 @@ describe("ageTicks", () => {
     expect(ageTicks(8.5)).toEqual([0, 2, 4, 6]);
     expect(ageTicks(25.7)).toEqual([0, 5, 10, 15, 20]);
     expect(ageTicks(40.75)).toEqual([0, 10, 20, 30]);
+  });
+});
+
+describe("ageTicks from a later age", () => {
+  test("a strip cropped at 16 starts its ticks there", () => {
+    expect(ageTicks(40.75, 16)).toEqual([16, 20, 25, 30, 35]);
+  });
+});
+
+describe("itemLength", () => {
+  test("until the next start, the end, or now", () => {
+    const sequence = seq([item("Bachelor", 19), item("Master", 22)], 24);
+    expect(itemLength(sequence, 0, 40)).toEqual({ years: 3, ongoing: false });
+    expect(itemLength(sequence, 1, 40)).toEqual({ years: 2, ongoing: false });
+    expect(itemLength(seq([item("Job", 30)]), 0, 40)).toEqual({ years: 10, ongoing: true });
+    expect(describeLength({ years: 10, ongoing: true })).toBe("10 years so far");
+    expect(describeLength({ years: 1, ongoing: false })).toBe("1 year");
   });
 });
 

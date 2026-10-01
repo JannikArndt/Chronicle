@@ -3,6 +3,7 @@
 // colours are data (stored on the row, drawn as-is in both themes), like the
 // "Places lived" colour `completeIdentityStep` has always used.
 
+import { educationChips } from "./schoolSystems";
 import type { SequenceRules } from "./sequence";
 
 export type TopicId = "lived" | "learned" | "worked" | "partner";
@@ -30,6 +31,9 @@ export interface LifeTopic {
   chips?: AddChip[];
   // A free-text adder instead of chips; `gapLength` adds a ⏸ Gap button.
   textAdder?: { placeholder: string; gapLength?: number };
+  // The strip starts at this age unless asked (work, partners): years of
+  // childhood would squeeze a short job into a sliver.
+  lateStart?: number;
 }
 
 export const KIDS_COLOR = "#3d8798";
@@ -59,15 +63,9 @@ export const TOPICS: Record<TopicId, LifeTopic> = {
     hint: "Add in order. Gaps hold time and create nothing.",
     noun: "School",
     still: "Still going",
-    chips: [
-      { icon: "🏫", text: "School", label: "School", length: 12, start: 6 },
-      { icon: "🛠", text: "Ausbildung", label: "Ausbildung", length: 3, start: 16 },
-      { icon: "🎓", text: "Bachelor", label: "Bachelor", length: 3 },
-      { icon: "🎓", text: "Master", label: "Master", length: 2 },
-      { icon: "📜", text: "PhD", label: "PhD", length: 4 },
-      { icon: "🌍", text: "Year abroad", label: "Year abroad", length: 1 },
-      { icon: "⏸", text: "Gap", label: "", length: 3, gap: true },
-    ],
+    // The neutral set; the assistant swaps in the one for where you went to
+    // school (schoolSystems.ts).
+    chips: educationChips("generic"),
   },
   worked: {
     id: "worked",
@@ -78,6 +76,7 @@ export const TOPICS: Record<TopicId, LifeTopic> = {
     withPlace: false,
     prompt: "Where have you worked?",
     hint: "One job after another. Name them now or later.",
+    lateStart: 16,
     noun: "Job",
     still: "Still going",
     chips: [
@@ -96,6 +95,7 @@ export const TOPICS: Record<TopicId, LifeTopic> = {
     withPlace: false,
     prompt: "Who have you been with?",
     hint: "Add the ones that matter to you. Skipping is fine.",
+    lateStart: 16,
     noun: "Partner",
     still: "Still together",
     textAdder: { placeholder: "Add a partner", gapLength: 2 },
