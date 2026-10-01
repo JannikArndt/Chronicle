@@ -70,6 +70,18 @@
      every colour and has to stay legible on all of them. */
   --color-canvas-event: #4a4340;
 
+  /* The first-run assistant's ageing figure (src/onboarding/AgeFigure.tsx),
+     painted on a canvas that reads these at paint time. */
+  --color-figure-skin: #e9b993;
+  --color-figure-line: #292524;
+  --color-figure-shirt: #c2410c;
+  --color-figure-pants: #4f6ea8;
+  --color-figure-onesie: #8aa66d;
+  --color-figure-cane: #7a5232;
+  --color-figure-hair-young: #4a3426;
+  --color-figure-hair-mid: #8d8478;
+  --color-figure-hair-old: #ebe7e0;
+
   color-scheme: light dark;
 }
 
@@ -125,6 +137,18 @@
     --color-canvas-gridline-strong: #3e392f;
     --color-canvas-row-selected: rgba(140, 160, 220, 0.16);
     --color-canvas-event: #ded9d0;
+
+    /* Skin, face line and hair read the same on either background; the
+       clothes follow the lighter dark-theme accents. */
+    --color-figure-skin: #e9b993;
+    --color-figure-line: #292524;
+    --color-figure-shirt: #e8621f;
+    --color-figure-pants: #6787c2;
+    --color-figure-onesie: #93b076;
+    --color-figure-cane: #a37450;
+    --color-figure-hair-young: #4a3426;
+    --color-figure-hair-mid: #8d8478;
+    --color-figure-hair-old: #ebe7e0;
   }
 }
 
@@ -2115,99 +2139,9 @@ textarea {
   flex: none;
 }
 
-.places-table {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 45vh;
-  overflow-y: auto;
-  overflow-x: visible;
-  padding: 2px;
-}
-
-.places-table-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-/* Column labels above the rows — mirrors the row flex layout exactly:
-   place flex: 1, year 64px, then the fixed remove-button gutter. */
-.places-table-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--color-text-muted);
-}
-
-.places-table-header-place {
-  flex: 1;
-  min-width: 0;
-}
-
-.places-table-header-year {
-  width: 64px;
-  flex: none;
-}
-
-/* Fixed-width remove column: the ✕ button and the spacer (header, rows
-   without ✕) share it so the year column lines up in every row. */
-.places-table-remove,
-.places-table-remove-gutter {
-  width: 24px;
-  flex: none;
-}
-
-.places-table-remove {
-  text-align: center;
-}
-
-.places-table-row .place-autocomplete {
-  flex: 1;
-  min-width: 0;
-}
-
-.places-table-year {
-  width: 64px;
-  flex: none;
-}
-
 .assistant-input-area input {
   font-size: 15px;
   padding: 8px 10px;
-}
-
-.birth-date-input {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-}
-
-.birth-date-segment {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.birth-date-segment-label {
-  font-size: 12px;
-  color: var(--color-text-muted);
-}
-
-.birth-date-segment input {
-  font-size: 15px;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-}
-
-.birth-date-segment-day input,
-.birth-date-segment-month input {
-  width: 48px;
-}
-
-.birth-date-segment-year input {
-  width: 70px;
 }
 
 .assistant-nav {
@@ -2316,6 +2250,632 @@ textarea {
      it is the only thing happening. */
 }
 
+/* ---------- first-run assistant (OnboardingAssistant) ---------- */
+
+/* One topic per screen: prompt and hint on top, the editor, the one action,
+   Back/Skip, and the live preview pinned to the foot. A card on desktop that
+   scrolls inside itself; the whole screen on a phone. */
+.onboarding-shell {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  gap: 12px;
+}
+
+.onboarding-shell .assistant-prompt {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.onboarding-shell .assistant-input-area {
+  flex: 1 0 auto;
+  gap: 12px;
+}
+
+.onboarding-shell .assistant-nav {
+  margin-top: 0;
+}
+
+/* 16px everywhere in this flow, phone or not. The floor at the end of this
+   file loses to `.assistant-input-area input` on specificity, so it can't be
+   relied on here; iOS would zoom into a 15px field. */
+.onboarding-shell input:not([type="range"]) {
+  font-size: 16px;
+}
+
+.onboarding-shell input[type="range"] {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--color-accent);
+}
+
+.onboarding-hint {
+  margin: -6px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* The one action of a screen, at the foot of its content. */
+.onboarding-go {
+  margin-top: auto;
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.onboarding-link {
+  border: none;
+  background: none;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.onboarding-note {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+/* --- born --- */
+
+.age-figure {
+  display: block;
+  width: 100%;
+  height: 200px;
+}
+
+.born-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.born-age {
+  font-size: 52px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.born-unit {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.born-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.born-year {
+  min-width: 9.5em;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.born-nudge {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 17px;
+}
+
+.born-month {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Twelve months as a grid of pills — a dropdown is exactly what this screen
+   is meant not to be. */
+.born-months {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  width: 100%;
+}
+
+.born-month-pill {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.born-month-pill-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.born-month-note {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* --- the sequence editor: strip and list --- */
+
+/* `--seq` is the topic's row colour, set inline from data (it is what the
+   canvas will draw the same bars in). */
+.seq {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.seq-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.seq-head .pill-row {
+  margin-top: 0;
+}
+
+.seq-mini {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.seq-mini[aria-pressed="true"] {
+  border-color: var(--seq);
+  background: var(--seq);
+  color: var(--color-on-accent);
+}
+
+.seq-strip {
+  position: relative;
+  padding: 4px 0 70px;
+  touch-action: none;
+}
+
+.seq-ticks {
+  position: relative;
+  height: 14px;
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.seq-ticks-years {
+  margin-top: 3px;
+  color: var(--color-text-faint);
+}
+
+.seq-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.seq-bar {
+  position: relative;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--color-bg-hover);
+}
+
+.seq-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 7px;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--seq);
+  color: var(--color-on-accent);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: inset -2px 0 0 var(--color-surface);
+}
+
+.seq-seg-first {
+  border-radius: 8px 0 0 8px;
+}
+
+.seq-seg-last {
+  border-radius: 0 8px 8px 0;
+  box-shadow: none;
+}
+
+.seq-seg-first.seq-seg-last {
+  border-radius: 8px;
+}
+
+.seq-seg-alt {
+  filter: brightness(0.9);
+}
+
+/* A gap holds time and creates nothing, so it is drawn as an outline only. */
+.seq-seg-gap {
+  background: transparent;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  font-style: italic;
+  outline: 1.5px dashed var(--seq);
+  outline-offset: -3px;
+  box-shadow: none;
+}
+
+.seq-seg-ongoing {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+}
+
+/* A boundary is a dot on a stem below the bar — a finger-sized target that
+   does not hide the bar it moves. Two dots closer than a finger drop to a
+   second row (`staggerKnobs`). */
+.seq-knob {
+  position: absolute;
+  top: 66px;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--seq);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.seq-knob::before {
+  content: "";
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  width: 2px;
+  height: 24px;
+  margin-left: -1px;
+  background: var(--seq);
+}
+
+.seq-knob-low {
+  top: 100px;
+}
+
+.seq-knob-low::before {
+  top: -58px;
+  height: 58px;
+}
+
+.seq-knob-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.seq-bubble {
+  min-height: 1.4em;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.seq-crowd {
+  font-size: 12.5px;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-radius: 8px;
+  padding: 6px 9px;
+}
+
+.seq-crowd button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+}
+
+.seq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px;
+}
+
+.seq-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto 22px;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  transition: transform 140ms ease;
+}
+
+.seq-row-gap {
+  background: transparent;
+  border-style: dashed;
+}
+
+.seq-row-dragging {
+  z-index: 2;
+  transition: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+}
+
+.seq-handle {
+  padding: 6px 0;
+  text-align: center;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--color-text-faint);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.onboarding-shell .seq-name {
+  min-width: 0;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  font-size: 16px;
+}
+
+.seq-row-gap .seq-name {
+  font-style: italic;
+}
+
+.seq-stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.seq-stepper button {
+  width: 22px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+}
+
+.seq-stepper button:disabled {
+  opacity: 0.3;
+}
+
+.seq-stepper span {
+  display: flex;
+  flex-direction: column;
+  min-width: 52px;
+  line-height: 1.15;
+}
+
+.seq-stepper small {
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.seq-remove {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-text-faint);
+}
+
+.seq-end {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 6px 2px 8px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.seq-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.seq-chip {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 13px;
+}
+
+.seq-chip[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.seq-add {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.seq-add > input,
+.seq-add .place-autocomplete {
+  flex: 1;
+  min-width: 0;
+}
+
+.seq-add .place-autocomplete input {
+  width: 100%;
+}
+
+.onboarding-shell .seq-add input {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.seq-add > button {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+/* --- kids and grandkids --- */
+
+.family-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.family-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.family-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 22px;
+  gap: 2px 10px;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.family-row-grandkid {
+  gap: 6px 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.family-parent {
+  grid-column: 1 / -1;
+}
+
+.onboarding-shell .family-row input[type="text"] {
+  min-width: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.family-row small {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.family-summary {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  background: var(--color-accent-soft);
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+/* --- the live preview --- */
+
+.onboarding-preview {
+  margin: 0 -20px -20px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
+}
+
+.onboarding-preview-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Lanes thin out first (previewLayout.ts); this only scrolls past that. */
+.onboarding-preview-scroll {
+  max-height: calc(33vh - 34px);
+  overflow-y: auto;
+}
+
+.onboarding-preview canvas {
+  display: block;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .onboarding-shell {
+    max-height: none;
+    justify-content: flex-start;
+    padding-top: calc(20px + env(safe-area-inset-top));
+  }
+
+  .onboarding-preview {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .onboarding-shell .onboarding-preview {
+    margin-bottom: calc(-20px - env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-height: 700px) {
+  .age-figure {
+    height: 150px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seq-row {
+    transition: none;
+  }
+}
+
 /* ---------- the add flows, as a sheet ---------- */
 
 /* Above the timeline sheet (65) it is opened from, and above the scrim. */
@@ -2349,11 +2909,10 @@ textarea {
   overflow: visible;
 }
 
-/* One scroller per screen. These tables cap their own height when the assistant
+/* One scroller per screen. The table caps its own height when the assistant
    is a card on its own; inside the sheet the sheet's list is the scroller, and a
    second one nested in it steals the drag that should move the sheet. */
-.sheet-assistant .entry-table,
-.sheet-assistant .places-table {
+.sheet-assistant .entry-table {
   max-height: none;
   overflow: visible;
 }
