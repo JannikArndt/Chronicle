@@ -163,27 +163,23 @@ try {
     await page.context().close();
   }
 
-  // The setup assistant a new visitor meets, a few answers in.
+  // The setup assistant a new visitor meets, a few answers in: places lived,
+  // then school and after, with the live preview drawing both.
   {
     const page = await open({ width: 1180, height: 780, scale: 2 });
     await page.waitForSelector(".assistant-overlay input");
     await page.keyboard.type("Mara");
     await page.keyboard.press("Enter");
-    await page.waitForSelector(".birth-date-input input");
-    await page.keyboard.type("12041990");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(300);
-    await page.keyboard.type("Hamburg");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(300);
-    await page.keyboard.type("2008");
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(300);
-    await page.keyboard.type("Utrecht");
-    await page.keyboard.press("Tab");
-    await page.keyboard.type("2012");
-    await page.keyboard.press("Tab");
-    await page.keyboard.type("Berlin");
+    await page.getByRole("slider", { name: "Age" }).fill("36");
+    await page.locator(".onboarding-go").click();
+    for (const city of ["Hamburg", "Utrecht", "Berlin", "Lisbon"]) {
+      await page.locator(".seq-add input").fill(city);
+      await page.locator(".seq-add input").press("Enter");
+    }
+    await page.locator(".onboarding-go").click();
+    for (const chip of ["School", "Bachelor", "Gap", "Master"]) {
+      await page.locator(".seq-chip", { hasText: chip }).first().click();
+    }
     await page.waitForTimeout(400);
     await page.locator(".assistant-overlay > *").first().screenshot({ path: `${OUT}/onboarding.png` });
     await page.context().close();
