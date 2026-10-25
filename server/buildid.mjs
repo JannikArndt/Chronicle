@@ -3,7 +3,7 @@
 // git SHA, which changes on commits that touch nothing a browser downloads,
 // and not a hand-bumped version number, which someone forgets.
 //
-// SERVED lists every file and directory a client can fetch, or that changes
+// INPUTS lists every file and directory a client can fetch, or that changes
 // what the server does when it answers a request. Tests and docs are skipped:
 // a change there must not make every open tab reload.
 //
@@ -22,13 +22,14 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
-const SERVED = [
+export const INPUTS = [
   "package.json",
   "package-lock.json",
   "index.html",
   "vite.config.ts",
   "tsconfig.json",
   "Dockerfile",
+  "docker-entrypoint.sh",
   "src",
   "server",
   "scripts/build-server.mjs",
@@ -47,7 +48,7 @@ function walk(path) {
 
 export function buildId() {
   const hash = createHash("sha256");
-  const files = SERVED.flatMap((p) => walk(join(ROOT, p)))
+  const files = INPUTS.flatMap((p) => walk(join(ROOT, p)))
     .map((file) => relative(ROOT, file).split(sep).join("/"))
     .sort();
   for (const file of files) {

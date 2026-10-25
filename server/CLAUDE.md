@@ -26,7 +26,7 @@ one file. Keep it that way; the Docker image carries no `node_modules`.
 - `social.ts` — invites, connections, suggestions, grants, public links,
   account deletion.
 - `static.ts` — dist/ with caching rules, the CSP, the build-id stamp.
-- `buildid.mjs` — hash of every shipped file; `/version` and the deploy
+- `buildid.mjs` — hash of every shipped file (`INPUTS`); `/version` and the deploy
   workflow's live check both use it. Plain JS so CI runs it without a build.
 - `testkit.ts` — a real server on port 0 + a cookie-keeping client with an
   SSE reader. Every server test goes through HTTP with it.
@@ -80,9 +80,24 @@ npm run dev          # Vite on :5173, proxying /api and /version to :8787
 npm test             # includes server/**/*.test.ts
 ```
 
-Production env: `PORT` (80), `DATA_DIR` (`/data` — **must be a CapRover
-persistent directory**), `TRUST_PROXY` (true), `STATIC_DIR` (../dist),
-`PUBLIC_ORIGIN` (optional, e.g. `https://chronicle.timpanini.com`).
+Production env: `PORT` (80), `DATA_DIR` (`/data` — **must be the CapRover
+volume `chronicle-data`**, which no other app shares; CapRover volume names
+are global), `TRUST_PROXY` (true), `STATIC_DIR` (../dist), `PUBLIC_ORIGIN`
+(optional, e.g. `https://chronicle.timpanini.com`).
+
+**`TRUST_PROXY` defaults to on, in the code and in the Dockerfile**, because
+the only way in is CapRover's nginx, which sets `X-Forwarded-*`. Exposed
+directly, a client could spoof those headers (rate limits, the HTTPS-only
+sign-in rule); `npm run dev:server` and the e2e runs set it to `false`.
+
+**Container**: `docker-entrypoint.sh` starts as root, gives anything in
+`/data` not owned by `node` to `node` (a volume first written by an older
+root container), then `exec su-exec node …`, so node is PID 1 and gets SIGTERM
+on a deploy. `HEALTHCHECK` asks `/version`. `/version` reads `version` from
+`package.json`, which the image carries next to `dist-server/`
+(`npm_package_version` is unset under plain `node`). The file list the build id
+hashes (`INPUTS` in `buildid.mjs`) must equal the Dockerfile's build-stage
+`COPY` lines; `test/deploy-contract.test.mjs` fails otherwise.
 
 ## Not built
 

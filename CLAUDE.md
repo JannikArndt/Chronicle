@@ -7,26 +7,68 @@ container on the owner's CapRover. Local-first still: signed out, the app makes 
 network calls at all; signed in, the account's timelines sync to every device and to
 the people they are shared with, live.
 
-## Commands
+## Ship loop
 
-```
-npm run dev            # Vite dev server (proxies /api and /version to :8787)
-npm run dev:server     # the Chronicle server on :8787, rebuilt on change, data in .data/
-npm test               # vitest — client and server (580+ tests)
-npm run build          # tsc -b && vite build && esbuild server  (tsc also typechecks tests)
-npm run buildid        # the build id /version must report after a deploy
-```
+Work on `main`. A change isn't done until it's live.
+
+1. `npm run verify` before every push — exactly what CI runs (deploy contract,
+   tests, `tsc -b` + both builds). Last line `VERIFY: PASS`.
+2. Push `main`. CI: verify → `caprover deploy` → waits until `/version`
+   reports this commit's build id.
+3. `npm run live -- --wait` (or just `npm run ship` from a clean tree, which
+   does all three). Last line `LIVE: <build>`.
+
+| command | does | last line |
+|---|---|---|
+| `npm run verify` | contract test, vitest, build; every step runs, failures are printed (`verify test` runs one) | `VERIFY: PASS` / `VERIFY: FAIL (…)` |
+| `npm run live` | does chronicle.timpanini.com serve this tree's build? `--wait` polls up to 10 min | `LIVE: <build>` / `NOT LIVE: …` |
+| `npm run ship` | clean tree → verify → push `main` → live --wait | `LIVE: <build>` / `SHIP: FAIL (…)` |
+| `npm run logs [lines]` | the container's log (needs `CAPROVER_URL`, `CAPROVER_PASSWORD` — admin, from the environment, never in git) | — |
+| `npm run buildid` | the id `/version` must report | the id |
+| `npm run dev` | Vite dev server (proxies /api and /version to :8787) | — |
+| `npm run dev:server` | the Chronicle server on :8787, rebuilt on change, data in `.data/` | — |
+| `npm test` | vitest, client and server | — |
+| `npm run test:watch` | vitest in watch mode | — |
+| `npm run build` | `tsc -b && vite build && esbuild server` (tsc also typechecks tests) | — |
+| `npm run build:client`, `npm run build:server` | the two halves of the build | — |
+| `npm start` | the built server, the same file the Dockerfile runs | — |
+| `npm run preview` | Vite's preview of the built client | — |
 
 The server's tests run a real server on port 0 with an in-memory SQLite and talk
 to it over HTTP (`server/testkit.ts`) — the access rules are tested as they run.
 
-Deploy: push to `main` → `.github/workflows/deploy.yml` runs the tests, sends the
-commit to CapRover (`caprover deploy` with the per-app token in the
-`CAPROVER_*` secrets), then polls `/version` until the new build answers — a
-deploy that never came up fails the workflow. `workflow_dispatch` deploys any
-branch. The app's CapRover config needs HTTPS on and a persistent directory at
-`/data` (the SQLite database); see `server/CLAUDE.md`. Open tabs pick up a new
-build on their own at a quiet moment (`src/ui/fresh.ts`).
+## Deploying
+
+- CapRover app `chronicle` (`.github/workflows/deploy.yml`): push to `main` →
+  verify → deploy → live check. A pull request (Dependabot's) runs verify only;
+  `workflow_dispatch` runs verify on any ref but deploys only from `main`.
+  There is no dev app.
+- Secrets `CAPROVER_APP`, `CAPROVER_APP_TOKEN`; optional variable `APP_URL`.
+  The server URL is written into the workflow. The deploy token travels as an
+  env var, the CLI is pinned (`caprover@2.4.4`), stdin is closed.
+- The CLI can exit 0 without deploying, and CapRover keeps serving the old
+  container when a new image fails to build or boot — so the workflow's last
+  step polls `/version` for this commit's build id and fails otherwise. The
+  build log is in the CapRover dashboard (or `GET /api/v2/user/apps/appData/chronicle`).
+- Build id: `server/buildid.mjs` over `INPUTS` (Dockerfile, entrypoint,
+  package.json, lockfile, build configs, `src`, `server`, `public-data`),
+  stamped into `dist-server/BUILD_ID` by the Dockerfile's build stage, served
+  at `/version` and in the page's `app-build` meta.
+  `test/deploy-contract.test.mjs` keeps Dockerfile, `.dockerignore` and
+  `INPUTS` in step, and holds pins, permissions, timeouts and these docs.
+  Adding a file the build needs means adding it to `INPUTS` *and* the
+  Dockerfile's `COPY` lines.
+- The image runs `docker-entrypoint.sh` as root just long enough to give
+  `/data` to `node`, then drops privileges (`su-exec`); `HEALTHCHECK` asks
+  `/version`. Node is PID 1 after the exec, so SIGTERM reaches it.
+- Data: CapRover volume `chronicle-data` at `/data` (SQLite, WAL). Never
+  shared with another app.
+- Open tabs pick up a new build at a quiet moment (`src/ui/fresh.ts`).
+- Dependabot: weekly (npm, docker, github-actions; majors ignored), merges
+  itself on green and starts the deploy (`.github/workflows/dependabot-merge.yml`).
+  Actions are pinned to commit SHAs, the base image to a digest.
+- Pages (`pages.yml`) publishes the product page only; the Node major, the
+  `caprover` pin and the Pages action SHAs move by hand or by Dependabot.
 
 Product page: `site/` is the static page at https://jannikarndt.github.io/Chronicle/
 (plain HTML + CSS, no build, no JS), published by `.github/workflows/pages.yml`

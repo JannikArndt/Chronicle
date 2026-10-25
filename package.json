@@ -3,6 +3,9 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "vite",
     "dev:server": "node scripts/build-server.mjs --watch",
@@ -13,7 +16,11 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "buildid": "node server/buildid.mjs"
+    "buildid": "node server/buildid.mjs",
+    "verify": "node scripts/verify.mjs",
+    "live": "node scripts/live.mjs",
+    "ship": "node scripts/ship.mjs",
+    "logs": "node scripts/logs.mjs"
   },
   "dependencies": {
     "@simplewebauthn/browser": "14.0.0",

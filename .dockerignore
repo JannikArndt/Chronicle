@@ -1,6 +1,15 @@
+# Nothing here may be named in INPUTS (server/buildid.mjs);
+# test/deploy-contract.test.mjs checks.
+.git
+.github
+.claude
 node_modules
+.data
 dist
 dist-server
-.data
-.git
 *.tar
+*.md
+docs
+plans
+site
+test

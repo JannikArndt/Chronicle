@@ -1,75 +1,90 @@
-# Deploys Chronicle to CapRover (https://chronicle.timpanini.com) on every
-# push to main, and fails loudly if the new build never actually comes up.
+# Deploys Chronicle to CapRover (https://chronicle.timpanini.com).
 #
-# Secrets: CAPROVER_URL (the captain.* host), CAPROVER_APP, CAPROVER_APP_TOKEN
-# (the app's deploy token — scoped to this one app, never the server password).
-# Optional repo variable APP_URL overrides the URL the last step polls.
+# push to main          -> verify -> deploy -> confirm the build is live
+# pull request          -> verify only (Dependabot's PRs merge on that)
+# workflow_dispatch     -> verify on any ref, deploy only from main
 #
-# workflow_dispatch deploys whichever ref it is started on — used to try a
-# branch on the real server before merging it.
+# Secrets: CAPROVER_APP, CAPROVER_APP_TOKEN (the app's deploy token, scoped to
+# this one app). Optional variable APP_URL if the app answers on another host.
 name: Deploy
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
+  pull_request:
+  workflow_dispatch: # started by dependabot-merge.yml after it merges
 
 permissions:
   contents: read
 
+# One deploy at a time; a newer push waits rather than cancelling a deploy
+# half way. Superseded pull-request runs are cancelled.
 concurrency:
-  group: deploy
-  cancel-in-progress: false
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - run: npm run verify # the same command a session runs before pushing
 
   deploy:
     needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    env:
-      APP_URL: ${{ vars.APP_URL || 'https://chronicle.timpanini.com' }}
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-
-      # A tarball of exactly the committed tree: CapRover builds the image
-      # from it server-side (captain-definition → Dockerfile), and the build
-      # id below is computed over the same files.
-      - name: Pack the commit
-        run: git archive --format=tar -o deploy.tar HEAD
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # `caprover deploy -b` needs real git history, not a 1-commit shim
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
 
       - name: Deploy to CapRover
         env:
-          CAPROVER_URL: ${{ secrets.CAPROVER_URL || 'https://captain.timpanini.com' }}
+          CAPROVER_URL: https://captain.timpanini.com
           CAPROVER_APP: ${{ secrets.CAPROVER_APP }}
           CAPROVER_APP_TOKEN: ${{ secrets.CAPROVER_APP_TOKEN }}
-          CAPROVER_TAR_FILE: deploy.tar
-        # Pinned to an exact version: a published npm version cannot change
-        # under us. The token travels only as an env var, never as a flag
-        # another step could read out of argv.
-        run: npx --yes caprover@2.4.4 deploy
-
-      - name: Confirm the new build is live
+        # Exact CLI version. The token only as an env var (an argument is in
+        # argv for anything else in the job to read). Every other value as a
+        # flag and stdin closed: with a value missing the CLI prompts, crashes
+        # on the missing TTY and still exits 0.
         run: |
+          if [ -z "$CAPROVER_APP" ] || [ -z "$CAPROVER_APP_TOKEN" ]; then
+            echo "::error::Set the CAPROVER_APP and CAPROVER_APP_TOKEN repository secrets"
+            exit 1
+          fi
+          npx --yes caprover@2.4.4 deploy -u "$CAPROVER_URL" -a "$CAPROVER_APP" -b main < /dev/null
+
+      # The CLI can report success without deploying anything, and CapRover
+      # keeps serving the old build when the new one fails to build or boot.
+      # /version is the real check. It must never skip itself: the URL falls
+      # back to the app's default subdomain.
+      - name: Confirm the new build is live
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          CAPROVER_APP: ${{ secrets.CAPROVER_APP }}
+        run: |
+          base="${APP_URL:-https://$CAPROVER_APP.timpanini.com}"
+          url="${base%/}/version"
           want="$(node server/buildid.mjs)"
-          got=""
-          for i in $(seq 1 36); do
-            got="$(curl -fsSL "$APP_URL/version" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{console.log(JSON.parse(d).build)}catch{console.log("")}})' || true)"
-            if [ "$got" = "$want" ]; then
-              echo "live: $got at $APP_URL"
-              exit 0
-            fi
+          got=""; code=""
+          for i in $(seq 1 60); do
+            body="$(curl -sS --max-time 10 -w '\n%{http_code}' "$url" || true)"
+            code="${body##*$'\n'}"
+            got="$(printf '%s' "${body%$'\n'*}" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{console.log(JSON.parse(d).build)}catch{}})')"
+            if [ "$got" = "$want" ]; then echo "LIVE: $got"; exit 0; fi
+            echo "attempt $i: HTTP $code, build ${got:-none}, want $want"
             sleep 10
           done
-          echo "::error::deploy finished but $APP_URL/version never reported build $want (saw: '$got')"
+          echo "::error::$url never reported build $want (last: HTTP $code, build ${got:-none}). Read the CapRover build log: npm run logs, or the dashboard."
           exit 1
