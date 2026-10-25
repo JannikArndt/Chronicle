@@ -22,6 +22,7 @@ ENV NODE_ENV=production \
     PORT=80 \
     DATA_DIR=/data \
     TRUST_PROXY=true
+COPY --from=build /app/package.json ./
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/dist-server ./dist-server
 EXPOSE 80

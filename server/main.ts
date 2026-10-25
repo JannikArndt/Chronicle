@@ -23,6 +23,18 @@ function readBuildId(): string {
   return existsSync(file) ? readFileSync(file, "utf8").trim() : "dev";
 }
 
+// The version comes from package.json, which the image carries next to
+// dist-server/. npm_package_version only exists under `npm run`, and the
+// container starts with plain `node`, so it used to report a stale constant.
+function readVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
 const port = Number(process.env.PORT ?? 80);
 const staticDir = process.env.STATIC_DIR ?? join(here, "..", "dist");
 
@@ -30,7 +42,7 @@ const app = createApp({
   dataDir: process.env.DATA_DIR ?? "/data",
   staticDir: existsSync(staticDir) ? staticDir : undefined,
   buildId: readBuildId(),
-  version: process.env.npm_package_version ?? "2.0.0",
+  version: readVersion(),
   trustProxy: process.env.TRUST_PROXY !== "false",
   publicOrigin: process.env.PUBLIC_ORIGIN || undefined,
 });
