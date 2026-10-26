@@ -130,8 +130,8 @@ function paintStrip(
   context.globalAlpha = BAR_OPACITY;
   let laneTop = TOP_INSET_PX;
   for (const lane of lanes) {
-    context.fillStyle = lane.color;
     for (const span of lane.spans) {
+      context.fillStyle = span.color ?? lane.color;
       const x0 = msToX(span.startMs);
       const x1 = Math.max(msToX(span.endMs), x0 + MIN_BAR_WIDTH_PX);
       context.fillRect(x0, laneTop, x1 - x0, metrics.barHeight);

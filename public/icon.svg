@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Chronicle's app icon: parallel timelines on one time axis. The source
+       for every PNG icon next to it — scripts/app-icons.mjs renders them.
+       Full-bleed and opaque, because iOS rounds the corners itself and fills
+       transparency with black. Colours are the app's light palette. -->
+  <rect width="512" height="512" fill="#fafaf8"/>
+  <g stroke="#e7e5e4" stroke-width="4">
+    <line x1="128" y1="72" x2="128" y2="440"/>
+    <line x1="256" y1="72" x2="256" y2="440"/>
+    <line x1="384" y1="72" x2="384" y2="440"/>
+  </g>
+  <rect x="72" y="108" width="236" height="56" rx="18" fill="#4f6fa8"/>
+  <rect x="164" y="188" width="276" height="56" rx="18" fill="#8ba66f"/>
+  <rect x="72" y="268" width="140" height="56" rx="18" fill="#a8433b"/>
+  <rect x="228" y="268" width="148" height="56" rx="18" fill="#7c6aa6"/>
+  <path d="M200 348 H404 L440 376 L404 404 H200 a18 18 0 0 1 -18 -18 v-20 a18 18 0 0 1 18 -18 z" fill="#c2410c"/>
+</svg>

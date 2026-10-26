@@ -26,6 +26,7 @@ export const INPUTS = [
   "package.json",
   "package-lock.json",
   "index.html",
+  "public",
   "vite.config.ts",
   "tsconfig.json",
   "Dockerfile",

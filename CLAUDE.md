@@ -70,6 +70,11 @@ to it over HTTP (`server/testkit.ts`) — the access rules are tested as they ru
 - Pages (`pages.yml`) publishes the product page only; the Node major, the
   `caprover` pin and the Pages action SHAs move by hand or by Dependabot.
 
+Home-screen icons: `public/` (copied into `dist/` as is) holds `icon.svg`,
+the PNGs rendered from it by `CHROMIUM_PATH=/opt/pw-browsers/chromium node
+scripts/app-icons.mjs` (iOS takes only `apple-touch-icon.png`) and the
+manifest Android reads. Re-render after changing the SVG.
+
 Product page: `site/` is the static page at https://jannikarndt.github.io/Chronicle/
 (plain HTML + CSS, no build, no JS), published by `.github/workflows/pages.yml`
 on pushes to `main` that touch it; the repo's Pages source is "GitHub Actions".

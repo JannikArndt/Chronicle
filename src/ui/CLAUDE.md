@@ -87,7 +87,8 @@ tap parks it at peek. Onboarding is the one thing that still takes the whole
 screen (`.assistant-overlay`) — it is the only thing happening.
 
 `MiniMap.tsx` is a second canvas painting `src/render/miniMap.ts` (pure,
-tested) — one lane per row, plus the current viewport window on *both* axes;
+tested) — one lane per row and per lane of a collapsed group, plus the current
+viewport window on *both* axes;
 tapping or dragging it calls `engine.centerOnMs()` and
 `engine.centerOnLayoutY()`, and it reads the canvas's vertical position from
 the `EngineView` the engine reports through `onViewChange`.
