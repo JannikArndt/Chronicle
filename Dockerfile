@@ -15,6 +15,7 @@ COPY Dockerfile docker-entrypoint.sh package.json package-lock.json index.html v
 RUN npm ci
 COPY src ./src
 COPY server ./server
+COPY public ./public
 COPY public-data ./public-data
 COPY scripts/build-server.mjs ./scripts/
 # Typecheck and tests already ran in CI before this deploy was sent; the

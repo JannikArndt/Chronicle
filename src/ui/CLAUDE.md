@@ -62,6 +62,13 @@ live there). 🌍 World events is done — `WorldEventsPicker.tsx`.
 
 ## Mobile shell
 
+**Home Screen.** The mobile shell is also what runs when Chronicle is added
+to the Home Screen (standalone: no address bar, no reload). Manifest, icons
+and metas are in the root `CLAUDE.md`; here the rule is that anything
+that needs a reload must happen through `fresh.ts`, and layout stays on
+the `env(safe-area-inset-*)` variables (the status bar is `default`, so the
+app starts below it).
+
 **Mobile is a second shell, not a restyled first one.** `App.tsx` branches once
 on `useIsMobile()` (a width media query) into `MobileShell.tsx`, and no media
 query tries to reconcile the two — the information architecture genuinely

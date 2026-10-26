@@ -64,6 +64,21 @@ to it over HTTP (`server/testkit.ts`) — the access rules are tested as they ru
 - Data: CapRover volume `chronicle-data` at `/data` (SQLite, WAL). Never
   shared with another app.
 - Open tabs pick up a new build at a quiet moment (`src/ui/fresh.ts`).
+- Home Screen: `public/` (copied into `dist/` by Vite; in `INPUTS` and the
+  Dockerfile `COPY`) holds `manifest.webmanifest` and `icons/*.png`, drawn
+  by `node scripts/make-icons.mjs` (four parallel bars on one axis, the
+  `:root` light tokens; the PNGs are committed). `index.html` carries the
+  `apple-*` metas and two `theme-color` metas (light/dark, matching
+  `--color-bg`); the contract test holds the checklist. A Home Screen copy
+  has storage separate from Safari's (iOS 16.4+): cookie, IndexedDB and
+  localStorage start empty, so the first launch is signed out and the person
+  signs in again (passkey or password; the RP ID is the host, so passkeys
+  work there; the session cookie is `Max-Age` one year, so it persists once
+  set). Signed in, the account's timelines sync down; anything only in the
+  Safari tab's IndexedDB stays there (export/import moves it). Invite links
+  open in Safari, not in the installed app. The status bar is `default`
+  (white), not `black-translucent`, because the app has a light and a dark
+  ground.
 - Dependabot: weekly (npm, docker, github-actions; majors ignored), merges
   itself on green and starts the deploy (`.github/workflows/dependabot-merge.yml`).
   Actions are pinned to commit SHAs, the base image to a digest.

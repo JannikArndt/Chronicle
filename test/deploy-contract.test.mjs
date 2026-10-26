@@ -89,3 +89,43 @@ test("CLAUDE.md exists and names every npm script", () => {
   for (const s of ["verify", "live", "ship"]) assert.ok(scripts.includes(s), `package.json has no "${s}" script`);
   for (const s of scripts) assert.match(claude, new RegExp(`npm (run )?${s}\\b`), `CLAUDE.md does not mention npm run ${s}`);
 });
+
+// Home Screen: the app opens from an icon without browser chrome, with its own
+// name and a real PNG icon (app-conventions: home-screen.md).
+if (has("index.html") && has("public/manifest.webmanifest")) {
+  const html = read("index.html");
+  const pngSize = (p) => {
+    const b = readFileSync(join(ROOT, p));
+    assert.equal(b.subarray(1, 4).toString(), "PNG", `${p} is not a PNG`);
+    return `${b.readUInt32BE(16)}x${b.readUInt32BE(20)}`;
+  };
+  const href = (re) => html.match(re)?.[1];
+
+  test("the page head has the Home Screen lines", () => {
+    assert.match(html, /viewport-fit=cover/);
+    assert.match(html, /<meta name="theme-color" content="#[0-9a-f]{6}" media="\(prefers-color-scheme: light\)"/);
+    assert.match(html, /<meta name="theme-color" content="#[0-9a-f]{6}" media="\(prefers-color-scheme: dark\)"/);
+    assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes"/);
+    assert.match(html, /<meta name="mobile-web-app-capable" content="yes"/);
+    assert.match(html, /<meta name="apple-mobile-web-app-status-bar-style" content="(default|black-translucent)"/);
+    assert.match(html, /<link rel="manifest" href="\/manifest\.webmanifest"/);
+    const title = href(/<meta name="apple-mobile-web-app-title" content="([^"]+)"/);
+    assert.ok(title && title.length <= 12, "apple-mobile-web-app-title missing or longer than 12 characters");
+  });
+
+  test("apple-touch-icon is a 180x180 PNG that ships", () => {
+    const icon = href(/<link rel="apple-touch-icon" href="\/([^"]+)"/);
+    assert.ok(icon?.endsWith(".png"), "apple-touch-icon is not a PNG");
+    assert.equal(pngSize(`public/${icon}`), "180x180");
+    const fav = href(/<link rel="icon" href="\/([^"]+)"/);
+    assert.ok(fav?.endsWith(".png") && has(`public/${fav}`), "favicon is not a PNG that exists");
+  });
+
+  test("the manifest parses, its icons exist at their stated size, one is maskable", () => {
+    const m = JSON.parse(read("public/manifest.webmanifest"));
+    assert.equal(m.display, "standalone");
+    assert.ok(m.name && m.short_name && m.start_url && m.theme_color && m.background_color);
+    for (const i of m.icons) assert.equal(pngSize(`public${i.src}`), i.sizes, `${i.src} is not ${i.sizes}`);
+    assert.ok(m.icons.some((i) => i.purpose === "maskable"), "no maskable icon");
+  });
+}
