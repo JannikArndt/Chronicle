@@ -6,7 +6,7 @@
 # Node major). Resolve one deliberately with:
 #
 #   docker buildx imagetools inspect node:24-alpine
-FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS build
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS build
 WORKDIR /app
 # Exactly INPUTS in server/buildid.mjs (test/deploy-contract.test.mjs checks):
 # the build id is stamped below from what is copied here, so a file the build
@@ -23,7 +23,7 @@ COPY scripts/build-server.mjs ./scripts/
 # from the sources here because the runtime image carries none to hash.
 RUN npm run build:client && npm run build:server && node server/buildid.mjs > dist-server/BUILD_ID
 
-FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
 WORKDIR /app
 # su-exec drops from root to node in docker-entrypoint.sh, after it has handed
 # the /data volume (possibly first written by an older, root container) to node.
