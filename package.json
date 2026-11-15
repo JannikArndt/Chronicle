@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@simplewebauthn/browser": "14.0.0",
-    "@simplewebauthn/server": "14.0.3",
+    "@simplewebauthn/server": "14.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -35,10 +35,10 @@
     "@vitejs/plugin-react": "^4.3.4",
     "ajv": "^8.17.1",
     "esbuild": "0.28.2",
-    "fake-indexeddb": "^6.2.7",
-    "playwright-core": "^1.64.1",
+    "fake-indexeddb": "^6.2.8",
+    "playwright-core": "^1.65.0",
     "typescript": "^5.6.3",
-    "vite": "^6.4.5",
+    "vite": "^6.4.6",
     "vitest": "^2.1.8"
   }
 }
