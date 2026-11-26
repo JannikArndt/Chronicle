@@ -75,15 +75,17 @@ npm run dev:server   # the Chronicle server on :8787 (data in .data/)
 npm run dev          # the client, proxying /api to the server
 npm test             # client and server tests (the server's run a real server in-process)
 npm run build        # typecheck + client build + server bundle
+npm run verify       # what CI runs; last line VERIFY: PASS
+npm run live         # is this build what chronicle.timpanini.com serves?
 ```
 
 The server is one dependency-free Node process (`node:http`, `node:sqlite`) — see
 [`server/CLAUDE.md`](./server/CLAUDE.md) and [`plans/v2-server-design.md`](./plans/v2-server-design.md).
 
-Deployment: pushes to `main` run the tests and deploy to CapRover via
+Deployment: pushes to `main` run `npm run verify` and deploy to CapRover via
 [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml), which then waits until
-`/version` reports the new build. The CapRover app needs HTTPS enabled and a persistent
-directory mounted at `/data`.
+`/version` reports the new build. The CapRover app needs HTTPS enabled (with HTTP
+forced to HTTPS) and the persistent volume `chronicle-data` mounted at `/data`.
 
 ## Conventions
 

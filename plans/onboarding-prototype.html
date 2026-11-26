@@ -1,0 +1,1105 @@
+<!doctype html>
+<!-- Clickable design reference for plans/onboarding-questionnaire.md. Open it in a browser.
+     All names and places in it are invented examples. Not part of the app build. -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chronicle Onboarding Sketches</title>
+<style>
+/* Layout: seven working phone screens on a quiet bench, one shared state, wrapping to fewer columns on smaller screens.
+   Palette mirrors Chronicle's own --color-* tokens (src/ui/styles.css) so the sketches read as the app. */
+:root {
+  --bg: #f1f0ec;
+  --surface: #fafaf8;
+  --card: #ffffff;
+  --text: #292524;
+  --text-2: #57534e;
+  --muted: #78716c;
+  --faint: #a8a29e;
+  --border: #d6d3cd;
+  --frame: #2a2724;
+  --accent: #c2410c;
+  --accent-soft: rgba(194, 65, 12, 0.12);
+  --on-accent: #ffffff;
+  --band: rgba(41, 37, 34, 0.05);
+  --grid: #e4e2dc;
+  --shadow: rgba(0, 0, 0, 0.12);
+  --row-places: #8aa66d;
+  --row-school: #7f68a8;
+  --row-work: #4f6ea8;
+  --row-love: #a8443f;
+  --row-kids: #3d8798;
+  --fig-skin: #e9b993;
+  --fig-shirt: #c2410c;
+  --fig-pants: #4f6ea8;
+  --fig-onesie: #8aa66d;
+  --fig-line: #292524;
+  --fig-cane: #7a5232;
+  --fig-hair-young: #4a3426;
+  --fig-hair-mid: #8d8478;
+  --fig-hair-old: #ebe7e0;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141210; --surface: #1c1a17; --card: #28251f; --text: #e7e5e0; --text-2: #c2bcae;
+    --muted: #a39e93; --faint: #7d7869; --border: #3a352c; --frame: #000000;
+    --accent: #e8621f; --accent-soft: rgba(232, 98, 31, 0.18); --on-accent: #ffffff;
+    --band: rgba(231, 229, 224, 0.06); --grid: #2f2b25; --shadow: rgba(0, 0, 0, 0.4);
+    --row-places: #93b076; --row-school: #9580bd; --row-work: #6787c2; --row-love: #c25a54; --row-kids: #4fa1b3;
+    --fig-shirt: #e8621f; --fig-pants: #6787c2; --fig-onesie: #93b076; --fig-cane: #a37450;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141210; --surface: #1c1a17; --card: #28251f; --text: #e7e5e0; --text-2: #c2bcae;
+  --muted: #a39e93; --faint: #7d7869; --border: #3a352c; --frame: #000000;
+  --accent: #e8621f; --accent-soft: rgba(232, 98, 31, 0.18); --on-accent: #ffffff;
+  --band: rgba(231, 229, 224, 0.06); --grid: #2f2b25; --shadow: rgba(0, 0, 0, 0.4);
+  --row-places: #93b076; --row-school: #9580bd; --row-work: #6787c2; --row-love: #c25a54; --row-kids: #4fa1b3;
+  --fig-shirt: #e8621f; --fig-pants: #6787c2; --fig-onesie: #93b076; --fig-cane: #a37450;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.4; }
+.wrap { max-width: 1420px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 48px; display: flex; flex-direction: column; gap: 26px; }
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; }
+h1 { font-size: 26px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; font-size: 14px; }
+.try { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.pill { font: inherit; font-size: 14px; border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 999px; padding: 6px 13px; cursor: pointer; }
+.pill:hover { border-color: var(--faint); }
+.pill[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pill:focus-visible, button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.bench { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px; justify-items: center; }
+.col { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+.tag { display: flex; align-items: baseline; gap: 8px; }
+.tag b { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.tag span { font-weight: 650; font-size: 16px; }
+.tag em { font-style: normal; font-size: 11px; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 1px 7px; }
+.note { margin: 0; color: var(--text-2); font-size: 13.5px; min-height: 2.8em; }
+.creates { margin: 0; font-size: 12.5px; color: var(--muted); }
+.creates code { font-family: inherit; color: var(--text-2); background: var(--band); border-radius: 4px; padding: 1px 5px; }
+
+.phone { width: 100%; height: 720px; border-radius: 42px; border: 9px solid var(--frame); background: var(--surface); overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.scr { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 26px 18px 16px; min-height: 0; }
+.dots { display: flex; gap: 6px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.dots i.on { background: var(--accent); }
+.q { font-size: 21px; font-weight: 700; margin: 0; line-height: 1.2; text-wrap: balance; }
+.hint { margin: -4px 0 0; color: var(--muted); font-size: 13px; }
+.go { font: inherit; font-size: 15px; font-weight: 600; background: var(--accent); color: var(--on-accent); border: 0; border-radius: 12px; padding: 12px; cursor: pointer; }
+.ghost { font: inherit; font-size: 13px; background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px 0; }
+.ghost:disabled { opacity: 0.4; cursor: default; }
+.ticks { position: relative; height: 14px; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ticks.years { color: var(--faint); }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+
+/* A: age dial */
+#fig { width: 100%; height: 200px; display: block; }
+.readout { display: flex; align-items: baseline; justify-content: center; gap: 10px; font-variant-numeric: tabular-nums; }
+.readout .age { font-size: 52px; font-weight: 750; letter-spacing: -0.03em; line-height: 1; }
+.readout .unit { color: var(--muted); font-size: 14px; }
+.bornrow { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: -4px; }
+.born { font-size: 16px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; min-width: 9.5em; text-align: center; }
+.nudge { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 17px; cursor: pointer; }
+input[type="range"] { width: 100%; accent-color: var(--accent); height: 28px; margin: 0; }
+.monthbox { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 26px; }
+.months { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; width: 100%; }
+.months .pill { padding: 5px 0; font-size: 13px; }
+.monthnote { font-size: 12px; color: var(--muted); text-align: center; }
+
+/* Sequence editor: one strip + list, shared by places, education and work */
+.seq { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1 1 auto; }
+.segctl { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.segctl button { font: inherit; font-size: 13px; padding: 5px 13px; border: 0; background: var(--card); color: var(--text-2); cursor: pointer; }
+.segctl button[aria-pressed="true"] { background: var(--text); color: var(--surface); }
+.bhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.strip { position: relative; padding: 4px 0 70px; touch-action: none; }
+.strip .years { margin-top: 3px; }
+.bar { position: relative; height: 44px; border-radius: 8px; background: var(--band); }
+.seg { position: absolute; top: 0; bottom: 0; background: var(--seq); color: var(--on-accent); font-size: 12px; font-weight: 600; display: flex; align-items: center; padding-left: 7px; overflow: hidden; white-space: nowrap; box-shadow: inset -2px 0 0 var(--surface); }
+.seg.first { border-radius: 8px 0 0 8px; }
+.seg.last { border-radius: 0 8px 8px 0; box-shadow: none; }
+.seg.first.last { border-radius: 8px; }
+.seg.alt { filter: brightness(0.9); }
+.seg.gap { background: transparent; color: var(--muted); font-weight: 500; font-style: italic; outline: 1.5px dashed var(--seq); outline-offset: -3px; box-shadow: none; }
+.seg.ongoing { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); }
+.knob { position: absolute; top: 66px; width: 30px; height: 30px; margin-left: -15px; border-radius: 50%; background: var(--card); border: 2px solid var(--seq); cursor: ew-resize; touch-action: none; display: grid; place-items: center; font-size: 11px; color: var(--muted); box-shadow: 0 1px 3px var(--shadow); z-index: 1; }
+.knob::before { content: ""; position: absolute; top: -24px; left: 50%; margin-left: -1px; width: 2px; height: 24px; background: var(--seq); }
+.knob.low { top: 100px; }
+.knob.low::before { top: -58px; height: 58px; }
+.knob.active { border-color: var(--accent); background: var(--accent-soft); }
+.bubble { min-height: 1.4em; font-size: 13px; color: var(--text-2); text-align: center; font-variant-numeric: tabular-nums; }
+.crowd { font-size: 12.5px; color: var(--accent); background: var(--accent-soft); border-radius: 8px; padding: 6px 9px; }
+.crowd button { font: inherit; color: inherit; background: none; border: 0; text-decoration: underline; cursor: pointer; padding: 0; }
+.list { display: flex; flex-direction: column; gap: 6px; overflow: auto; min-height: 0; flex: 1 1 auto; padding: 2px; }
+.lrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto 20px; align-items: center; gap: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 3px 6px; position: relative; transition: transform 140ms ease; flex: none; }
+.lrow.gap { background: transparent; border-style: dashed; }
+.lrow.gap .lname { font-style: italic; }
+.lrow.drag { z-index: 2; transition: none; box-shadow: 0 6px 16px var(--shadow); border-color: var(--accent); background: var(--card); }
+.handle { cursor: grab; touch-action: none; color: var(--faint); text-align: center; font-size: 17px; user-select: none; line-height: 1; padding: 6px 0; }
+.lname { font: inherit; font-size: 16px; border: 0; background: none; color: var(--text); min-width: 0; padding: 4px 2px; }
+.lname::placeholder { color: var(--faint); }
+.lfrom { display: flex; align-items: center; gap: 2px; font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.lfrom button { border: 0; background: var(--band); border-radius: 6px; width: 22px; height: 28px; cursor: pointer; color: var(--text); font: inherit; }
+.lfrom button:disabled { opacity: 0.3; cursor: default; }
+.lfrom span { min-width: 44px; line-height: 1.15; }
+.lfrom small { color: var(--faint); font-size: 11px; }
+.lend { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12.5px; color: var(--text-2); padding: 6px 6px 2px 8px; flex: none; }
+.x { border: 0; background: none; color: var(--faint); cursor: pointer; font: inherit; padding: 0; }
+.mini { font: inherit; font-size: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text-2); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.mini[aria-pressed="true"] { background: var(--seq); border-color: var(--seq); color: var(--on-accent); }
+.adder { display: flex; flex-direction: column; gap: 6px; }
+.add { display: flex; gap: 6px; }
+.add input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 8px 11px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+.add button { font: inherit; font-size: 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 0 12px; cursor: pointer; }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pills .pill { font-size: 13px; padding: 5px 10px; }
+
+/* shared preview */
+.preview { border-top: 1px solid var(--border); margin: auto -18px -16px; padding: 10px 12px 12px; background: var(--card); }
+.preview p { margin: 0 0 6px; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.preview canvas { width: 100%; display: block; }
+
+/* F: kids */
+.kids { display: flex; flex-direction: column; gap: 10px; overflow: auto; min-height: 0; padding: 2px; }
+.kid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 20px; gap: 2px 10px; align-items: center; font-variant-numeric: tabular-nums; }
+.kid input[type="text"] { font: inherit; font-size: 16px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); min-width: 0; }
+.kid small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.gkid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) 20px; gap: 6px 10px; align-items: center; font-variant-numeric: tabular-nums; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.gkid .pills { grid-column: 1 / -1; }
+.gkid input[type="text"] { font: inherit; font-size: 16px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); min-width: 0; }
+.gkid small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; margin-top: -4px; }
+.empty { font-size: 13px; color: var(--muted); background: var(--band); border-radius: 8px; padding: 10px; }
+.made { font-size: 12.5px; color: var(--text-2); background: var(--accent-soft); border-radius: 8px; padding: 7px 9px; }
+
+/* flow */
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+.flow .step { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.flow .step b { color: var(--accent); margin-right: 4px; }
+.flow .arr { color: var(--faint); }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 22px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; color: var(--text-2); }
+.rules b { color: var(--text); display: block; }
+h2 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+@media (prefers-reduced-motion: reduce) { .lrow { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Onboarding sketches</h1>
+      <p class="sub">One screen per topic, all sharing one state. Nothing is saved.</p>
+    </div>
+    <div class="try" role="group" aria-label="Try as">
+      Try as
+      <button class="pill" data-try="20">20</button>
+      <button class="pill" data-try="40" aria-pressed="true">40</button>
+      <button class="pill" data-try="63">63</button>
+    </div>
+  </header>
+
+  <section class="bench">
+    <!-- A -->
+    <div class="col">
+      <div class="tag"><b>1</b><span>Born</span></div>
+      <p class="note">Slide or nudge the year. If the birthday is still to come, the month makes the age right.</p>
+      <div class="phone">
+        <div class="scr">
+          <div class="dots" data-step="1"></div>
+          <h3 class="q">When were you born?</h3>
+          <p class="hint">The year is enough for now.</p>
+          <canvas id="fig" aria-label="A person drawn at the chosen age"></canvas>
+          <div class="readout"><span class="age" id="ageNum">40</span><span class="unit">years old</span></div>
+          <div class="bornrow">
+            <button class="nudge" id="earlier" aria-label="One year earlier">‹</button>
+            <span class="born" id="bornLine">born 1986</span>
+            <button class="nudge" id="later" aria-label="One year later">›</button>
+          </div>
+          <input type="range" id="age" min="0" max="95" value="40" aria-label="Age">
+          <div class="monthbox" id="monthBox"></div>
+          <button class="go" style="margin-top:auto">That's me →</button>
+        </div>
+      </div>
+      <p class="creates">Creates <code>🙂 You</code> with a birth year, or a month if given.</p>
+    </div>
+
+    <!-- B -->
+    <div class="col">
+      <div class="tag"><b>2</b><span>Lived</span></div>
+      <p class="note">Strip for a few, list for many. Reordering swaps the names; the dates stay put.</p>
+      <div class="phone">
+        <div class="scr">
+          <div class="dots" data-step="2"></div>
+          <h3 class="q">Where have you lived?</h3>
+          <div class="seq" data-seq="places"></div>
+          <div class="preview"><p>Your timeline so far</p><canvas id="prevB"></canvas></div>
+        </div>
+      </div>
+      <p class="creates">Creates <code>🏠 Places lived</code>, one entry per place, year precision.</p>
+    </div>
+
+    <!-- D -->
+    <div class="col">
+      <div class="tag"><b>3</b><span>Learned</span></div>
+      <p class="note">Same editor as places, plus gaps and an end. Back to university at 31 is a gap, then a Master.</p>
+      <div class="phone">
+        <div class="scr">
+          <div class="dots" data-step="3"></div>
+          <h3 class="q">School and after</h3>
+          <div class="seq" data-seq="edu"></div>
+          <div class="preview"><p>Your timeline so far</p><canvas id="prevD"></canvas></div>
+        </div>
+      </div>
+      <p class="creates">Creates <code>🎓 Education</code>, one entry per item. Gaps create nothing.</p>
+    </div>
+
+    <!-- E -->
+    <div class="col">
+      <div class="tag"><b>4</b><span>Worked</span></div>
+      <p class="note">Jobs in order, with gaps for a degree, travel or time between jobs. Retired? Set an end.</p>
+      <div class="phone">
+        <div class="scr">
+          <div class="dots" data-step="4"></div>
+          <h3 class="q">Where have you worked?</h3>
+          <div class="seq" data-seq="work"></div>
+          <div class="preview"><p>Your timeline so far</p><canvas id="prevE"></canvas></div>
+        </div>
+      </div>
+      <p class="creates">Creates <code>💼 Work</code>, one entry per job. Unnamed jobs stay as "Job" until renamed.</p>
+    </div>
+    <!-- Partner -->
+    <div class="col">
+      <div class="tag"><b>5</b><span>Partner</span><em>new</em></div>
+      <p class="note">Same editor again. Partners in order, gaps between, "still together" is the open end.</p>
+      <div class="phone">
+        <div class="scr">
+          <div class="dots" data-step="5"></div>
+          <h3 class="q">Who have you been with?</h3>
+          <div class="seq" data-seq="love"></div>
+          <div class="preview"><p>Your timeline so far</p><canvas id="prevP"></canvas></div>
+        </div>
+      </div>
+      <p class="creates">Creates <code>❤️ Relationships</code>, one entry per partner. Only the ones you choose to add.</p>
+    </div>
+
+    <!-- F -->
+    <div class="col">
+      <div class="tag"><b>6</b><span>Kids</span><em>new</em></div>
+      <p class="note">Each child is added with a name and birth year. No count up front; "No kids" moves on.</p>
+      <div class="phone">
+        <div class="scr">
+          <div class="dots" data-step="6"></div>
+          <h3 class="q">Do you have kids?</h3>
+          <p class="hint">Name and birth year. More family can come later.</p>
+          <div class="kids" id="kids"></div>
+          <div class="pills"><button class="pill" id="addKid">＋ Add a child</button><button class="pill" id="noKids" aria-pressed="false">No kids</button></div>
+          <div class="made" id="kidsMade"></div>
+          <button class="go">Next →</button>
+          <div class="preview"><p>Your timeline so far</p><canvas id="prevF"></canvas></div>
+        </div>
+      </div>
+      <p class="creates">Creates a <code>👨‍👩‍👧 Family</code> group, one group per child with a name and birth year.</p>
+    </div>
+
+    <!-- Grandkids -->
+    <div class="col">
+      <div class="tag"><b>7</b><span>Grandkids</span><em>new</em></div>
+      <p class="note">Shown only if you added kids. Each grandchild goes inside its parent's group.</p>
+      <div class="phone">
+        <div class="scr">
+          <div class="dots" data-step="7"></div>
+          <h3 class="q">Any grandchildren?</h3>
+          <p class="hint">Pick whose child, then name and year.</p>
+          <div class="kids" id="gkids"></div>
+          <div class="pills"><button class="pill" id="addGkid">＋ Add a grandchild</button><button class="pill" id="noGkids" aria-pressed="false">None</button></div>
+          <div class="made" id="gkidsMade"></div>
+          <button class="go">Draw my timeline →</button>
+          <div class="preview"><p>Your timeline so far</p><canvas id="prevG"></canvas></div>
+        </div>
+      </div>
+      <p class="creates">Creates one group per grandchild, nested in its parent's group.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Proposed flow</h2>
+    <div class="flow">
+      <span class="step"><b>1</b>Born</span><span class="arr">→</span>
+      <span class="step"><b>2</b>Lived</span><span class="arr">→</span>
+      <span class="step"><b>3</b>Learned</span><span class="arr">→</span>
+      <span class="step"><b>4</b>Worked</span><span class="arr">→</span>
+      <span class="step"><b>5</b>Partner</span><span class="arr">→</span>
+      <span class="step"><b>6</b>Kids</span><span class="arr">→</span>
+      <span class="step"><b>7</b>Grandkids</span><span class="arr">→</span>
+      <span class="step">Canvas, zoomed to your life</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Rules it rests on</h2>
+    <ul class="rules">
+      <li><b>One topic, one screen, one order</b>Everything about a topic is asked in one place. The order is the same at every age.</li>
+      <li><b>Ages and years side by side</b>"At 19" is easier to recall than "2005". Show both.</li>
+      <li><b>One editor for "one thing after another"</b>Places, education and work share the strip and the list.</li>
+      <li><b>Gaps hold time, nothing more</b>A gap keeps the order honest and creates no entry.</li>
+      <li><b>A year is enough</b>Stored with year precision. Month or day can be refined later on the canvas.</li>
+      <li><b>Always show the result</b>The preview grows with every answer. No reveal screen to wait for.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(() => {
+  const NOW = 2026;
+  const NOW_MONTH = 9; // October, 0-based
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const S = { age: 40, month: null, monthOpen: false, kids: [], noKids: false, gkids: [], noGkids: false };
+  const $ = (s) => document.querySelector(s);
+  const tok = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const birth = () => NOW - S.age;
+  const exactAge = () => (S.month !== null && S.month > NOW_MONTH ? Math.max(0, S.age - 1) : S.age);
+  const bracket = (a) => (a < 28 ? "young" : a < 52 ? "mid" : "senior");
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+  const pct = (at) => (S.age ? at / S.age : 0) * 100;
+  const tickStep = () => (S.age <= 12 ? 2 : S.age <= 30 ? 5 : 10);
+
+  function ticksHtml(years) {
+    const step = tickStep();
+    let h = "";
+    for (let t = 0; t <= S.age; t += step) {
+      if (S.age - t < step * 0.45 && t !== 0) continue;
+      h += `<span style="left:${pct(t)}%">${years ? birth() + t : t}</span>`;
+    }
+    return h + `<span style="left:100%">${years ? "now" : S.age}</span>`;
+  }
+
+  // ---------- A: ageing figure ----------
+  function hexToRgb(h) {
+    h = h.replace("#", "");
+    if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+    const n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function mix(a, b, t) {
+    const A = hexToRgb(a), B = hexToRgb(b);
+    return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * clamp(t, 0, 1))).join(",")})`;
+  }
+  function hairColor(age) {
+    const y = tok("--fig-hair-young"), m = tok("--fig-hair-mid"), o = tok("--fig-hair-old");
+    if (age < 40) return mix(y, y, 0);
+    if (age < 62) return mix(y, m, (age - 40) / 22);
+    return mix(m, o, (age - 62) / 18);
+  }
+  function setup(c, cssH) {
+    const dpr = window.devicePixelRatio || 1;
+    if (cssH) c.style.height = cssH + "px";
+    const w = c.clientWidth, h = c.clientHeight;
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+    const ctx = c.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h };
+  }
+  function rr(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+    else ctx.rect(x, y, w, h);
+  }
+  function face(ctx, x, y, r, age) {
+    const line = tok("--fig-line");
+    ctx.fillStyle = line;
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(x + s * r * 0.36, y + r * 0.08, r * 0.09, 0, 7); ctx.fill(); }
+    ctx.strokeStyle = line; ctx.lineWidth = Math.max(1.2, r * 0.08); ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(x, y + r * 0.3, r * 0.3, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    if (age >= 44) {
+      ctx.lineWidth = Math.max(1.2, r * 0.07);
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(x + s * r * 0.36, y + r * 0.08, r * 0.24, 0, 7); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(x - r * 0.12, y + r * 0.06); ctx.lineTo(x + r * 0.12, y + r * 0.06); ctx.stroke();
+    }
+  }
+  function hair(ctx, x, y, r, age) {
+    ctx.fillStyle = hairColor(age);
+    const thin = age > 55 ? Math.min(0.4, (age - 55) * 0.016) : 0;
+    ctx.beginPath();
+    ctx.ellipse(x, y - r * 0.18, r * 1.06, r * (0.92 - thin), 0, Math.PI, 2 * Math.PI);
+    ctx.fill();
+    if (age >= 4 && age < 60) {
+      for (const s of [-1, 1]) { rr(ctx, x + s * r * 0.98 - r * 0.14, y - r * 0.25, r * 0.28, r * 0.55, r * 0.14); ctx.fill(); }
+    }
+  }
+  function drawPerson(c, age) {
+    const { ctx, w, h } = setup(c);
+    const ground = h - 12, cx = w / 2;
+    ctx.fillStyle = tok("--band");
+    ctx.beginPath(); ctx.ellipse(cx, ground + 2, 56, 7, 0, 0, 7); ctx.fill();
+    const skin = tok("--fig-skin"), shirt = tok("--fig-shirt"), pants = tok("--fig-pants"), line = tok("--fig-line");
+
+    if (age < 2) {
+      const r = 18, bodyY = ground - 22;
+      ctx.fillStyle = tok("--fig-onesie");
+      rr(ctx, cx - 6, ground - 15, 38, 14, 7); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx - 6, bodyY, 21, 22, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = skin;
+      ctx.beginPath(); ctx.ellipse(cx + 34, ground - 8, 6, 7, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 12, bodyY - 2, 6, 0, 7); ctx.fill();
+      const hy = bodyY - 22 - r + 6;
+      ctx.beginPath(); ctx.arc(cx - 6, hy, r, 0, 7); ctx.fill();
+      ctx.strokeStyle = hairColor(0); ctx.lineWidth = 2.5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.arc(cx - 2, hy - r - 2, 5, Math.PI * 0.9, Math.PI * 2.1); ctx.stroke();
+      face(ctx, cx - 6, hy, r, age);
+      return;
+    }
+
+    const grow = age < 18 ? 0.36 + 0.64 * Math.pow(age / 18, 0.8) : 1 - Math.max(0, Math.min(0.07, (age - 68) * 0.004));
+    const H = (h - 26) * grow;
+    const heads = age < 18 ? 4.2 + 3.2 * Math.min(age, 18) / 18 : 7.4;
+    const r = H / heads / 2;
+    const legLen = H * (0.4 + 0.07 * Math.min(age, 18) / 18);
+    const neck = r * 0.25;
+    const torsoLen = H - legLen - 2 * r - neck;
+    const sw = r * (age < 18 ? 1.0 + 0.25 * age / 18 : 1.25);
+    const stoop = age > 66 ? Math.min(0.26, (age - 66) * 0.012) : 0;
+    const hipX = cx - stoop * 24, hipY = ground - legLen;
+    const cane = age >= 78;
+
+    ctx.lineCap = "round";
+    ctx.strokeStyle = pants; ctx.lineWidth = r * 0.62;
+    const st = r * 0.42;
+    for (const s of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(hipX + s * st * 0.6, hipY); ctx.lineTo(hipX + s * st, ground - r * 0.2); ctx.stroke();
+    }
+    ctx.fillStyle = line;
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hipX + s * st + s * r * 0.12, ground - r * 0.12, r * 0.38, r * 0.18, 0, 0, 7); ctx.fill(); }
+
+    const cos = Math.cos(stoop), sin = Math.sin(stoop);
+    const world = (x, y) => [hipX + x * cos - y * sin, hipY + x * sin + y * cos];
+
+    ctx.save();
+    ctx.translate(hipX, hipY); ctx.rotate(stoop);
+    ctx.strokeStyle = shirt; ctx.lineWidth = r * 0.5;
+    const lh = [-sw - r * 0.2, -torsoLen * 0.12];
+    ctx.beginPath(); ctx.moveTo(-sw + r * 0.25, -torsoLen + r * 0.3); ctx.lineTo(lh[0], lh[1]); ctx.stroke();
+    ctx.fillStyle = shirt; rr(ctx, -sw, -torsoLen, sw * 2, torsoLen + r * 0.35, r * 0.55); ctx.fill();
+    const rh = cane ? [sw + r * 1.0, -torsoLen * 0.3] : [sw + r * 0.2, -torsoLen * 0.12];
+    ctx.strokeStyle = shirt;
+    ctx.beginPath(); ctx.moveTo(sw - r * 0.25, -torsoLen + r * 0.3); ctx.lineTo(rh[0], rh[1]); ctx.stroke();
+    ctx.fillStyle = skin;
+    for (const p of [lh, rh]) { ctx.beginPath(); ctx.arc(p[0], p[1], r * 0.24, 0, 7); ctx.fill(); }
+    rr(ctx, -r * 0.22, -torsoLen - neck - r * 0.2, r * 0.44, neck + r * 0.4, 2); ctx.fill();
+    const hy = -torsoLen - neck - r;
+    ctx.beginPath(); ctx.arc(0, hy, r, 0, 7); ctx.fill();
+    hair(ctx, 0, hy, r, age);
+    face(ctx, 0, hy, r, age);
+    ctx.restore();
+
+    if (cane) {
+      const [hx, hyw] = world(rh[0], rh[1]);
+      ctx.strokeStyle = tok("--fig-cane"); ctx.lineWidth = Math.max(2.5, r * 0.18);
+      ctx.beginPath(); ctx.moveTo(hx, hyw - r * 0.1); ctx.lineTo(hx + r * 0.25, ground); ctx.stroke();
+    }
+  }
+
+  function renderMonth() {
+    const box = $("#monthBox");
+    box.innerHTML = "";
+    if (!S.monthOpen && S.month === null) {
+      const b = document.createElement("button");
+      b.className = "ghost";
+      b.textContent = "Birthday still to come this year? ＋ Add month";
+      b.addEventListener("click", () => { S.monthOpen = true; renderMonth(); });
+      box.appendChild(b);
+      return;
+    }
+    const grid = document.createElement("div");
+    grid.className = "months";
+    MONTHS.forEach((m, i) => {
+      const b = document.createElement("button");
+      b.className = "pill"; b.textContent = m;
+      b.setAttribute("aria-pressed", String(S.month === i));
+      b.addEventListener("click", () => { S.month = S.month === i ? null : i; renderA(); drawPreviews(); });
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+    const note = document.createElement("div");
+    note.className = "monthnote";
+    note.textContent = S.month === null ? "Pick the month, or leave it." : S.month === NOW_MONTH ? `Birthday this month: ${S.age - 1} or ${S.age} until then.` : S.month > NOW_MONTH ? `Turns ${S.age} in ${MONTHS[S.month]}.` : `Turned ${S.age} in ${MONTHS[S.month]}.`;
+    box.appendChild(note);
+  }
+  function renderA() {
+    $("#ageNum").textContent = exactAge();
+    $("#bornLine").textContent = `born ${S.month !== null ? MONTHS[S.month] + " " : ""}${birth()}`;
+    $("#age").value = S.age;
+    renderMonth();
+    drawPerson($("#fig"), exactAge());
+  }
+
+
+  // ---------- sequence editor: places, education, work ----------
+  // Items run one after another: item N lasts until item N+1 starts, the last
+  // one until `end` (null = still going). A gap holds time and creates nothing.
+  // Reordering moves names, never dates.
+  const SEQS = {};
+  function Seq(cfg) {
+    cfg.items = [];
+    cfg.end = null;
+    cfg.view = "strip";
+    const root = document.querySelector(`[data-seq="${cfg.key}"]`);
+    root.style.setProperty("--seq", `var(${cfg.color})`);
+    root.innerHTML = `
+      <div class="bhead"><div class="segctl" role="group" aria-label="View"><button data-v="strip" aria-pressed="true">Strip</button><button data-v="list" aria-pressed="false">List</button></div><span class="extra"></span></div>
+      <div class="sv"><p class="hint" style="margin:0 0 6px"></p><div class="strip"><div class="ticks ages"></div><div class="bar"></div><div class="ticks years"></div></div></div>
+      <div class="list" hidden></div>
+      <div class="bubble">&nbsp;</div>
+      <div class="crowd" hidden>That's a lot for one strip. <button type="button">Switch to the list</button></div>
+      <div class="adder"></div>`;
+    const q = (s) => root.querySelector(s);
+    const bar = q(".bar"), list = q(".list"), bubble = q(".bubble");
+    q(".hint").textContent = cfg.hint;
+    let knobs = [], drag = null, ldrag = null;
+
+    const nameOf = (it) => it.label || (it.gap ? "gap" : cfg.noun);
+    const spanEnd = (i) => (i + 1 < cfg.items.length ? cfg.items[i + 1].at : cfg.end ?? S.age);
+    const changed = () => drawPreviews();
+
+    function clampSeq() {
+      const it = cfg.items, n = it.length;
+      if (!n) { cfg.end = null; return; }
+      if (!cfg.freeStart) it[0].at = 0;
+      for (let i = 0; i < n; i++) {
+        const lo = i ? it[i - 1].at + 1 : 0;
+        it[i].at = clamp(it[i].at, lo, Math.max(lo, S.age - 1 - (n - 1 - i)));
+      }
+      if (cfg.end !== null) cfg.end = clamp(cfg.end, it[n - 1].at + 1, Math.max(it[n - 1].at + 1, S.age));
+    }
+    function say(k) {
+      if (k.type === "end") { bubble.textContent = `Ended at ${cfg.end} · ${birth() + cfg.end}`; return; }
+      const it = cfg.items[k.i];
+      bubble.textContent = cfg.say ? cfg.say(nameOf(it), it.at, k.i) : `${it.gap ? "Gap" : nameOf(it)} from ${it.at} · ${birth() + it.at}`;
+    }
+    const knobVal = (k) => (k.type === "end" ? cfg.end : cfg.items[k.i].at);
+    const setKnob = (k, v) => { if (k.type === "end") cfg.end = v; else cfg.items[k.i].at = v; };
+
+    function buildStrip() {
+      bar.innerHTML = "";
+      cfg.items.forEach((it) => {
+        const seg = document.createElement("div");
+        seg.className = "seg";
+        seg.textContent = nameOf(it);
+        bar.appendChild(seg);
+      });
+      knobs = [];
+      cfg.items.forEach((it, i) => { if (i > 0 || cfg.freeStart) knobs.push({ type: i === 0 ? "start" : "b", i }); });
+      if (cfg.end !== null && cfg.items.length) knobs.push({ type: "end" });
+      knobs.forEach((k) => {
+        const el = document.createElement("div");
+        el.className = "knob";
+        el.tabIndex = 0;
+        el.setAttribute("role", "slider");
+        el.textContent = k.type === "start" ? "◂" : k.type === "end" ? "▸" : "↔";
+        el.setAttribute("aria-label", k.type === "end" ? "End" : `Start of ${nameOf(cfg.items[k.i])}`);
+        k.el = el;
+        el.addEventListener("pointerdown", (e) => { drag = k; el.setPointerCapture(e.pointerId); el.classList.add("active"); e.preventDefault(); });
+        el.addEventListener("pointermove", (e) => {
+          if (drag !== k) return;
+          const r = bar.getBoundingClientRect();
+          setKnob(k, Math.round(clamp((e.clientX - r.left) / r.width, 0, 1) * S.age));
+          clampSeq(); update(); say(k); changed();
+        });
+        const end = () => { if (drag === k) { drag = null; el.classList.remove("active"); } };
+        el.addEventListener("pointerup", end);
+        el.addEventListener("pointercancel", end);
+        el.addEventListener("keydown", (e) => {
+          const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+          if (!d) return;
+          setKnob(k, knobVal(k) + d); clampSeq(); update(); say(k); changed(); e.preventDefault();
+        });
+        bar.appendChild(el);
+      });
+    }
+    function update() {
+      const segs = bar.querySelectorAll(".seg");
+      const n = cfg.items.length;
+      let alt = 0;
+      cfg.items.forEach((it, i) => {
+        const s = segs[i];
+        s.style.left = pct(it.at) + "%";
+        s.style.width = Math.max(0, pct(spanEnd(i)) - pct(it.at)) + "%";
+        s.className = "seg" + (it.gap ? " gap" : alt++ % 2 ? " alt" : "") + (i === 0 ? " first" : "") + (i === n - 1 ? " last" : "") + (i === n - 1 && cfg.end === null && !it.gap ? " ongoing" : "");
+        s.textContent = nameOf(it);
+      });
+      // Knobs closer than a finger drop to a second row instead of overlapping.
+      const w = bar.clientWidth;
+      let hi = -Infinity, lo = -Infinity;
+      knobs.forEach((k) => {
+        const p = pct(knobVal(k));
+        const x = (p / 100) * w;
+        k.el.style.left = p + "%";
+        const low = x - hi < 32 && x - lo >= 32;
+        k.el.classList.toggle("low", low);
+        if (low) lo = x; else hi = x;
+      });
+      q(".ticks.ages").innerHTML = ticksHtml(false);
+      q(".ticks.years").innerHTML = ticksHtml(true);
+      q(".crowd").hidden = !(cfg.view === "strip" && cfg.items.length > 6);
+      const still = q(".extra .mini");
+      if (still) { still.setAttribute("aria-pressed", String(cfg.end === null)); still.hidden = !cfg.items.length; }
+      updateListDates();
+    }
+
+    function buildList() {
+      list.innerHTML = "";
+      cfg.items.forEach((it, i) => {
+        const row = document.createElement("div");
+        row.className = "lrow" + (it.gap ? " gap" : "");
+        row.innerHTML = `<span class="handle" role="button" tabindex="0" aria-label="Drag to reorder">≡</span><input class="lname"><div class="lfrom"><button aria-label="Earlier">‹</button><span></span><button aria-label="Later">›</button></div><button class="x" aria-label="Remove">✕</button>`;
+        const inp = row.querySelector(".lname");
+        inp.value = it.label;
+        inp.id = `${cfg.key}-${i}`;
+        inp.placeholder = it.gap ? "Gap · creates nothing" : cfg.noun;
+        inp.setAttribute("aria-label", `${cfg.noun} ${i + 1}`);
+        inp.addEventListener("input", () => { it.label = inp.value; update(); changed(); });
+        const [minus, plus] = row.querySelectorAll(".lfrom button");
+        minus.disabled = plus.disabled = i === 0 && !cfg.freeStart;
+        const step = (d) => { it.at += d; clampSeq(); update(); changed(); };
+        minus.addEventListener("click", () => step(-1));
+        plus.addEventListener("click", () => step(1));
+        row.querySelector(".x").addEventListener("click", () => {
+          if (!cfg.freeStart && cfg.items.length === 1) return;
+          cfg.items.splice(i, 1); clampSeq(); rebuild(); changed();
+        });
+        const h = row.querySelector(".handle");
+        h.addEventListener("pointerdown", (e) => {
+          ldrag = { i, y0: e.clientY, t: i, h: row.offsetHeight + 6, rows: [...list.querySelectorAll(".lrow")] };
+          h.setPointerCapture(e.pointerId); row.classList.add("drag"); e.preventDefault();
+        });
+        h.addEventListener("pointermove", (e) => {
+          if (!ldrag || ldrag.i !== i) return;
+          const dy = e.clientY - ldrag.y0;
+          row.style.transform = `translateY(${dy}px)`;
+          ldrag.t = clamp(i + Math.round(dy / ldrag.h), 0, cfg.items.length - 1);
+          ldrag.rows.forEach((r, k) => {
+            if (k === i) return;
+            let s = 0;
+            if (i < ldrag.t && k > i && k <= ldrag.t) s = -ldrag.h;
+            if (i > ldrag.t && k >= ldrag.t && k < i) s = ldrag.h;
+            r.style.transform = s ? `translateY(${s}px)` : "";
+          });
+        });
+        const drop = () => { if (!ldrag || ldrag.i !== i) return; const t = ldrag.t; ldrag = null; moveItem(i, t); };
+        h.addEventListener("pointerup", drop);
+        h.addEventListener("pointercancel", drop);
+        h.addEventListener("keydown", (e) => {
+          const d = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+          if (d) { moveItem(i, clamp(i + d, 0, cfg.items.length - 1)); e.preventDefault(); }
+        });
+        list.appendChild(row);
+      });
+      if (cfg.endable && cfg.items.length) {
+        const row = document.createElement("div");
+        row.className = "lend";
+        list.appendChild(row);
+      }
+      updateListDates();
+    }
+    function renderEndRow(row) {
+      row.innerHTML = "";
+      const last = cfg.items[cfg.items.length - 1];
+      const toggle = document.createElement("button");
+      toggle.className = "mini";
+      if (cfg.end === null) {
+        row.innerHTML = `<span>▸ ${cfg.still || "Still going"}</span>`;
+        toggle.textContent = "Set an end";
+        toggle.addEventListener("click", () => { cfg.end = clamp(last.at + 2, last.at + 1, S.age); clampSeq(); rebuild(); changed(); });
+      } else {
+        row.innerHTML = `<span>🏁 Ended</span><div class="lfrom"><button aria-label="Earlier">‹</button><span>at ${cfg.end}<br><small>${birth() + cfg.end}</small></span><button aria-label="Later">›</button></div>`;
+        const [minus, plus] = row.querySelectorAll(".lfrom button");
+        minus.addEventListener("click", () => { cfg.end--; clampSeq(); update(); changed(); });
+        plus.addEventListener("click", () => { cfg.end++; clampSeq(); update(); changed(); });
+        toggle.textContent = cfg.still || "Still going";
+        toggle.addEventListener("click", () => { cfg.end = null; rebuild(); changed(); });
+      }
+      row.appendChild(toggle);
+    }
+    function updateListDates() {
+      list.querySelectorAll(".lrow").forEach((row, i) => {
+        const it = cfg.items[i];
+        row.querySelector(".lfrom span").innerHTML = i === 0 && !cfg.freeStart ? `from birth<br><small>${birth()}</small>` : `from ${it.at}<br><small>${birth() + it.at}</small>`;
+      });
+      const end = list.querySelector(".lend");
+      if (end) renderEndRow(end);
+    }
+    function moveItem(from, to) {
+      if (from !== to) {
+        const names = cfg.items.map((it) => ({ label: it.label, gap: it.gap }));
+        const [m] = names.splice(from, 1);
+        names.splice(to, 0, m);
+        names.forEach((p, k) => Object.assign(cfg.items[k], p));
+        bubble.textContent = "Reordered. The dates stayed put.";
+      }
+      rebuild(); changed();
+    }
+    function full() { bubble.textContent = "No room left. Move a date first."; }
+    function addItem(label, len = 2, gap = false, start) {
+      const it = cfg.items, last = it[it.length - 1];
+      let at;
+      if (!last) {
+        at = clamp(start ?? 18, 0, Math.max(0, S.age - 1));
+        if (cfg.endable) cfg.end = Math.min(S.age, at + len);
+      } else if (cfg.end !== null) {
+        at = cfg.end;
+        if (at >= S.age) return full();
+        cfg.end = Math.min(S.age, at + len);
+      } else {
+        at = Math.round((last.at + S.age) / 2);
+        if (at <= last.at || at > S.age - 1) return full();
+      }
+      it.push({ label, at, gap });
+      clampSeq(); rebuild(); say({ type: "b", i: it.length - 1 }); changed();
+    }
+    function setView(v) {
+      cfg.view = v;
+      q('[data-v="strip"]').setAttribute("aria-pressed", String(v === "strip"));
+      q('[data-v="list"]').setAttribute("aria-pressed", String(v === "list"));
+      q(".sv").hidden = v !== "strip";
+      list.hidden = v !== "list";
+      bubble.textContent = v === "list" ? "≡ drag to reorder · ‹ › move a date" : " ";
+      rebuild();
+    }
+    function rebuild() { buildStrip(); buildList(); update(); }
+
+    q('[data-v="strip"]').addEventListener("click", () => setView("strip"));
+    q('[data-v="list"]').addEventListener("click", () => setView("list"));
+    q(".crowd button").addEventListener("click", () => setView("list"));
+
+    const extra = q(".extra"), adder = q(".adder");
+    if (cfg.demo) {
+      const b = document.createElement("button");
+      b.className = "ghost"; b.textContent = cfg.demo.text;
+      b.addEventListener("click", () => { api.set(cfg.demo.items(), null); changed(); });
+      extra.appendChild(b);
+    }
+    if (cfg.endable) {
+      const b = document.createElement("button");
+      b.className = "mini"; b.textContent = `▸ ${cfg.still || "Still going"}`;
+      b.addEventListener("click", () => {
+        const last = cfg.items[cfg.items.length - 1];
+        if (!last) return;
+        cfg.end = cfg.end === null ? clamp(last.at + 2, last.at + 1, S.age) : null;
+        clampSeq(); rebuild(); changed();
+      });
+      extra.appendChild(b);
+    }
+    if (cfg.chips) {
+      const pills = document.createElement("div");
+      pills.className = "pills";
+      cfg.chips.forEach((c) => {
+        const b = document.createElement("button");
+        b.className = "pill";
+        b.textContent = `＋ ${c.icon} ${c.text ?? c.label}`;
+        b.addEventListener("click", () => addItem(c.label, c.len, !!c.gap, c.start));
+        pills.appendChild(b);
+      });
+      adder.appendChild(pills);
+    } else {
+      const form = document.createElement("form");
+      form.className = "add";
+      form.innerHTML = `<input id="${cfg.key}-new" placeholder="Add a ${cfg.noun.toLowerCase()}" autocomplete="off"><button type="submit">Add</button>`;
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const inp = form.querySelector("input");
+        const used = new Set(cfg.items.map((p) => p.label));
+        const label = inp.value.trim() || (cfg.samples || []).find((s) => !used.has(s)) || `${cfg.noun} ${cfg.items.length + 1}`;
+        inp.value = "";
+        addItem(label);
+      });
+      if (cfg.gaps) {
+        const g = document.createElement("button");
+        g.type = "button"; g.textContent = "⏸ Gap";
+        g.addEventListener("click", () => addItem("", 2, true));
+        form.appendChild(g);
+      }
+      adder.appendChild(form);
+    }
+
+    const api = {
+      cfg,
+      set(rows, end) { cfg.items = rows.map(([label, at, gap]) => ({ label, at, gap: !!gap })); cfg.end = end; clampSeq(); rebuild(); },
+      setEnd(end) { cfg.end = end; clampSeq(); rebuild(); },
+      setCount(n) {
+        const names = cfg.items.filter((i) => !i.gap).map((i) => i.label);
+        const s0 = cfg.freeStart ? (cfg.items[0]?.at ?? 20) : 0;
+        api.set(Array.from({ length: n }, (_, i) => [names[i] ?? "", Math.round(s0 + ((S.age - s0) * i) / n)]), cfg.endable ? cfg.end : null);
+      },
+      refresh() { clampSeq(); rebuild(); },
+      spans() {
+        return cfg.items.map((it, i) => ({ from: it.at, to: spanEnd(i), label: nameOf(it), gap: it.gap })).filter((s) => !s.gap);
+      },
+    };
+    return api;
+  }
+
+  const SAMPLE = ["Hamburg", "Utrecht", "Berlin", "Lisbon", "Munich", "Vienna", "Leipzig", "Bremen", "Zürich"];
+  SEQS.places = Seq({
+    key: "places", color: "--row-places", noun: "Place", freeStart: false, endable: false, samples: SAMPLE,
+    hint: "Drag the dots to when you moved. Roughly is fine.",
+    say: (name, at, i) => (i ? `Moved to ${name} at ${at} · ${birth() + at}` : `${name} from birth`),
+    demo: { text: "Try 9 places", items: () => SAMPLE.map((p, i) => [p, Math.round((S.age * i) / 9)]) },
+  });
+  SEQS.edu = Seq({
+    key: "edu", color: "--row-school", noun: "School", freeStart: true, endable: true,
+    hint: "Add in order. Gaps hold time and create nothing.",
+    chips: [
+      { label: "School", icon: "🏫", len: 12, start: 6 },
+      { label: "Ausbildung", icon: "🛠", len: 3, start: 16 },
+      { label: "Bachelor", icon: "🎓", len: 3 },
+      { label: "Master", icon: "🎓", len: 2 },
+      { label: "PhD", icon: "📜", len: 4 },
+      { label: "Year abroad", icon: "🌍", len: 1 },
+      { label: "", text: "Gap", icon: "⏸", len: 3, gap: true },
+    ],
+  });
+  SEQS.work = Seq({
+    key: "work", color: "--row-work", noun: "Job", freeStart: true, endable: true,
+    hint: "One job after another. Name them now or later.",
+    chips: [
+      { label: "", text: "Job", icon: "💼", len: 3, start: 20 },
+      { label: "Parental leave", icon: "👶", len: 1 },
+      { label: "Sabbatical", icon: "🌴", len: 1 },
+      { label: "", text: "Gap", icon: "⏸", len: 1, gap: true },
+    ],
+  });
+  SEQS.love = Seq({
+    key: "love", color: "--row-love", noun: "Partner", freeStart: true, endable: true, gaps: true, still: "Still together",
+    hint: "Add the ones that matter to you. Skipping is fine.",
+  });
+  function defaultPlaces(a) {
+    const p = [["Hamburg", 0]];
+    if (a >= 8) p.push(["Utrecht", Math.round(a * 0.5)]);
+    if (a >= 12) p.push(["Berlin", Math.round(a * 0.78)]);
+    return p;
+  }
+  const PRESETS = {
+    young: { edu: [["School", 6], ["Bachelor", 18]], eduEnd: null, work: [["Café", 16]], workEnd: null, love: [["Lena", 17]], loveEnd: 19 },
+    mid: {
+      edu: [["School", 6], ["Bachelor", 19], ["", 22, true], ["Master", 31]], eduEnd: 33,
+      work: [["Agency", 22], ["Startup", 26], ["Master", 31, true], ["Product lead", 33]], workEnd: null,
+      love: [["Jonas", 19], ["", 24, true], ["Elena", 27]], loveEnd: null,
+    },
+    senior: {
+      edu: [["School", 6], ["Ausbildung", 16], ["", 19, true], ["Meisterschule", 28]], eduEnd: 30,
+      work: [["Bosch", 19], ["Meisterschule", 28, true], ["Own workshop", 30]], workEnd: 62,
+      love: [["Karl", 22]], loveEnd: null, kids: [["Mia", 26], ["Jonas", 29]], gkids: [[0, "Ella", 55], [1, "Paul", 58]],
+    },
+  };
+  function applyPreset() {
+    const p = PRESETS[bracket(S.age)];
+    SEQS.places.set(defaultPlaces(S.age), null);
+    SEQS.edu.set(p.edu, p.eduEnd);
+    SEQS.work.set(p.work, p.workEnd);
+    SEQS.love.set(p.love, p.loveEnd);
+    S.kids = (p.kids || []).map(([name, at]) => ({ name, at }));
+    S.gkids = (p.gkids || []).map(([k, name, at]) => ({ parent: S.kids[k], name, year: birth() + at }));
+    S.noKids = S.noGkids = false;
+  }
+
+  // ---------- shared preview ----------
+  function drawPreview(c) {
+    const rows = [];
+    rows.push({ icon: "🏠", color: "--row-places", segs: SEQS.places.spans() });
+    const edu = SEQS.edu.spans(), work = SEQS.work.spans();
+    if (edu.length) rows.push({ icon: "🎓", color: "--row-school", segs: edu });
+    if (work.length) rows.push({ icon: "💼", color: "--row-work", segs: work });
+    const love = SEQS.love.spans();
+    if (love.length) rows.push({ icon: "❤️", color: "--row-love", segs: love });
+    if (S.kids.length) {
+      rows.push({ icon: "👨‍👩‍👧", header: "Family" });
+      S.kids.forEach((k, i) => {
+        rows.push({ icon: "👶", indent: 10, color: "--row-kids", segs: [{ from: k.at, to: S.age, label: `${kidName(k, i)} · ${birth() + k.at}` }] });
+        S.gkids.filter((g) => g.parent === k).forEach((g) => {
+          const at = clamp(g.year - birth(), 0, S.age);
+          rows.push({ icon: "🧒", indent: 16, color: "--row-kids", segs: [{ from: at, to: S.age, label: `${g.name.trim() || "Grandchild"} · ${g.year}` }] });
+        });
+      });
+    }
+
+    const rowH = 15, gap = 4, top = 30;
+    const { ctx, w } = setup(c, top + rows.length * (rowH + gap) + 2);
+    const x0 = 26, x1 = w - 6, X = (age) => x0 + (S.age ? age / S.age : 0) * (x1 - x0);
+    const step = tickStep();
+    ctx.font = "10px " + tok("--font");
+    ctx.textBaseline = "middle";
+    let lastLabel = -Infinity;
+    for (let t = 0; t <= S.age; t += step) {
+      const x = X(t);
+      ctx.strokeStyle = tok("--grid"); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x + 0.5, 22); ctx.lineTo(x + 0.5, c.clientHeight); ctx.stroke();
+      const lx = t === 0 ? x + 14 : x;
+      if (lx - lastLabel < 40 || x1 - x < 14) continue;
+      lastLabel = lx;
+      ctx.textAlign = "center";
+      ctx.fillStyle = tok("--text-2"); ctx.fillText(String(birth() + t), lx, 6);
+      ctx.fillStyle = tok("--faint"); ctx.fillText(`age ${t}`, lx, 17);
+    }
+    rows.forEach((r, i) => {
+      const y = top + i * (rowH + gap);
+      ctx.textAlign = "left";
+      if (r.header) {
+        ctx.fillStyle = tok("--band"); rr(ctx, x0, y, x1 - x0, rowH, 4); ctx.fill();
+        ctx.font = "11px " + tok("--font"); ctx.fillStyle = tok("--text"); ctx.fillText(r.icon, 2, y + rowH / 2 + 1);
+        ctx.font = "600 10px " + tok("--font"); ctx.fillStyle = tok("--muted"); ctx.fillText(r.header, x0 + 5, y + rowH / 2 + 0.5);
+        return;
+      }
+      ctx.font = "11px " + tok("--font");
+      ctx.fillStyle = tok("--text");
+      if (r.icon) ctx.fillText(r.icon, r.indent ? Math.min(r.indent, 14) : 2, y + rowH / 2 + 1);
+      ctx.font = "600 10px " + tok("--font");
+      r.segs.forEach((s, j) => {
+        const a0 = X(s.from), a1 = Math.max(a0 + 3, X(s.to) - 1.5);
+        ctx.globalAlpha = r.ghost ? 0.35 : j % 2 ? 0.82 : 1;
+        ctx.fillStyle = tok(r.color);
+        rr(ctx, a0, y, a1 - a0, rowH, 4); ctx.fill();
+        ctx.globalAlpha = 1;
+        if (r.ghost) { ctx.strokeStyle = tok(r.color); ctx.setLineDash([3, 2]); rr(ctx, a0 + 0.5, y + 0.5, a1 - a0 - 1, rowH - 1, 4); ctx.stroke(); ctx.setLineDash([]); }
+        if (s.label && a1 - a0 > 30) {
+          ctx.save(); rr(ctx, a0, y, a1 - a0, rowH, 4); ctx.clip();
+          ctx.fillStyle = r.ghost ? tok("--text-2") : tok("--on-accent");
+          ctx.fillText(s.label, a0 + 5, y + rowH / 2 + 0.5);
+          ctx.restore();
+        }
+      });
+    });
+  }
+  function drawPreviews() { ["#prevB", "#prevD", "#prevE", "#prevP", "#prevF", "#prevG"].forEach((id) => drawPreview($(id))); }
+
+  // ---------- F: kids ----------
+  const kidName = (k, i) => k.name.trim() || `Child ${i + 1}`;
+  function sayKids() {
+    $("#kidsMade").textContent = S.kids.length
+      ? `👨‍👩‍👧 Family group · ${S.kids.map(kidName).join(", ")}, each a group with a birth year`
+      : S.noKids ? "Nothing to create. On to your timeline." : "Add each child, or tap No kids.";
+    $("#noKids").setAttribute("aria-pressed", String(S.noKids && !S.kids.length));
+  }
+  function renderKids() {
+    const box = $("#kids");
+    box.innerHTML = "";
+    S.kids.forEach((k, i) => {
+      const row = document.createElement("div");
+      row.className = "kid";
+      const name = document.createElement("input");
+      name.type = "text"; name.id = `kidname${i}`; name.placeholder = `Child ${i + 1}`; name.value = k.name;
+      name.setAttribute("aria-label", `Name of child ${i + 1}`);
+      const r = document.createElement("input");
+      r.type = "range"; r.id = `kid${i}`; r.min = Math.min(14, S.age); r.max = S.age; r.value = k.at;
+      r.setAttribute("aria-label", `When child ${i + 1} was born`);
+      const x = document.createElement("button");
+      x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", `Remove child ${i + 1}`);
+      const txt = document.createElement("small");
+      const say = () => { txt.textContent = `👶 born ${birth() + k.at} · you were ${k.at}`; };
+      name.addEventListener("input", () => { k.name = name.value; sayKids(); renderGkids(); drawPreviews(); });
+      r.addEventListener("input", () => { k.at = Number(r.value); say(); drawPreviews(); });
+      x.addEventListener("click", () => { S.gkids = S.gkids.filter((g) => g.parent !== k); S.kids.splice(i, 1); renderKids(); renderGkids(); drawPreviews(); });
+      say();
+      row.append(name, r, x, txt);
+      box.appendChild(row);
+    });
+    sayKids();
+  }
+  $("#addKid").addEventListener("click", () => {
+    const prev = S.kids[S.kids.length - 1];
+    const at = prev ? prev.at + 3 : Math.round(S.age * 0.4) + 12;
+    S.kids.push({ name: "", at: clamp(at, Math.min(14, S.age), S.age) });
+    S.noKids = false;
+    renderKids(); renderGkids(); drawPreviews();
+    $(`#kidname${S.kids.length - 1}`).focus();
+  });
+  $("#noKids").addEventListener("click", () => { S.kids = []; S.gkids = []; S.noKids = true; renderKids(); renderGkids(); drawPreviews(); });
+
+  // ---------- grandkids: only when there are kids; each one nests in its parent's group ----------
+  function renderGkids() {
+    const box = $("#gkids");
+    box.innerHTML = "";
+    const has = S.kids.length > 0;
+    $("#addGkid").disabled = $("#noGkids").disabled = !has;
+    if (!has) {
+      box.innerHTML = `<div class="empty">No kids added, so this screen is skipped.</div>`;
+      $("#gkidsMade").textContent = "Nothing to create.";
+      return;
+    }
+    S.gkids.forEach((g, i) => {
+      const row = document.createElement("div");
+      row.className = "gkid";
+      const pills = document.createElement("div");
+      pills.className = "pills";
+      pills.setAttribute("role", "radiogroup");
+      pills.setAttribute("aria-label", "Whose child");
+      S.kids.forEach((k, ki) => {
+        const b = document.createElement("button");
+        b.className = "pill"; b.textContent = kidName(k, ki);
+        b.setAttribute("aria-pressed", String(g.parent === k));
+        b.addEventListener("click", () => { g.parent = k; g.year = clamp(g.year, birth() + k.at + 15, NOW); renderGkids(); drawPreviews(); });
+        pills.appendChild(b);
+      });
+      const name = document.createElement("input");
+      name.type = "text"; name.id = `gkname${i}`; name.placeholder = "Name"; name.value = g.name;
+      name.setAttribute("aria-label", `Name of grandchild ${i + 1}`);
+      const parentYear = birth() + g.parent.at;
+      const r = document.createElement("input");
+      r.type = "range"; r.id = `gk${i}`; r.min = Math.min(NOW, parentYear + 15); r.max = NOW; r.value = g.year;
+      r.setAttribute("aria-label", `When grandchild ${i + 1} was born`);
+      const x = document.createElement("button");
+      x.className = "x"; x.textContent = "✕"; x.setAttribute("aria-label", `Remove grandchild ${i + 1}`);
+      const txt = document.createElement("small");
+      const pIdx = S.kids.indexOf(g.parent);
+      const say = () => { txt.textContent = `🧒 born ${g.year} · ${kidName(g.parent, pIdx)} was ${g.year - parentYear}`; };
+      name.addEventListener("input", () => { g.name = name.value; sayG(); drawPreviews(); });
+      r.addEventListener("input", () => { g.year = Number(r.value); say(); drawPreviews(); });
+      x.addEventListener("click", () => { S.gkids.splice(i, 1); renderGkids(); drawPreviews(); });
+      say();
+      row.append(pills, name, r, x, txt);
+      box.appendChild(row);
+    });
+    sayG();
+  }
+  function sayG() {
+    $("#gkidsMade").textContent = S.gkids.length
+      ? `🧒 ${S.gkids.map((g) => `${g.name.trim() || "Grandchild"} in ${kidName(g.parent, S.kids.indexOf(g.parent))}`).join(", ")}`
+      : S.noGkids ? "Nothing to create." : "Add a grandchild, or tap None.";
+    $("#noGkids").setAttribute("aria-pressed", String(S.noGkids && !S.gkids.length));
+  }
+  $("#addGkid").addEventListener("click", () => {
+    const k = S.kids[S.kids.length - 1];
+    if (!k) return;
+    S.gkids.push({ parent: k, name: "", year: clamp(birth() + k.at + 30, birth() + k.at + 15, NOW) });
+    S.noGkids = false;
+    renderGkids(); drawPreviews();
+    $(`#gkname${S.gkids.length - 1}`).focus();
+  });
+  $("#noGkids").addEventListener("click", () => { S.gkids = []; S.noGkids = true; renderGkids(); drawPreviews(); });
+
+  document.querySelectorAll(".dots[data-step]").forEach((d) => {
+    for (let i = 1; i <= 7; i++) { const dot = document.createElement("i"); if (i === Number(d.dataset.step)) dot.className = "on"; d.appendChild(dot); }
+  });
+
+  // ---------- wiring ----------
+  function setAge(a, reset) {
+    S.age = clamp(a, 0, 95);
+    if (reset) { S.month = null; S.monthOpen = false; applyPreset(); }
+    else Object.values(SEQS).forEach((s) => s.refresh());
+    S.kids.forEach((k) => (k.at = Math.min(k.at, S.age)));
+    document.querySelectorAll("[data-try]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.try) === S.age)));
+    renderA(); renderKids(); renderGkids(); drawPreviews();
+  }
+  $("#age").addEventListener("input", (e) => setAge(Number(e.target.value), false));
+  $("#earlier").addEventListener("click", () => setAge(S.age + 1, false));
+  $("#later").addEventListener("click", () => setAge(S.age - 1, false));
+  document.querySelectorAll("[data-try]").forEach((b) => b.addEventListener("click", () => setAge(Number(b.dataset.try), true)));
+  const redraw = () => { renderA(); Object.values(SEQS).forEach((s) => s.refresh()); drawPreviews(); };
+  window.addEventListener("resize", redraw);
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", redraw);
+  new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  setAge(40, true);
+})();
+</script>

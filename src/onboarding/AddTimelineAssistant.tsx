@@ -4,14 +4,14 @@
 // This is the plural case the app is really about — "Bands I played in",
 // "Places I lived", "Schools I went to" — where a step-per-entry wizard would
 // be exhausting and where remembering the fourth band routinely corrects the
-// second. So the last step follows PlacesTable, not the entry assistant: every
+// second. So the last step is a live table, not the entry assistant: every
 // row is editable at once, writes happen as you type, and there is no Back
 // past that point because editing a row *is* the correction.
 //
-// It also follows PlacesTable's two hard-won rules — the row array lives in a
-// ref and is mutated by plain functions, never inside a setState updater
-// (React may run those twice and write an entry twice), and every commit reads
-// rowsRef.current rather than a captured closure.
+// It keeps two hard-won rules from the first-run places table it was modelled
+// on — the row array lives in a ref and is mutated by plain functions, never
+// inside a setState updater (React may run those twice and write an entry
+// twice), and every commit reads rowsRef.current rather than a captured closure.
 
 import { useReducer, useRef, useState } from "react";
 import { AssistantStepShell } from "./AssistantStepShell";
@@ -225,8 +225,8 @@ function EntryTable({
     if (!row) return;
     const title = row.title.trim();
 
-    // Clearing the title is how a row is deleted — the same gesture PlacesTable
-    // uses, so there is one way to undo an entry across the whole app.
+    // Clearing the title is how a row is deleted, so a row is undone by the
+    // same gesture that made it.
     if (title === "") {
       if (!row.entryId) return;
       deleteEntryWithCascade(row.entryId);

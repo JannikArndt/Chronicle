@@ -8,16 +8,10 @@ tsconfig.tsbuildinfo
 # Editor noise
 .DS_Store
 
-# Backend config. .env.example is tracked and holds no values; anything with a
-# real key in it is not. The anon key is publishable, but .env files are also
-# where a service_role key ends up by accident, and that one bypasses RLS.
+# Environment files: anything with a real key in it is not tracked.
 .env
 .env.*
 !.env.example
-
-# Supabase CLI local state: the linked project ref, container volumes, temp files.
-supabase/.temp/
-supabase/.branches/
 
 # NOTE ON PRIVACY: personal timeline data must NEVER appear in this repo.
 # The shipped app keeps it in IndexedDB and user-initiated export files only.

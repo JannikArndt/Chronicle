@@ -6,7 +6,9 @@
 // but only at a quiet moment:
 //   1. Never out from under a finger: no focused field, no draft entry, no
 //      date being picked, no assistant open, nothing unsaved or unsent.
-//   2. Never twice: one reload per page life, whatever races happen.
+//   2. Never twice for the same build: one reload per page life, and the build
+//      we reloaded for is remembered across the reload (sessionStorage), so a
+//      mismatch that never resolves is one build behind, not a reload loop.
 //   3. Never in the first 20 seconds of a page's life — a page that reloads
 //      itself moments after opening looks broken even when it is correct.
 //   4. A page with no stamped build (the Vite dev server) does nothing.
@@ -23,6 +25,7 @@ const POLL_MS = 5 * 60_000;
 const QUIET_RETRY_MS = 15_000;
 
 const pageLoadedAt = Date.now();
+const RELOADED_KEY = "app-fresh-reloaded";
 let alreadyReloading = false;
 let knownNewBuild: string | undefined;
 const busyChecks: Array<() => boolean> = [];
@@ -55,12 +58,22 @@ function reloadWhenQuiet(): void {
     return;
   }
   alreadyReloading = true;
+  try {
+    if (knownNewBuild) sessionStorage.setItem(RELOADED_KEY, knownNewBuild);
+  } catch {
+    // Storage blocked: the in-page flag still stops a loop within one page life.
+  }
   location.reload();
 }
 
 export function noticeServerBuild(build: string | undefined): void {
   if (build === undefined || currentBuild() === "dev" || build === currentBuild()) return;
   if (knownNewBuild === build) return;
+  try {
+    if (sessionStorage.getItem(RELOADED_KEY) === build) return;
+  } catch {
+    // Storage blocked: fall through.
+  }
   knownNewBuild = build;
   reloadWhenQuiet();
 }

@@ -1,0 +1,36 @@
+# Weekly updates for everything pinned by hand. Template from the
+# app-conventions skill; keep only the ecosystems the repo has.
+# Majors never come from here: a new Node LTS line or framework major is
+# moved on purpose. So every PR this opens may merge itself once the checks
+# pass (.github/workflows/dependabot-merge.yml).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

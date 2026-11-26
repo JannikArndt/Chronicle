@@ -528,7 +528,10 @@ while editing. There is no toggle, on purpose: a toggle beside a field that also
 accepted "now" meant two controls claiming one meaning.
 
 **Assistant** — a guided, one-question-per-screen flow.
-- **setup assistant** — name, birth date, places lived. Runs on a fresh dataset.
+- **setup assistant** — your name, then one topic per screen: born, lived,
+  learned, worked, partner, kids, grandkids, with a live preview of the result at
+  the foot of each. Runs on a fresh dataset; "✨ Replay setup assistant" resumes
+  it from what was saved.
 - **add-entry assistant** — behind the FAB, and behind `＋ Add an entry` at the
   foot of a timeline, where it arrives already knowing the timeline and the year.
   Its last question — "how long did it last?" — is what decides whether you get
@@ -538,14 +541,26 @@ accepted "now" meant two controls claiming one meaning.
   Name it, style it, then fill it in.
 
 Assistants create nothing until the last step, which is what makes their Back
-button safe. The exception is a **table step**.
+button safe. The exceptions are a **table step**, and the setup assistant, which
+saves each screen as you leave it — by reconciling, so going back and changing an
+answer updates what was saved instead of adding a copy.
 → `src/onboarding/`
 
 **Table step** — a step showing *every* row at once, editable, saving as you
 type, with no Back button. Used where remembering the fourth thing routinely
-corrects the second (places lived; the entries on a new timeline) — there
-editing a row *is* the correction, so there is nothing to navigate back through.
-→ `PlacesTable.tsx`, `AddTimelineAssistant.tsx`
+corrects the second (the entries on a new timeline) — there editing a row *is*
+the correction, so there is nothing to navigate back through.
+→ `AddTimelineAssistant.tsx`
+
+**Sequence editor** — the setup assistant's editor for things that follow one
+another (places, schools, jobs, partners): a **strip** from birth to now with a
+draggable dot at every change, or a **list** with one row each. Each item lasts
+until the next one starts. Reordering moves the names, never the dates.
+→ `src/onboarding/SequenceEditor.tsx`, `sequence.ts`
+
+**Gap** — an item in a sequence that holds time and creates nothing: Bachelor →
+Gap → Master is "back to university at 31". It is never saved; the item before
+it simply ends where the gap starts.
 
 **Draft** — a half-made entry created by dragging on the canvas. It lives in
 `state.draft` and only joins the dataset once you give it a title. The assistant
