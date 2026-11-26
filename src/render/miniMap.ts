@@ -1,10 +1,13 @@
 // The life-strip minimap: the whole dataset squeezed into one band at the top
 // of the mobile shell, with the canvas's current viewport drawn over it.
 //
-// Pure geometry only — MiniMap.tsx paints it. One lane per visible timeline,
-// deliberately: a group roll-up was built during the prototype and rejected,
-// because rows keep their own colour and the ungrouped version already reads as
-// coloured bands per group (see plans/mobile-shell.md).
+// Pure geometry only — MiniMap.tsx paints it. One lane per lane the canvas
+// draws: a timeline gets one, and so does each lane of a COLLAPSED group, which
+// the canvas draws as a timeline of its children's bars. An EXPANDED group gets
+// no lane of its own, deliberately: a roll-up of open groups was built during
+// the prototype and rejected, because rows keep their own colour and the
+// ungrouped version already reads as coloured bands per group (see
+// plans/mobile-shell.md).
 
 import type { TimelineDataset } from "../model/types";
 import type { Layout } from "./layout";
@@ -37,10 +40,14 @@ const RANGE_PADDING_FRACTION = 0.04;
 export interface MiniMapSpan {
   startMs: number;
   endMs: number;
+  // Overrides the lane's colour: a collapsed group's lane holds one span per
+  // child, each in that child's colour, exactly as the canvas draws them.
+  color?: string;
 }
 
 export interface MiniMapLane {
-  rowId: string;
+  // The row's id, or `<group id>:<lane>` for a lane of a collapsed group.
+  id: string;
   color: string;
   spans: MiniMapSpan[];
 }
@@ -77,20 +84,44 @@ function clamp(value: number, low: number, high: number): number {
   return Math.min(high, Math.max(low, value));
 }
 
-// One lane per row the canvas is currently drawing, in the same order, so the
-// strip reads top-to-bottom like the timeline it summarises.
+// One lane per lane the canvas is currently drawing, in the same order, so the
+// strip reads top-to-bottom like the timeline it summarises. A collapsed group
+// is drawn on the canvas as a timeline of one bar per direct child, lane-packed
+// for overlap (layout.ts) — it gets those same lanes and bars here. Skipping
+// it, as an early version did, made everything inside a collapsed group vanish
+// from the overview.
 export function miniMapLanes(layout: Layout, dataset: TimelineDataset, nowMs: number): MiniMapLane[] {
   const lanes: MiniMapLane[] = [];
   for (const item of layout.items) {
-    if (item.kind !== "row" || !item.row) continue;
-    const row = item.row;
-    lanes.push({
-      rowId: row.id,
-      color: row.color ?? DEFAULT_LANE_COLOR,
-      spans: dataset.entries
-        .filter((entry) => entry.rowId === row.id)
-        .map((entry) => ({ startMs: entry.start.ms, endMs: entry.end?.ms ?? nowMs })),
-    });
+    if (item.kind === "row" && item.row) {
+      const row = item.row;
+      lanes.push({
+        id: row.id,
+        color: row.color ?? DEFAULT_LANE_COLOR,
+        spans: dataset.entries
+          .filter((entry) => entry.rowId === row.id)
+          .map((entry) => ({ startMs: entry.start.ms, endMs: entry.end?.ms ?? nowMs })),
+      });
+      continue;
+    }
+    if (item.kind !== "group" || !item.summaries) continue;
+    // Same colour fallback as the canvas: the child's, else the group's.
+    const groupColor = item.group?.color ?? DEFAULT_LANE_COLOR;
+    const laneCount = item.summaries.reduce((count, bar) => Math.max(count, bar.lane + 1), 1);
+    const groupLanes: MiniMapLane[] = Array.from({ length: laneCount }, (_, lane) => ({
+      id: `${item.id}:${lane}`,
+      color: groupColor,
+      spans: [],
+    }));
+    for (const bar of item.summaries) {
+      groupLanes[bar.lane].spans.push({
+        startMs: bar.startMs,
+        // An ongoing child is drawn up to today, like an ongoing entry.
+        endMs: bar.ongoing ? Math.max(bar.endMs, nowMs) : bar.endMs,
+        color: bar.color ?? groupColor,
+      });
+    }
+    lanes.push(...groupLanes);
   }
   return lanes;
 }

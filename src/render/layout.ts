@@ -54,6 +54,10 @@ export interface GroupSummaryBar {
   endMs: number; // === startMs when the child holds only one dated thing
   ongoing: boolean; // some entry in this child's subtree has no end
   lane: number; // 0-based stacking lane — see packLanes()
+  // The visible rows this bar aggregates — the child row itself, or every
+  // non-hidden row in the child group's subtree. What a tap on the bar picks
+  // from (summaryPick.ts), so a hidden row stays out of reach there too.
+  rowIds: string[];
 }
 
 export interface LayoutItem {
@@ -188,13 +192,22 @@ export function computeLayout(
     for (const child of orderedChildren(dataset, groupId)) {
       if (isHidden(hidden, child)) continue;
       if (child.kind === "row") {
-        const agg = aggregate(new Set([child.row.id]));
+        const rowIds = [child.row.id];
+        const agg = aggregate(new Set(rowIds));
         if (!agg) continue;
-        bars.push({ kind: "row", id: child.row.id, label: child.row.label, color: child.row.color, ...agg });
+        bars.push({ kind: "row", id: child.row.id, label: child.row.label, color: child.row.color, ...agg, rowIds });
       } else {
-        const agg = aggregate(new Set(visibleSubtreeRowIds(child.group.id)));
+        const rowIds = visibleSubtreeRowIds(child.group.id);
+        const agg = aggregate(new Set(rowIds));
         if (!agg) continue;
-        bars.push({ kind: "group", id: child.group.id, label: child.group.label, color: child.group.color, ...agg });
+        bars.push({
+          kind: "group",
+          id: child.group.id,
+          label: child.group.label,
+          color: child.group.color,
+          ...agg,
+          rowIds,
+        });
       }
     }
     return packLanes(bars);
@@ -267,4 +280,18 @@ export function computeLayout(
   pushContainer(undefined, 0, false);
 
   return { items, totalHeight: y + EDGE_PAD };
+}
+
+// Where a row sits vertically, for anything that wants to bring it on screen:
+// its own item's middle, or — while a collapsed ancestor stands in for it —
+// the middle of the lane its summary bar is drawn in. `undefined` when the row
+// is not in the picture at all (hidden, or under a collapsed group that drew
+// no bar for it).
+export function rowCenterY(layout: Layout, rowId: string): number | undefined {
+  for (const item of layout.items) {
+    if (item.kind === "row" && item.id === rowId) return item.y + item.height / 2;
+    const bar = item.summaries?.find((candidate) => candidate.rowIds.includes(rowId));
+    if (bar) return item.y + bar.lane * ROW_HEIGHT + ROW_HEIGHT / 2;
+  }
+  return undefined;
 }

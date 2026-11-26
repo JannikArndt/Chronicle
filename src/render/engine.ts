@@ -4,13 +4,14 @@
 // everything DOM (rail, panels) and feeds state in via setInput().
 
 import { computeLayout } from "./layout";
-import type { Layout, LayoutItem } from "./layout";
+import type { GroupSummaryBar, Layout, LayoutItem } from "./layout";
 import { ROW_HEIGHT } from "./layout";
 import { barGeometry, gradientStops, labelAnchorX, labelLimitX, pickBarLabel, truncateToWidth } from "./bars";
 import type { BarGeometry } from "./bars";
 import { EVENT_PIN_RADIUS_PX, eventMarkerOpacity, layoutEventMarkers } from "./events";
 import type { EventMarker } from "./events";
 import { PLUS_RADIUS, plusSpots } from "./plusSpots";
+import { pickInSummary } from "./summaryPick";
 import { ROW_STRIPES, rowStripes } from "./rowStripes";
 import { treeLines } from "./treeLines";
 import { clampScale, msToX, panBy, scaleForRange, xToMs, zoomAt } from "./timeScale";
@@ -188,6 +189,16 @@ interface EventHit {
   event: TimelineEvent;
 }
 
+interface SummaryHit {
+  // The bar itself — a collapsed group's label is drawn inside its bar, so
+  // there is nothing beyond it to widen the box.
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+  bar: GroupSummaryBar;
+}
+
 interface PlusHit {
   x: number;
   y: number;
@@ -211,6 +222,7 @@ export class TimelineEngine {
 
   private entryHits: EntryHit[] = [];
   private eventHits: EventHit[] = [];
+  private summaryHits: SummaryHit[] = [];
   private plusHits: PlusHit[] = [];
   private pointerDown?: {
     x: number;
@@ -542,6 +554,33 @@ export class TimelineEngine {
       this.callbacks.onSelectEntry(narrowest.entry.id);
       return;
     }
+    // A collapsed group's bars stand in for whole children, so a tap on one is
+    // resolved to the entry or event under the finger in that child's rows
+    // (summaryPick.ts). Without this a collapsed group was a picture you could
+    // not touch — and on mobile, where there is no way to expand it, its
+    // entries were simply unreachable from the canvas.
+    const touchedSummaries = this.summaryHits.filter(
+      (hit) =>
+        x >= hit.x0 - TAP_SLOP_PX &&
+        x <= hit.x1 + TAP_SLOP_PX &&
+        y >= hit.y0 - TAP_SLOP_PX &&
+        y <= hit.y1 + TAP_SLOP_PX,
+    );
+    if (touchedSummaries.length > 0) {
+      // Bars in one lane never overlap, but two back-to-back ones share an
+      // edge within the slop: the one the finger is actually on wins.
+      const outside = (hit: SummaryHit) => Math.max(0, hit.x0 - x, x - hit.x1);
+      const closest = touchedSummaries.reduce((best, hit) => (outside(hit) < outside(best) ? hit : best));
+      const pick = pickInSummary(closest.bar, this.input.dataset, xToMs(this.scale, x), Date.now());
+      if (pick?.kind === "entry") {
+        this.callbacks.onSelectEntry(pick.id);
+        return;
+      }
+      if (pick?.kind === "event") {
+        this.callbacks.onSelectEvent(pick.id);
+        return;
+      }
+    }
     const contentY = y - this.contentTop() + this.scrollY;
     const rowItem = this.input.layout.items.find(
       (item) => item.kind === "row" && contentY >= item.y && contentY <= item.y + item.height,
@@ -565,6 +604,7 @@ export class TimelineEngine {
 
     this.entryHits = [];
     this.eventHits = [];
+    this.summaryHits = [];
     this.plusHits = [];
 
     const ticks = computeTicks(this.scale, this.width);
@@ -656,6 +696,11 @@ export class TimelineEngine {
       this.input.dataset.entries.find((e) => e.id === this.input.selectedEntryId) ??
       (this.input.draft?.id === this.input.selectedEntryId ? this.input.draft : undefined);
     const relatedIds = selectedEntry ? this.relatedEntryIds(selectedEntry) : null;
+    // Whose row the selected entry or event is on — a collapsed group outlines
+    // the bar that holds it, since the record itself is not drawn.
+    const selectedRowIdOfRecord =
+      selectedEntry?.rowId ??
+      this.input.dataset.events.find((e) => e.id === this.input.selectedEventId)?.rowId;
 
     // Behind everything: the alternating row backgrounds. Painted first so a
     // group's band, the selection tint and every bar sit on top of them.
@@ -675,7 +720,7 @@ export class TimelineEngine {
         // `subtreeEndY` unset while collapsed. `summaries` is set on exactly
         // the collapsed groups, so it doubles as that test.
         if (item.summaries) {
-          this.drawGroupSummary(item, nowMs);
+          this.drawGroupSummary(item, nowMs, selectedRowIdOfRecord);
           if (this.input.showRowLabels) this.drawGroupLabel(item);
           continue;
         }
@@ -1109,7 +1154,7 @@ export class TimelineEngine {
   // three entries did before collapsing, not one flattened band. Lane `n`
   // sits at `item.y + n * ROW_HEIGHT`, same 6px inset and bar height as a
   // normal row bar.
-  private drawGroupSummary(item: LayoutItem, nowMs: number): void {
+  private drawGroupSummary(item: LayoutItem, nowMs: number, selectedRecordRowId: string | undefined): void {
     const { ctx } = this;
     const bars = item.summaries;
     if (!bars) return;
@@ -1159,6 +1204,13 @@ export class TimelineEngine {
       }
       ctx.fillStyle = colorWithAlpha(color, 0.6);
       ctx.fill();
+      // The same accent outline a selected entry gets: the selection is
+      // somewhere inside this bar.
+      if (selectedRecordRowId !== undefined && bar.rowIds.includes(selectedRecordRowId)) {
+        ctx.strokeStyle = this.colors.guide;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
 
       if (bar.label !== "") {
         ctx.font = "12px -apple-system, system-ui, sans-serif";
@@ -1172,6 +1224,14 @@ export class TimelineEngine {
         }
       }
       ctx.restore();
+
+      this.summaryHits.push({
+        x0,
+        x1: x0 + width,
+        y0: top - this.scrollY + this.contentTop(),
+        y1: top + barHeight - this.scrollY + this.contentTop(),
+        bar,
+      });
     }
   }
 

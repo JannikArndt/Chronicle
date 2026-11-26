@@ -49,12 +49,12 @@ function lanesFor(dataset: TimelineDataset, hiddenRowIds: string[] = []) {
 describe("miniMapLanes", () => {
   it("gives every visible row its own lane, in layout order", () => {
     const lanes = lanesFor(datasetWithRows(3));
-    expect(lanes.map((lane) => lane.rowId)).toEqual(["row-0", "row-1", "row-2"]);
+    expect(lanes.map((lane) => lane.id)).toEqual(["row-0", "row-1", "row-2"]);
   });
 
   it("drops hidden rows so the strip re-fits", () => {
     const lanes = lanesFor(datasetWithRows(3), ["row-1"]);
-    expect(lanes.map((lane) => lane.rowId)).toEqual(["row-0", "row-2"]);
+    expect(lanes.map((lane) => lane.id)).toEqual(["row-0", "row-2"]);
   });
 
   it("falls back to the canvas's default colour for a row without one", () => {
@@ -67,6 +67,57 @@ describe("miniMapLanes", () => {
     const dataset = datasetWithRows(1);
     delete dataset.entries[0].end;
     expect(lanesFor(dataset)[0].spans[0].endMs).toBe(NOW_MS);
+  });
+
+  describe("a collapsed group", () => {
+    // "Life" holds row-0 directly and a sub-group "Kids" holding row-1 and
+    // row-2. Collapsed, the canvas draws it as one timeline of child bars.
+    function nestedDataset(): TimelineDataset {
+      const dataset = datasetWithRows(3);
+      dataset.groups.push({ id: "group-kids", parentGroupId: "group-1", label: "Kids", color: "#3f7d54", collapsed: false });
+      dataset.rows[1].groupId = "group-kids";
+      dataset.rows[2].groupId = "group-kids";
+      return dataset;
+    }
+
+    it("gets the lanes and bars the canvas draws for it, not nothing", () => {
+      const dataset = nestedDataset();
+      const layout = computeLayout(dataset, new Set(["group-1"]));
+      const lanes = miniMapLanes(layout, dataset, NOW_MS);
+      // row-0 (2000–2005) overlaps Kids (2001–2007), so they are two lanes,
+      // each bar in its child's own colour.
+      expect(lanes.map((lane) => lane.id)).toEqual(["group-1:0", "group-1:1"]);
+      expect(lanes[0].spans).toEqual([
+        { startMs: Date.UTC(2000, 0, 1), endMs: Date.UTC(2005, 0, 1), color: "#b45309" },
+      ]);
+      expect(lanes[1].spans).toEqual([
+        { startMs: Date.UTC(2001, 0, 1), endMs: Date.UTC(2007, 0, 1), color: "#3f7d54" },
+      ]);
+    });
+
+    it("sits after the rows above it, one lane per lane of its own", () => {
+      const dataset = nestedDataset();
+      const layout = computeLayout(dataset, new Set(["group-kids"]));
+      const lanes = miniMapLanes(layout, dataset, NOW_MS);
+      // row-1 (2001–2006) and row-2 (2002–2007) overlap: two lanes.
+      expect(lanes.map((lane) => lane.id)).toEqual(["row-0", "group-kids:0", "group-kids:1"]);
+    });
+
+    it("runs an ongoing child up to now", () => {
+      const dataset = nestedDataset();
+      delete dataset.entries[2].end; // row-2, the second lane
+      const layout = computeLayout(dataset, new Set(["group-kids"]));
+      const lanes = miniMapLanes(layout, dataset, NOW_MS);
+      expect(lanes[2].spans[0].endMs).toBe(NOW_MS);
+    });
+
+    it("keeps an empty lane when nothing in it is dated, like an empty row", () => {
+      const dataset = nestedDataset();
+      dataset.entries = dataset.entries.filter((entry) => entry.rowId === "row-0");
+      const layout = computeLayout(dataset, new Set(["group-kids"]));
+      const lanes = miniMapLanes(layout, dataset, NOW_MS);
+      expect(lanes[1]).toEqual({ id: "group-kids:0", color: "#3f7d54", spans: [] });
+    });
   });
 });
 
@@ -107,14 +158,14 @@ describe("miniMapMetrics", () => {
 
 describe("miniMapTimeRange", () => {
   it("spans the data plus a margin at both ends", () => {
-    const lanes = [{ rowId: "a", color: "#000", spans: [{ startMs: 0, endMs: 40 * YEAR_MS }] }];
+    const lanes = [{ id: "a", color: "#000", spans: [{ startMs: 0, endMs: 40 * YEAR_MS }] }];
     const range = miniMapTimeRange(lanes, 0);
     expect(range.startMs).toBeLessThan(0);
     expect(range.endMs).toBeGreaterThan(40 * YEAR_MS);
   });
 
   it("reaches up to now even when nothing recent is recorded", () => {
-    const lanes = [{ rowId: "a", color: "#000", spans: [{ startMs: 0, endMs: YEAR_MS }] }];
+    const lanes = [{ id: "a", color: "#000", spans: [{ startMs: 0, endMs: YEAR_MS }] }];
     expect(miniMapTimeRange(lanes, 100 * YEAR_MS).endMs).toBeGreaterThan(100 * YEAR_MS);
   });
 

@@ -20,9 +20,12 @@ search telling a lie, and below the ramp only the matches are drawn, so there
 is nothing for them to collide with.
 
 `miniMap.ts` (paired with `src/ui/MiniMap.tsx`) is a second canvas — one lane
-per row, plus the current viewport window on both axes. It deliberately draws
-no events: it is an overview of spans, and a pin that only exists at high zoom
-has nothing to say there.
+per lane the canvas draws, plus the current viewport window on both axes: a
+row gets one, a COLLAPSED group gets one per summary lane with each child's bar
+in its own colour (skipping it made a collapsed group vanish from the
+overview), an expanded group's header gets none. It deliberately draws no
+events: it is an overview of spans, and a pin that only exists at high zoom has
+nothing to say there.
 
 ## Invariants
 
@@ -84,6 +87,15 @@ has nothing to say there.
   hidden by the user would otherwise be visibly back). Overlap is the one
   thing that breaks "same height as a row": the item grows to
   `lanes × ROW_HEIGHT`, because the alternative is hiding a child.
+  **A summary bar is tappable, and a tap selects a record, not the child**:
+  each bar carries the visible `rowIds` it aggregates, the engine registers
+  its box (`summaryHits`, checked after entries), and `summaryPick.ts` resolves
+  the tap to the narrowest entry holding that instant, else the nearest entry
+  or event in those rows — so a broken-out group's bar simply is its entry.
+  Mobile has no way to expand a group, and before this its entries were
+  unreachable from the canvas. The bar holding the selected entry or event
+  gets the selected-entry outline; `rowCenterY()` in `layout.ts` finds a row's
+  lane inside a collapsed group, which is how "Show on timeline" lands there.
 - **A container's rows and sub-groups are ONE ordered sequence.**
   `pushContainer` walks `orderedChildren()` (`src/model/dataset.ts`, schema
   v10) rather than "every row, then every group", which is what lets a group

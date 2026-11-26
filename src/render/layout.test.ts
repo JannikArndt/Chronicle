@@ -165,6 +165,7 @@ describe("computeLayout", () => {
         endMs: Date.UTC(2020, 0, 1),
         ongoing: false,
         lane: 0,
+        rowIds: ["r2", "r3"],
       },
     ]);
   });
@@ -273,6 +274,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2012, 0, 1),
           ongoing: false,
           lane: 0,
+          rowIds: ["r-a"],
         },
         {
           kind: "row",
@@ -283,6 +285,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2016, 0, 1),
           ongoing: false,
           lane: 0,
+          rowIds: ["r-b"],
         },
       ]);
     });
@@ -364,6 +367,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2015, 0, 1),
           ongoing: true,
           lane: 0,
+          rowIds: ["r-og1", "r-og2"],
         },
       ]);
     });
@@ -399,6 +403,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2015, 0, 1),
           ongoing: false,
           lane: 0,
+          rowIds: ["r2"],
         },
         {
           kind: "group",
@@ -409,6 +414,7 @@ describe("computeLayout", () => {
           endMs: Date.UTC(2020, 0, 1),
           ongoing: false,
           lane: 0,
+          rowIds: ["r3"],
         },
       ]);
 
